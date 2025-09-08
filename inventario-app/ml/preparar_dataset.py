@@ -1,9 +1,13 @@
 import os
 from PIL import Image
 from sklearn.model_selection import train_test_split
+import numpy as np
+# type: ignore
+from tensorflow.keras.preprocessing.image import ImageDataGenerator  # type: ignore
 
-base_dir = "dataset/train"  # carpeta original con estados y productos
-output_dir = "dataset_ready"  # carpeta final
+# Configuración
+base_dir = "train"  # carpeta original con estados y productos
+output_dir = "dataset_limpio"  # carpeta final
 IMG_SIZE = (224, 224)
 val_ratio = 0.15
 test_ratio = 0.15
@@ -28,20 +32,48 @@ for estado in os.listdir(base_dir):
         imgs_train, imgs_temp = train_test_split(imagenes, test_size=(val_ratio + test_ratio), random_state=42)
         imgs_val, imgs_test = train_test_split(imgs_temp, test_size=test_ratio/(val_ratio + test_ratio), random_state=42)
 
-        # Función para copiar y redimensionar
+        # Función para copiar, redimensionar y normalizar
         def copiar_y_redimensionar(lista_imgs, split):
             for idx, img_path in enumerate(lista_imgs):
                 try:
-                    img = Image.open(img_path)
+                    img = Image.open(img_path).convert('RGB')
                     img = img.resize(IMG_SIZE)
                     nombre = f"{producto}_{idx}.jpg"
                     destino = os.path.join(output_dir, split, estado, producto, nombre)
-                    img.save(destino)
-                except:
-                    print(f"Error procesando {img_path}")
+                    # Guardar imagen normalizada (0-1) en numpy
+                    img_array = np.array(img, dtype=np.float32) / 255.0
+                    Image.fromarray((img_array*255).astype(np.uint8)).save(destino)
+                except Exception as e:
+                    print(f"Error procesando {img_path}: {e}")
 
         copiar_y_redimensionar(imgs_train, "train")
         copiar_y_redimensionar(imgs_val, "val")
         copiar_y_redimensionar(imgs_test, "test")
 
-print("✅ Dataset listo con subproductos, redimensionado y dividido en train/val/test")
+print("✅ Dataset listo con subproductos, redimensionado, normalizado y dividido en train/val/test")
+
+# Opcional: configurar generadores de datos Keras
+train_datagen = ImageDataGenerator(
+    rescale=1./255,
+    rotation_range=20,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    horizontal_flip=True
+)
+val_datagen = ImageDataGenerator(rescale=1./255)
+
+train_generator = train_datagen.flow_from_directory(
+    os.path.join(output_dir, "train"),
+    target_size=IMG_SIZE,
+    batch_size=32,
+    class_mode='categorical'
+)
+
+val_generator = val_datagen.flow_from_directory(
+    os.path.join(output_dir, "val"),
+    target_size=IMG_SIZE,
+    batch_size=32,
+    class_mode='categorical'
+)
+
+print("✅ Generadores Keras listos para entrenamiento")
