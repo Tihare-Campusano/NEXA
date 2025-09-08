@@ -31,7 +31,7 @@ imgs_por_producto = 20
 
 # Crear dataset con subcarpetas por categoría y producto
 for categoria, productos in search_queries.items():
-    carpeta_categoria = f'dataset/train/{categoria}'
+    carpeta_categoria = f'dataset_inicial/{categoria}'
     os.makedirs(carpeta_categoria, exist_ok=True)
     
     for producto, query in productos.items():

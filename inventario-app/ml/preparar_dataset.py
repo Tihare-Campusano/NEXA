@@ -6,7 +6,7 @@ import numpy as np
 from tensorflow.keras.preprocessing.image import ImageDataGenerator  # type: ignore
 
 # Configuración
-base_dir = "train"  # carpeta original con estados y productos
+base_dir = "dataset_inicial"  # carpeta original con estados y productos
 output_dir = "dataset_limpio"  # carpeta final
 IMG_SIZE = (224, 224)
 val_ratio = 0.15
