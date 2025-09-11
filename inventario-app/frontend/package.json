@@ -12,7 +12,8 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@capacitor-community/barcode-scanner": "^4.0.1",
+    "@capacitor-mlkit/barcode-scanning": "^7.3.0",
+    "@capacitor/android": "^7.4.3",
     "@capacitor/app": "7.0.2",
     "@capacitor/core": "^7.4.3",
     "@capacitor/haptics": "7.0.2",
@@ -32,6 +33,7 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^7.4.3",
+    "@tailwindcss/postcss": "^4.1.13",
     "@testing-library/dom": ">=7.21.4",
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^16.2.0",
@@ -61,3 +63,4 @@
   },
   "description": "An Ionic project"
 }
+
