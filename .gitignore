@@ -1,13 +1,44 @@
-# Node
+# Node / Vite
 node_modules/
-npm-debug.log
-yarn-error.log
+dist/
+npm-debug.log*
+yarn-*.log
+
+# Capacitor / Android
+android/.gradle/
+android/.idea/
+android/local.properties
+android/captures/
+android/app/build/
+android/build/
+*.iml
+
+# iOS (si se agrega en el futuro)
+ios/App/build/
+ios/App/Pods/
+ios/App/*.xcworkspace
+ios/App/*.xcuserdata
 
 # Python
 __pycache__/
 *.py[cod]
-venv/
+*.pyo
+*.pyd
+*.db
+*.sqlite3
 
-# Env
-.env
+# ML models
+ml/*.h5
+ml/*.pt
+ml/*.onnx
+ml/__pycache__/
+ml/checkpoints/
+ml/runs/
+
+# IDE / OS
+.vscode/
 .DS_Store
+Thumbs.db
+
+# Env / secrets
+.env
