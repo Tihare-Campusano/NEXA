@@ -1,0 +1,33 @@
+.tabla-container {
+    width: 100%;
+    padding: 1rem;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.tabla-container h2 {
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.tabla-productos {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.tabla-productos th,
+.tabla-productos t d {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.tabla-productos th {
+    background-color: #f3f3f3;
+}
+
+.tabla-productos tr:hover {
+    background-color: #f9f9f9;
+}

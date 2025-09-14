@@ -1,18 +1,10 @@
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent } from "@ionic/react";
+import ProductosTable from "../../components/home/table-products";
 
-const Home: React.FC = () => {
+export default function Home() {
   return (
-    <IonPage>
-      <IonHeader>
-        <IonToolbar>
-          <IonTitle>Home</IonTitle>
-        </IonToolbar>
-      </IonHeader>
-      <IonContent fullscreen>
-        <h1>Bienvenido a Home 🏠</h1>
-      </IonContent>
-    </IonPage>
+    <div style={{ padding: "1rem" }}>
+      <h1>🏠 Home</h1>
+      <ProductosTable />
+    </div>
   );
-};
-
-export default Home;
+}

@@ -40,5 +40,4 @@ ml/runs/
 .DS_Store
 Thumbs.db
 
-# Env / secrets
-.env
+node_modules
