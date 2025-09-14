@@ -1,23 +1,29 @@
-.tabla-container {
+/* Wrapper general */
+.tabla-wrapper {
     width: 100%;
-    padding: 1.5rem;
-    background: #fff;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    overflow-x: auto;
-    /* ✅ para tablas en móviles */
+    position: relative;
 }
 
-.tabla-container h2 {
-    margin-bottom: 1rem;
+/* Header fijo */
+.tabla-header {
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 20;
+    padding: 1rem 0.5rem;
     font-size: 1.4rem;
     font-weight: 600;
     color: #333;
     border-left: 4px solid #28a745;
-    /* ✅ acento verde */
-    padding-left: 0.5rem;
 }
 
+/* Contenedor solo para scroll horizontal de la tabla */
+.tabla-container {
+    overflow-x: auto; /* scroll horizontal solo de la tabla */
+    margin-top: 1rem;
+}
+
+/* Tabla */
 .tabla-productos {
     width: 100%;
     border-collapse: collapse;
@@ -37,6 +43,9 @@
     color: #495057;
     text-transform: uppercase;
     font-size: 0.85rem;
+    position: sticky; /* header de columna fijo */
+    top: 3.5rem; /* justo debajo del h2 */
+    z-index: 10;
 }
 
 .tabla-productos tr {
@@ -51,7 +60,7 @@
     color: #212529;
 }
 
-/* ✅ Etiquetas de estado */
+/* Etiquetas de estado */
 .tabla-productos .activo {
     color: #28a745;
     font-weight: bold;

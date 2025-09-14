@@ -53,8 +53,9 @@ const App: React.FC = () => (
           {/* Redirigir la raíz hacia /home */}
           <Route exact path="/">
             <Redirect to="/home" />
-          </Route>
 
+            {/* rutas */}
+          </Route>
           <Route exact path="/home" component={Home} />
           <Route exact path="/reportes" component={Reportes} />
           <Route exact path="/registro" component={Registro} />
@@ -62,6 +63,7 @@ const App: React.FC = () => (
           <Route exact path="/perfil" component={Perfil} />
         </IonRouterOutlet>
 
+        {/* Rutas para los tabs inferiores */}
         <IonTabBar slot="bottom">
           <IonTabButton tab="home" href="/home">
             <IonIcon aria-hidden="true" icon={home} />
