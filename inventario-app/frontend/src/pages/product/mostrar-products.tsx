@@ -1,18 +1,18 @@
 import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent } from "@ionic/react";
 
-const Home: React.FC = () => {
+const Productos: React.FC = () => {
   return (
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonTitle>Home</IonTitle>
+          <IonTitle>Productos</IonTitle>
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen>
-        <h1>Bienvenido a Home 🏠</h1>
+        <h1>Ver y Editar Productos ✏️</h1>
       </IonContent>
     </IonPage>
   );
 };
 
-export default Home;
+export default Productos;
