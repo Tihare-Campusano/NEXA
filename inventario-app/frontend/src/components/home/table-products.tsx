@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
+import "./table-products.css";
 
 // 👇 Configura tu cliente de Supabase
 const supabase = createClient(
