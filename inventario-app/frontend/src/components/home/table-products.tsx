@@ -15,26 +15,58 @@ type Producto = {
     modelo: string | null;
     sku: string | null;
     activo: boolean;
-    stock?: number;
+    stock: number;
+    estado: string;
+    fecha: string;
 };
 
-export default function ProductosTable() {
+type Props = {
+    productos?: Producto[];
+};
+
+export default function ProductosTable({ productos: productosProp }: Props) {
     const [productos, setProductos] = useState<Producto[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        if (productosProp) {
+            setProductos(productosProp);
+            setLoading(false);
+            return;
+        }
+
         const fetchProductos = async () => {
             setLoading(true);
             const { data, error } = await supabase
                 .from("productos")
-                .select("id, nombre, marca, modelo, sku, activo, stock(cantidad)");
+                .select(`
+          id,
+          nombre,
+          marca,
+          modelo,
+          sku,
+          activo,
+          created_at,
+          stock (
+            cantidad,
+            estado,
+            ultima_actualizacion
+          )
+        `);
 
             if (error) {
                 console.error("Error al cargar productos:", error.message);
             } else {
                 const productosConStock = data.map((p: any) => ({
-                    ...p,
+                    id: p.id,
+                    nombre: p.nombre,
+                    marca: p.marca,
+                    modelo: p.modelo,
+                    sku: p.sku,
+                    activo: p.activo,
                     stock: p.stock?.cantidad ?? 0,
+                    estado: p.stock?.estado ?? "N/A",
+                    fecha: p.created_at,
                 }));
                 setProductos(productosConStock);
             }
@@ -42,7 +74,7 @@ export default function ProductosTable() {
         };
 
         fetchProductos();
-    }, []);
+    }, [productosProp]);
 
     if (loading) return <p>Cargando productos...</p>;
 
@@ -56,9 +88,10 @@ export default function ProductosTable() {
                             <tr>
                                 <th>ID</th>
                                 <th>Nombre</th>
-                                <th>Marca</th>
-                                <th>Modelo</th>
                                 <th>Stock</th>
+                                <th>Fecha</th>
+                                <th>Disponibilidad</th>
+                                <th>Estado</th>
                                 <th>Activo</th>
                             </tr>
                         </thead>
@@ -67,9 +100,10 @@ export default function ProductosTable() {
                                 <tr key={prod.id}>
                                     <td>{prod.id}</td>
                                     <td>{prod.nombre}</td>
-                                    <td>{prod.marca ?? "-"}</td>
-                                    <td>{prod.modelo ?? "-"}</td>
                                     <td>{prod.stock}</td>
+                                    <td>{new Date(prod.fecha).toLocaleDateString()}</td>
+                                    <td>{prod.stock > 0 ? "Disponible" : "Agotado"}</td>
+                                    <td>{prod.estado}</td>
                                     <td>{prod.activo ? "✅" : "❌"}</td>
                                 </tr>
                             ))}
