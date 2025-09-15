@@ -1,0 +1,56 @@
+.titulo-centrado {
+    text-align: center;
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: #fff;
+    /* Blanco, como en Home */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Tarjeta de datos */
+.perfil-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    margin-bottom: 1rem;
+}
+
+/* Fila de datos */
+.perfil-item {
+    margin-bottom: 0.8rem;
+}
+
+.perfil-label {
+    font-size: 13px;
+    color: #6c757d;
+    /* gris secundario */
+}
+
+.perfil-value {
+    font-size: 15px;
+    font-weight: 500;
+    color: #212529;
+    /* texto primario */
+}
+
+/* Botón rojo */
+.btn-logout {
+    width: 100%;
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 0.7rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.btn-logout:hover {
+    background: #b02a37;
+}

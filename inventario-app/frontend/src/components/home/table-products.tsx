@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import "./table-products.css";
 
-// 👇 Configura tu cliente de Supabase
+// Configura tu cliente de Supabase
 const supabase = createClient(
     import.meta.env.VITE_SUPABASE_URL as string,
     import.meta.env.VITE_SUPABASE_ANON_KEY as string
@@ -40,19 +40,19 @@ export default function ProductosTable({ productos: productosProp }: Props) {
             const { data, error } = await supabase
                 .from("productos")
                 .select(`
-            id,
-            nombre,
-            marca,
-            modelo,
-            sku,
-            activo,
-            created_at,
-            stock (
-            cantidad,
-            estado,
-            ultima_actualizacion
-            )
-        `);
+                    id,
+                    nombre,
+                    marca,
+                    modelo,
+                    sku,
+                    activo,
+                    stock (
+                        cantidad,
+                        estado,
+                        ultima_actualizacion
+                    )
+                `)
+                .order("id", { ascending: false }); // 👈 ordenamos por id
 
             if (error) {
                 console.error("Error al cargar productos:", error.message);
@@ -66,7 +66,7 @@ export default function ProductosTable({ productos: productosProp }: Props) {
                     activo: p.activo,
                     stock: p.stock?.cantidad ?? 0,
                     estado: p.stock?.estado ?? "N/A",
-                    fecha: p.created_at,
+                    fecha: "-", // 👈 no tenemos created_at, ponemos "-"
                 }));
                 setProductos(productosConStock);
             }
@@ -101,7 +101,7 @@ export default function ProductosTable({ productos: productosProp }: Props) {
                                     <td>{prod.id}</td>
                                     <td>{prod.nombre}</td>
                                     <td>{prod.stock}</td>
-                                    <td>{new Date(prod.fecha).toLocaleDateString()}</td>
+                                    <td>{prod.fecha}</td>
                                     <td>{prod.stock > 0 ? "Disponible" : "Agotado"}</td>
                                     <td>{prod.estado}</td>
                                     <td>{prod.activo ? "✅" : "❌"}</td>
