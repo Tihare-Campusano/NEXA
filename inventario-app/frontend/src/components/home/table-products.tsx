@@ -48,32 +48,34 @@ export default function ProductosTable() {
 
     return (
         <div className="tabla-wrapper">
-            <h2 className="tabla-header">📦 Lista de Productos</h2>
-            <div className="tabla-container">
-                <table className="tabla-productos">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Nombre</th>
-                            <th>Marca</th>
-                            <th>Modelo</th>
-                            <th>Stock</th>
-                            <th>Activo</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {productos.map((prod) => (
-                            <tr key={prod.id}>
-                                <td>{prod.id}</td>
-                                <td>{prod.nombre}</td>
-                                <td>{prod.marca ?? "-"}</td>
-                                <td>{prod.modelo ?? "-"}</td>
-                                <td>{prod.stock}</td>
-                                <td>{prod.activo ? "✅" : "❌"}</td>
+            <div className="tabla-card">
+                <h2 className="tabla-header">📦 Lista de Productos</h2>
+                <div className="tabla-container">
+                    <table className="tabla-productos">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Marca</th>
+                                <th>Modelo</th>
+                                <th>Stock</th>
+                                <th>Activo</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {productos.map((prod) => (
+                                <tr key={prod.id}>
+                                    <td>{prod.id}</td>
+                                    <td>{prod.nombre}</td>
+                                    <td>{prod.marca ?? "-"}</td>
+                                    <td>{prod.modelo ?? "-"}</td>
+                                    <td>{prod.stock}</td>
+                                    <td>{prod.activo ? "✅" : "❌"}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );
