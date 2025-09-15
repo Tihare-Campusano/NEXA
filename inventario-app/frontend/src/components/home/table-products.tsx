@@ -8,7 +8,7 @@ const supabase = createClient(
     import.meta.env.VITE_SUPABASE_ANON_KEY as string
 );
 
-type Producto = {
+export type Producto = {
     id: number;
     nombre: string;
     marca: string | null;
@@ -40,18 +40,18 @@ export default function ProductosTable({ productos: productosProp }: Props) {
             const { data, error } = await supabase
                 .from("productos")
                 .select(`
-          id,
-          nombre,
-          marca,
-          modelo,
-          sku,
-          activo,
-          created_at,
-          stock (
+            id,
+            nombre,
+            marca,
+            modelo,
+            sku,
+            activo,
+            created_at,
+            stock (
             cantidad,
             estado,
             ultima_actualizacion
-          )
+            )
         `);
 
             if (error) {
