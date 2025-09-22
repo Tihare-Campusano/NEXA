@@ -1,24 +1,61 @@
 @startuml Diagrama_de_flujo
-title Flujo de Procesos - Proyecto APT
+title Diagrama de Flujo - Proyecto APT
 
 start
-:Usuario abre la aplicación;
-:Selecciona opción "Iniciar Sesión";
+:Usuario abre aplicación;
+:Ir a Login;
 
-if (Credenciales correctas?) then (Sí)
-    :Acceso permitido;
-    :Usuario navega al Dashboard;
+if (Credenciales válidas?) then (Sí)
+    :Pantalla Identifícate;
+    :Ingresar nombre y apellido;
+    :Registrar en BD;
+    :Acceso al Home;
 else (No)
-    :Mostrar mensaje de error;
+    :Mensaje de error;
+    stop
 endif
 
-:Usuario registra producto;
-:Sistema valida stock disponible;
-if (Stock válido?) then (Sí)
-    :Guardar en BD Supabase;
-    :Generar reporte automático;
-else (No)
-    :Mostrar alerta de stock insuficiente;
+:En Home, usuario elige acción;
+
+if (¿Buscar producto?) then (Sí)
+    :Ingresar término en barra de búsqueda;
+    :Mostrar resultados;
+endif
+
+if (¿Generar reporte?) then (Sí)
+    :Seleccionar tipo de reporte;
+    :Generar PDF;
+    :Descargar reporte;
+endif
+
+if (¿Registrar producto?) then (Sí)
+    if (¿Método?) then (Manual)
+        :Ingresar código manual;
+        if (Producto existe?) then (Sí)
+            :Autocompletar datos;
+        else (No)
+            :Ingresar datos completos;
+        endif
+    elseif (QR Pistola)
+        :Escanear QR → Autocompletar;
+    else (Cámara Móvil)
+        :Escanear con cámara → Autocompletar;
+    endif
+
+    :IA analiza imagen del producto;
+    :Clasificar estado (Nuevo/Usado/Mal estado);
+    :Guardar en BD;
+endif
+
+if (¿Editar producto?) then (Sí)
+    :Seleccionar producto en tabla;
+    :Ver más → Detalle;
+    :Editar campos permitidos;
+    :Guardar cambios;
+endif
+
+if (¿Ver perfil?) then (Sí)
+    :Mostrar alias, correo, dispositivos, sesiones, fecha logeo;
 endif
 
 stop
