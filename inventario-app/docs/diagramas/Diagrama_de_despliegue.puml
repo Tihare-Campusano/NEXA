@@ -1,0 +1,21 @@
+@startuml Diagrama_de_despliegue
+title Diagrama de Despliegue - Proyecto APT
+
+node "Cliente" {
+    artifact "Navegador / App Móvil (Ionic React)"
+}
+
+node "Servidor Backend" {
+    artifact "API REST (FastAPI / Node.js)"
+}
+
+node "Servicios en la Nube" {
+    database "Supabase (BD + Auth)"
+    artifact "IA (Google Vision / TensorFlow)"
+}
+
+"Cliente" --> "Servidor Backend" : HTTP/HTTPS
+"Servidor Backend" --> "Supabase (BD + Auth)" : Consultas SQL / Auth
+"Servidor Backend" --> "IA (Google Vision / TensorFlow)" : Procesamiento de imágenes
+
+@enduml

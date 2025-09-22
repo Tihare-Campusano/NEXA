@@ -1,0 +1,16 @@
+@startuml Diagrama_de_componentes
+title Diagrama de Componentes - Proyecto APT
+
+component "Frontend (Ionic React)" as FE
+component "Backend API (FastAPI / Node.js)" as BE
+database "Base de Datos (Supabase)" as DB
+component "Servicio de IA (Reconocimiento de Imágenes)" as IA
+component "Autenticación (Firebase Auth)" as AUTH
+
+FE --> BE : Peticiones REST/GraphQL
+BE --> DB : CRUD Inventario
+BE --> IA : Envío de imágenes para análisis
+FE --> AUTH : Validación de credenciales
+AUTH --> DB : Gestión de usuarios
+
+@enduml

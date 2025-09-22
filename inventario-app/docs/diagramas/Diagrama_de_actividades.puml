@@ -1,0 +1,17 @@
+@startuml Diagrama_de_actividades
+title Diagrama de Actividades - Registro de Producto
+
+start
+:Usuario ingresa datos del producto;
+:Validar campos requeridos;
+if (Datos válidos?) then (Sí)
+    :Enviar al Backend;
+    :Guardar en BD Supabase;
+    :Generar confirmación;
+    :Actualizar inventario;
+else (No)
+    :Mostrar error de validación;
+endif
+stop
+
+@enduml

@@ -1,0 +1,37 @@
+@startuml Diagrama_de_clases
+title Diagrama de Clases - Proyecto APT
+
+class Usuario {
+    +id: int
+    +nombre: string
+    +email: string
+    +rol: string
+    +password: string
+}
+
+class Producto {
+    +id: int
+    +nombre: string
+    +categoria: string
+    +stock: int
+}
+
+class Inventario {
+    +id: int
+    +fechaEntrada: date
+    +fechaSalida: date
+    +cantidad: int
+}
+
+class Reporte {
+    +id: int
+    +fecha: date
+    +descripcion: string
+}
+
+Usuario "1" --> "*" Reporte
+Usuario "1" --> "*" Inventario
+Inventario "*" --> "1" Producto
+Producto "1" --> "*" Reporte
+
+@enduml

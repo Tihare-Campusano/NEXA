@@ -1,0 +1,25 @@
+@startuml Diagrama_de_flujo
+title Flujo de Procesos - Proyecto APT
+
+start
+:Usuario abre la aplicación;
+:Selecciona opción "Iniciar Sesión";
+
+if (Credenciales correctas?) then (Sí)
+    :Acceso permitido;
+    :Usuario navega al Dashboard;
+else (No)
+    :Mostrar mensaje de error;
+endif
+
+:Usuario registra producto;
+:Sistema valida stock disponible;
+if (Stock válido?) then (Sí)
+    :Guardar en BD Supabase;
+    :Generar reporte automático;
+else (No)
+    :Mostrar alerta de stock insuficiente;
+endif
+
+stop
+@enduml
