@@ -45,4 +45,4 @@ for categoria, productos in search_queries.items():
             min_size=(200, 200)
         )
 
-print("✅ Dataset descargado en dataset/train/ con subcarpetas por producto dentro de cada categoría")
+print("✅ Dataset descargado en dataset_inicial con subcarpetas por producto dentro de cada categoría")
