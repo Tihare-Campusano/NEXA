@@ -1,0 +1,57 @@
+@startuml Arquitectura_IA
+title 🌐 Arquitectura de la IA - Clasificación de Productos (MobileNetV2)
+left to right direction
+skinparam node {
+    BackgroundColor White
+    BorderColor Black
+    FontColor Black
+}
+skinparam database {
+    BackgroundColor LightBlue
+    BorderColor Black
+    FontColor Black
+}
+skinparam folder {
+    BackgroundColor LightYellow
+    BorderColor Black
+    FontColor Black
+}
+skinparam actorStyle awesome
+
+actor "👤 Usuario" as user
+
+folder "📂 Dataset" as dataset {
+    [Nuevo]
+    [Usado]
+    [Mal estado]
+}
+
+node "⚙️ Entrenamiento" as entrenamiento {
+    [Preprocesamiento\n(ImageDataGenerator)]
+    [MobileNetV2\n(Base preentrenada)]
+    [Capas Personalizadas\n(Dense, GAP, Softmax)]
+    [Entrenamiento + Fine-tuning]
+}
+
+database "💾 Modelo entrenado" as modelo {
+    [modelo_IA.h5]
+    [modelo_IA.tflite]
+}
+
+node "📱 App Móvil\n(Ionic React)" as app {
+    [Clasificador de imágenes]
+}
+
+' --- Relaciones ---
+user --> [Clasificador de imágenes] : 📸 Sube foto
+[Clasificador de imágenes] --> [modelo_IA.tflite] : 🔎 Predicción local (TFLite)
+
+[modelo_IA.h5] --> [modelo_IA.tflite] : 🔄 Conversión a TensorFlow Lite
+
+dataset --> [Preprocesamiento\n(ImageDataGenerator)] : 🔧 Limpieza / Augmentation
+[Preprocesamiento\n(ImageDataGenerator)] --> [MobileNetV2\n(Base preentrenada)]
+[MobileNetV2\n(Base preentrenada)] --> [Capas Personalizadas\n(Dense, GAP, Softmax)]
+[Capas Personalizadas\n(Dense, GAP, Softmax)] --> [Entrenamiento + Fine-tuning]
+[Entrenamiento + Fine-tuning] --> [modelo_IA.h5] : ✅ Modelo resultante
+
+@enduml
