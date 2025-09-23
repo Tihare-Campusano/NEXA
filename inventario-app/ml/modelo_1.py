@@ -1,28 +1,28 @@
-# modelo_1.py
+# modelo_2.0.py
 import tensorflow as tf
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.applications import MobileNetV2
-from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
 from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
 from tensorflow.keras.optimizers import Adam
-import os
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
 
 # -----------------------------
-# 1️⃣ Configuración básica
+# 1️⃣ Configuración
 # -----------------------------
-img_height, img_width = 224, 224  # MobileNetV2 recomienda 224x224
-batch_size = 32
-epochs = 10  # ajusta según tus recursos
-num_classes = 3  # nuevo, usado, mal_estado
+IMG_SIZE = (224, 224)   # Tamaño recomendado para MobileNetV2
+BATCH_SIZE = 32
+EPOCHS = 20             # Más épocas, pero EarlyStopping detiene si no mejora
+NUM_CLASSES = 3         # nuevo, usado, mal_estado
+LEARNING_RATE = 0.0001
+DATASET_DIR = "ml/dataset_limpio" # Carpeta con subcarpetas por clase (dataset_inicial)
 
-dataset_dir = "dataset_limpio"  # carpeta que contiene las subcarpetas 'nuevo', 'usado', 'mal_estado'
-
 # -----------------------------
-# 2️⃣ Preparar generadores de imágenes
+# 2️⃣ Generadores de imágenes con Data Augmentation y validación automática
 # -----------------------------
-train_datagen = ImageDataGenerator(
+datagen = ImageDataGenerator(
     rescale=1./255,
-    validation_split=0.2,  # 20% para validación
+    validation_split=0.2,   # 80% train, 20% val
     rotation_range=20,
     width_shift_range=0.2,
     height_shift_range=0.2,
@@ -32,58 +32,82 @@ train_datagen = ImageDataGenerator(
     fill_mode='nearest'
 )
 
-train_generator = train_datagen.flow_from_directory(
-    dataset_dir,
-    target_size=(img_height, img_width),
-    batch_size=batch_size,
+train_generator = datagen.flow_from_directory(
+    DATASET_DIR,
+    target_size=IMG_SIZE,
+    batch_size=BATCH_SIZE,
     class_mode='categorical',
     subset='training',
     shuffle=True
 )
 
-validation_generator = train_datagen.flow_from_directory(
-    dataset_dir,
-    target_size=(img_height, img_width),
-    batch_size=batch_size,
+val_generator = datagen.flow_from_directory(
+    DATASET_DIR,
+    target_size=IMG_SIZE,
+    batch_size=BATCH_SIZE,
     class_mode='categorical',
     subset='validation',
     shuffle=False
 )
 
 # -----------------------------
-# 3️⃣ Cargar MobileNetV2 sin la cabeza
+# 3️⃣ Modelo Transfer Learning (MobileNetV2)
 # -----------------------------
-base_model = MobileNetV2(weights='imagenet', include_top=False, input_shape=(img_height, img_width, 3))
-base_model.trainable = False  # congelamos la base para entrenar solo la cabeza primero
+base_model = MobileNetV2(
+    input_shape=(224, 224, 3),
+    include_top=False,
+    weights='imagenet'
+)
+base_model.trainable = False  # congelamos capas base
 
-# -----------------------------
-# 4️⃣ Agregar la "cabeza" del modelo
-# -----------------------------
 x = base_model.output
 x = GlobalAveragePooling2D()(x)
 x = Dense(128, activation='relu')(x)
-predictions = Dense(num_classes, activation='softmax')(x)
+output = Dense(NUM_CLASSES, activation='softmax')(x)
 
-model = Model(inputs=base_model.input, outputs=predictions)
+model = Model(inputs=base_model.input, outputs=output)
 
 # -----------------------------
-# 5️⃣ Compilar el modelo
+# 4️⃣ Compilación
 # -----------------------------
-model.compile(optimizer=Adam(learning_rate=0.0001),
+model.compile(
+    optimizer=Adam(learning_rate=LEARNING_RATE),
     loss='categorical_crossentropy',
-    metrics=['accuracy'])
+    metrics=['accuracy']
+)
+
+model.summary()
 
 # -----------------------------
-# 6️⃣ Entrenar el modelo
+# 5️⃣ Callbacks
+# -----------------------------
+checkpoint = ModelCheckpoint(
+    'modelo_mejor.h5',
+    monitor='val_accuracy',
+    save_best_only=True,
+    verbose=1
+)
+
+early_stop = EarlyStopping(
+    monitor='val_loss',
+    patience=5,
+    restore_best_weights=True,
+    verbose=1
+)
+
+# -----------------------------
+# 6️⃣ Entrenamiento
 # -----------------------------
 history = model.fit(
     train_generator,
-    validation_data=validation_generator,
-    epochs=epochs
+    validation_data=val_generator,
+    epochs=EPOCHS,
+    callbacks=[checkpoint, early_stop],
+    verbose=1
 )
 
 # -----------------------------
 # 7️⃣ Guardar modelo final
 # -----------------------------
-model.save('modelo_final.h5')
-print("✅ Modelo entrenado y guardado como modelo_final.h5")
+model.save('modelo_IA_1.1.h5')
+print("✅ Entrenamiento completado. Modelo guardado como modelo_final.h5 y el mejor checkpoint en modelo_mejor.h5")
