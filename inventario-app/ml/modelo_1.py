@@ -142,8 +142,8 @@ history_fine = model.fit(
 # -----------------------------
 # 8️⃣ Guardar modelo final
 # -----------------------------
-model.save('modelo_final.h5')
-print("✅ Entrenamiento completado. Modelo guardado como modelo_final.h5 y el mejor checkpoint en modelo_mejor.h5")
+model.save('modelo_IA.h5')
+print("✅ Entrenamiento completado. Modelo guardado como modelo_IA.h5 y el checkpoint en checkpoint_IA.h5")
 
 # -----------------------------
 # 9️⃣ Graficar historial de entrenamiento
