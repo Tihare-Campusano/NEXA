@@ -5,11 +5,14 @@ rectangle "Frontend (Ionic React)" as FE
 rectangle "Backend/API (FastAPI)" as BE
 database "Base de Datos (Supabase)" as DB
 rectangle "Servicio de IA (Análisis de imágenes)" as IA
+rectangle "Autenticación (Firebase Auth)" as AUTH
 
 FE --> BE : Peticiones HTTP/REST
 BE --> DB : Consultas / Gestión inventario
 BE --> IA : Envío de imágenes
 IA --> BE : Resultado (estado del producto)
+FE --> AUTH : Validación de credenciales
+AUTH --> DB : Gestión de usuarios
 BE --> FE : Respuesta (confirmación / alerta)
 
 @enduml
