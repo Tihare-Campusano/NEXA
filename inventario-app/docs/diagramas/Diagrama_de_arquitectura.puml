@@ -3,16 +3,13 @@ title Diagrama de Arquitectura - Proyecto APT
 
 rectangle "Frontend (Ionic React)" as FE
 rectangle "Backend/API (FastAPI)" as BE
-database "Base de Datos (Supabase)" as DB
-rectangle "Servicio de IA (Análisis de imágenes)" as IA
-rectangle "Autenticación (Firebase Auth)" as AUTH
+database "Base de Datos y Autenticación (Supabase)" as DB
+rectangle "Servicio de IA (Análisis de Imágenes)" as IA
 
 FE --> BE : Peticiones HTTP/REST
-BE --> DB : Consultas / Gestión inventario
+BE --> DB : Consultas / Gestión de inventario\n+ Autenticación de usuarios
 BE --> IA : Envío de imágenes
 IA --> BE : Resultado (estado del producto)
-FE --> AUTH : Validación de credenciales
-AUTH --> DB : Gestión de usuarios
 BE --> FE : Respuesta (confirmación / alerta)
 
 @enduml

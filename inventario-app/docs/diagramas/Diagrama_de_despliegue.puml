@@ -5,17 +5,17 @@ node "Cliente" {
     artifact "Navegador / App Móvil (Ionic React)"
 }
 
-node "Servidor Backend" {
-    artifact "API REST (FastAPI / Node.js)"
+node "Servidor Backend (FastAPI)" {
+    artifact "API REST"
 }
 
 node "Servicios en la Nube" {
     database "Supabase (BD + Auth)"
-    artifact "IA (Google Vision / TensorFlow)"
+    artifact "Servicio de IA\n(TensorFlow - MobileNetV2)"
 }
 
-"Cliente" --> "Servidor Backend" : HTTP/HTTPS
-"Servidor Backend" --> "Supabase (BD + Auth)" : Consultas SQL / Auth
-"Servidor Backend" --> "IA (Google Vision / TensorFlow)" : Procesamiento de imágenes
+"Cliente" --> "Servidor Backend (FastAPI)" : HTTP/HTTPS
+"Servidor Backend (FastAPI)" --> "Supabase (BD + Auth)" : Consultas SQL / Autenticación
+"Servidor Backend (FastAPI)" --> "Servicio de IA\n(TensorFlow - MobileNetV2)" : Clasificación / Análisis de imágenes
 
 @enduml

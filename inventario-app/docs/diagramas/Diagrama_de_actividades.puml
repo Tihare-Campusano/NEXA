@@ -1,6 +1,5 @@
 @startuml Diagrama_de_actividades_v2
 title Diagrama de Actividades - Proyecto APT
-
 start
 
 :Usuario abre aplicación;

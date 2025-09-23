@@ -4,7 +4,7 @@ title Diagrama de Componentes - Proyecto APT
 package "Frontend (Ionic React)" {
     component "UI (Pantallas)" as UI
     component "Gestión de Estado (Context/Redux)" as STATE
-    component "Cliente API (REST/GraphQL)" as APIClient
+    component "Cliente API (REST)" as APIClient
 }
 
 package "Backend API (FastAPI)" {
@@ -14,19 +14,18 @@ package "Backend API (FastAPI)" {
     component "Módulo Comunicación DB" as BEDB
 }
 
-database "Base de Datos (Supabase)" as DB
+database "Base de Datos y Autenticación (Supabase)" as DB
 component "Servicio de IA (Reconocimiento de Imágenes)" as IA
-component "Autenticación (Firebase Auth)" as AUTH
 
 UI --> STATE
 STATE --> APIClient
 APIClient --> BEAuth : Login
 APIClient --> BEInv : CRUD Productos
-APIClient --> BEIA : Análisis Imagen
+APIClient --> BEIA : Análisis de Imagen
 
-BEAuth --> AUTH
-BEInv --> DB
-BEDB --> DB
-BEIA --> IA
+BEAuth --> DB : Validación usuarios
+BEInv --> DB : Gestión inventario
+BEDB --> DB : Conexión datos
+BEIA --> IA : Procesamiento imágenes
 
 @enduml

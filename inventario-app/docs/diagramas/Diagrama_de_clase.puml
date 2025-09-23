@@ -1,37 +1,98 @@
-@startuml Diagrama_de_clases
+@startuml Diagrama_Clases_APT
 title Diagrama de Clases - Proyecto APT
 
 class Usuario {
-    +id: int
-    +nombre: string
-    +email: string
-    +rol: string
-    +password: string
+    +id: UUID
+    +nombre: String
+    +email: String
+    +rol: String
+    +activo: Boolean
+    --
+    +login()
+    +logout()
+    +registrarMovimiento()
 }
 
 class Producto {
-    +id: int
-    +nombre: string
-    +categoria: string
-    +stock: int
+    +id: Int
+    +codigoBarras: String
+    +marca: String
+    +modelo: String
+    +compatibilidad: String
+    +sku: String
+    +nombre: String
+    --
+    +actualizarStock()
+    +asociarCategoria()
+    +agregarImagen()
 }
 
-class Inventario {
-    +id: int
-    +fechaEntrada: date
-    +fechaSalida: date
-    +cantidad: int
+class Categoria {
+    +id: Int
+    +nombre: String
+    +activo: Boolean
+    --
+    +agregarSubcategoria()
+    +listarProductos()
 }
 
-class Reporte {
-    +id: int
-    +fecha: date
-    +descripcion: string
+class Imagen {
+    +id: Int
+    +ruta: String
+    +ancho: Int
+    +alto: Int
+    +fechaCaptura: DateTime
+    --
+    +asociarProducto()
 }
 
-Usuario "1" --> "*" Reporte
-Usuario "1" --> "*" Inventario
-Inventario "*" --> "1" Producto
-Producto "1" --> "*" Reporte
+class Movimiento {
+    +id: Int
+    +fecha: DateTime
+    +tipo: String
+    +cantidad: Int
+    +motivo: String
+    --
+    +registrar()
+}
+
+class Stock {
+    +cantidad: Int
+    --
+    +incrementar()
+    +decrementar()
+    +consultar()
+}
+
+class Inspeccion {
+    +id: Int
+    +etiqueta: String
+    +confianza: Float
+    +detalles: String
+    --
+    +validar()
+    +asociarModeloIA()
+}
+
+class ModeloIA {
+    +id: Int
+    +nombre: String
+    +version: String
+    +proveedor: String
+    +uri: String
+    --
+    +ejecutar()
+    +actualizar()
+}
+
+' Relaciones UML
+Usuario "1" --> "*" Movimiento
+Producto "1" --> "*" Imagen
+Producto "1" --> "1" Stock
+Producto "*" --> "1" Categoria
+Producto "1" --> "*" Movimiento
+Producto "1" --> "*" Inspeccion
+Imagen "1" --> "*" Inspeccion
+ModeloIA "1" --> "*" Inspeccion
 
 @enduml
