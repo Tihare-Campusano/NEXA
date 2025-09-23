@@ -1,57 +1,58 @@
-@startuml Diagrama_de_actividades
+@startuml Diagrama_de_actividades_v2
 title Diagrama de Actividades - Proyecto APT
 
 start
 
 :Usuario abre aplicación;
-:Ir a pantalla de Login;
-
-if (¿Credenciales correctas?) then (Sí)
-    :Accede a pantalla "Identifícate";
-    :Ingresar nombre y apellido;
-    :Registrar usuario en BD;
-    :Ir al Home;
-else (No)
-    :Mostrar mensaje de error;
-    stop
-endif
+partition "Login" {
+    :Ir a pantalla de Login;
+    if (Credenciales correctas?) then (Sí)
+        :Accede a pantalla "Identifícate";
+        :Ingresar nombre y apellido;
+        :Registrar usuario en BD;
+    else (No)
+        :Mostrar mensaje de error;
+        stop
+    endif
+}
 
 partition "Home" {
     :Visualizar tabla de productos;
-    :Buscar productos (nombre, código, modelo);
+    :Seleccionar acción (Buscar / Reporte / Registrar / Editar / Perfil);
 
-    :Navegar a Reportes;
-    :Seleccionar tipo de reporte;
-    :Generar reporte PDF;
-    :Descargar reporte;
-
-    :Navegar a Registrar producto;
-    if (¿Método de registro?) then (Manual)
-        :Ingresar código de barras manual;
-        if (Producto ya existe?) then (Sí)
-            :Autocompletar datos;
-        else (No)
-            :Ingresar datos completos;
+    partition "Registrar Producto" {
+        if (Método?) then (Manual)
+            :Ingresar código manual;
+            if (Producto existe?) then (Sí)
+                :Autocompletar datos;
+            else (No)
+                :Ingresar datos completos;
+            endif
+        elseif (QR Pistola)
+            :Escanear QR → Autocompletar;
+        else (Cámara Móvil)
+            :Escanear con cámara → Autocompletar;
         endif
-    elseif (QR Pistola)
-        :Escanear QR con pistola;
-        :Autocompletar datos;
-    else (Cámara Móvil)
-        :Escanear con cámara;
-        :Autocompletar datos;
-    endif
+        :Tomar foto del producto;
+        :IA analiza estado;
+        :Guardar producto en BD;
+    }
 
-    :Tomar fotografía del producto;
-    :IA analiza estado (Nuevo/Usado/Mal estado);
-    :Guardar producto en BD;
+    partition "Editar Producto" {
+        :Seleccionar producto;
+        :Editar campos permitidos;
+        :Guardar cambios;
+    }
 
-    :Navegar a Editar producto;
-    :Ver detalle del producto;
-    :Editar campos permitidos (nombre, código, modelo, marca);
-    :Guardar cambios;
+    partition "Perfil" {
+        :Visualizar alias, correo, dispositivos, sesiones activas;
+    }
 
-    :Navegar a Perfil;
-    :Visualizar alias, correo, dispositivos, sesiones activas, fecha de logeo;
+    partition "Reportes" {
+        :Seleccionar tipo de reporte;
+        :Generar PDF;
+        :Descargar;
+    }
 }
 
 stop

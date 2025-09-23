@@ -1,61 +1,57 @@
-@startuml Diagrama_de_flujo
+@startuml Diagrama_de_flujo_v2
 title Diagrama de Flujo - Proyecto APT
 
 start
-:Usuario abre aplicación;
+:Usuario abre app;
 :Ir a Login;
 
-if (Credenciales válidas?) then (Sí)
-    :Pantalla Identifícate;
+if (Credenciales correctas?) then (Sí)
     :Ingresar nombre y apellido;
     :Registrar en BD;
     :Acceso al Home;
 else (No)
-    :Mensaje de error;
+    :Mostrar mensaje de error;
     stop
 endif
 
-:En Home, usuario elige acción;
+:Elegir acción;
 
-if (¿Buscar producto?) then (Sí)
-    :Ingresar término en barra de búsqueda;
+if (Buscar producto?) then (Sí)
+    :Ingresar término;
     :Mostrar resultados;
 endif
 
-if (¿Generar reporte?) then (Sí)
-    :Seleccionar tipo de reporte;
+if (Generar reporte?) then (Sí)
+    :Seleccionar tipo;
     :Generar PDF;
-    :Descargar reporte;
+    :Descargar;
 endif
 
-if (¿Registrar producto?) then (Sí)
-    if (¿Método?) then (Manual)
-        :Ingresar código manual;
-        if (Producto existe?) then (Sí)
-            :Autocompletar datos;
-        else (No)
+if (Registrar producto?) then (Sí)
+    if (Manual?) then
+        :Ingresar código;
+        if (Existe?) then
+            :Autocompletar;
+        else
             :Ingresar datos completos;
         endif
-    elseif (QR Pistola)
-        :Escanear QR → Autocompletar;
-    else (Cámara Móvil)
-        :Escanear con cámara → Autocompletar;
+    elseif (QR Pistola) then
+        :Escanear → Autocompletar;
+    else
+        :Escanear cámara → Autocompletar;
     endif
-
-    :IA analiza imagen del producto;
-    :Clasificar estado (Nuevo/Usado/Mal estado);
+    :IA analiza producto;
     :Guardar en BD;
 endif
 
-if (¿Editar producto?) then (Sí)
-    :Seleccionar producto en tabla;
-    :Ver más → Detalle;
-    :Editar campos permitidos;
-    :Guardar cambios;
+if (Editar producto?) then (Sí)
+    :Seleccionar producto;
+    :Editar campos;
+    :Guardar;
 endif
 
-if (¿Ver perfil?) then (Sí)
-    :Mostrar alias, correo, dispositivos, sesiones, fecha logeo;
+if (Ver perfil?) then (Sí)
+    :Mostrar alias, correo, dispositivos, sesiones;
 endif
 
 stop
