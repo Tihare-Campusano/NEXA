@@ -11,12 +11,9 @@ const supabase = createClient(
 export type Producto = {
     id: number;
     nombre: string;
-    marca: string | null;
-    modelo: string | null;
-    sku: string | null;
-    activo: boolean;
     stock: number;
     estado: string;
+    activo: boolean;
     fecha: string;
 };
 
@@ -40,19 +37,16 @@ export default function ProductosTable({ productos: productosProp }: Props) {
             const { data, error } = await supabase
                 .from("productos")
                 .select(`
-                    id,
-                    nombre,
-                    marca,
-                    modelo,
-                    sku,
-                    activo,
-                    stock (
-                        cantidad,
-                        estado,
-                        ultima_actualizacion
-                    )
-                `)
-                .order("id", { ascending: false }); // 👈 ordenamos por id
+            id,
+            nombre,
+            activo,
+            stock (
+                cantidad,
+                estado,
+                ultima_actualizacion
+                )
+            `)
+                .order("id", { ascending: false });
 
             if (error) {
                 console.error("Error al cargar productos:", error.message);
@@ -60,13 +54,10 @@ export default function ProductosTable({ productos: productosProp }: Props) {
                 const productosConStock = data.map((p: any) => ({
                     id: p.id,
                     nombre: p.nombre,
-                    marca: p.marca,
-                    modelo: p.modelo,
-                    sku: p.sku,
                     activo: p.activo,
                     stock: p.stock?.cantidad ?? 0,
                     estado: p.stock?.estado ?? "N/A",
-                    fecha: "-", // 👈 no tenemos created_at, ponemos "-"
+                    fecha: p.stock?.ultima_actualizacion ?? "-",
                 }));
                 setProductos(productosConStock);
             }
@@ -79,37 +70,58 @@ export default function ProductosTable({ productos: productosProp }: Props) {
     if (loading) return <p>Cargando productos...</p>;
 
     return (
-        <div className="tabla-wrapper">
-            <div className="tabla-card">
-                <h2 className="tabla-header">📦 Lista de Productos</h2>
-                <div className="tabla-container">
-                    <table className="tabla-productos">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Nombre</th>
-                                <th>Stock</th>
-                                <th>Fecha</th>
-                                <th>Disponibilidad</th>
-                                <th>Estado</th>
-                                <th>Activo</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {productos.map((prod) => (
-                                <tr key={prod.id}>
-                                    <td>{prod.id}</td>
-                                    <td>{prod.nombre}</td>
-                                    <td>{prod.stock}</td>
-                                    <td>{prod.fecha}</td>
-                                    <td>{prod.stock > 0 ? "Disponible" : "Agotado"}</td>
-                                    <td>{prod.estado}</td>
-                                    <td>{prod.activo ? "✅" : "❌"}</td>
+        <div className="productos-card">
+            {/* Encabezado con icono y título */}
+            <div className="productos-header">
+                <span className="productos-icon">📦</span>
+                <h3 className="productos-title">Lista de Productos</h3>
+            </div>
+
+            {/* Tabla */}
+            <div className="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nombre</th>
+                            <th>Stock</th>
+                            <th>Fecha</th>
+                            <th>Estado</th>
+                            <th>Activo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {productos.length > 0 ? (
+                            productos.map((p) => (
+                                <tr key={p.id}>
+                                    <td>{p.id}</td>
+                                    <td>{p.nombre}</td>
+                                    <td>{p.stock}</td>
+                                    <td>{p.fecha}</td>
+                                    <td>
+                                        <span
+                                            className={`badge ${p.estado === "Disponible"
+                                                    ? "disponible"
+                                                    : p.estado === "Agotado"
+                                                        ? "agotado"
+                                                        : "na"
+                                                }`}
+                                        >
+                                            {p.estado}
+                                        </span>
+                                    </td>
+                                    <td className="check">{p.activo ? "✅" : "❌"}</td>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                            ))
+                        ) : (
+                            <tr>
+                                <td colSpan={6} style={{ textAlign: "center", padding: "10px" }}>
+                                    No hay productos
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
             </div>
         </div>
     );
