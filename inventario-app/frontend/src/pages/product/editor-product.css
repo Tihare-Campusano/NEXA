@@ -6,7 +6,6 @@
     background: #fff;
     padding: 1.5rem 2rem;
     border-radius: 6px;
-    /* reducido */
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
     margin: 2rem auto;
     max-width: 750px;
@@ -18,16 +17,21 @@
     gap: 0.9rem 1.4rem;
 }
 
+/* importante: permitir que los items del grid colapsen si el contenido es muy largo */
 .editor-body p {
     margin: 0;
     font-size: 0.95rem;
     color: #333;
     padding: 0.55rem 0.75rem;
     border-radius: 4px;
-    /* reducido */
     background: #fafafa;
     border: 1px solid #eee;
     transition: background 0.2s;
+    min-width: 0;
+    /* <-- evita que el contenido fuerce overflow del grid */
+    overflow-wrap: anywhere;
+    /* <- para romper palabras largas */
+    word-break: break-word;
 }
 
 .editor-body p:hover {
@@ -37,18 +41,37 @@
 .editor-body strong {
     color: #111;
     font-weight: 600;
+    display: block;
+    margin-bottom: 6px;
 }
 
-.editor-body input {
+/* Inputs / textarea ocupan todo el ancho de su celda */
+.editor-body input,
+.editor-body textarea {
     border: none;
     background: transparent;
     border-bottom: 1px solid #ccc;
     outline: none;
-    width: 70%;
-    font-size: 0.9rem;
-    padding: 2px;
+    width: 100%;
+    font-size: 0.95rem;
+    padding: 6px 2px;
+    resize: vertical;
+    box-sizing: border-box;
 }
 
+/* Mostrar tooltip con texto completo al pasar el mouse */
+.editor-body input[title],
+.editor-body textarea[title] {
+    cursor: text;
+}
+
+/* textarea visual */
+.editor-body textarea {
+    min-height: 64px;
+    white-space: pre-wrap;
+}
+
+/* estados */
 .activo {
     color: #28a745;
     font-weight: bold;
@@ -59,12 +82,16 @@
     font-weight: bold;
 }
 
+/* acciones centradas */
 .editor-actions {
     margin-top: 1.5rem;
     display: flex;
-    justify-content: flex-end;
+    justify-content: center;
+    /* CENTRAR botones */
+    gap: 1rem;
 }
 
+/* botones */
 .btn-guardar {
     padding: 0.6rem 1.2rem;
     background: linear-gradient(135deg, #28a745, #218838);
@@ -72,12 +99,18 @@
     border: none;
     border-radius: 8px;
     cursor: pointer;
-    margin-right: 1rem;
     transition: transform 0.2s ease, background 0.3s ease;
+    font-weight: 600;
 }
 
-.btn-guardar:hover {
-    transform: scale(1.05);
+.btn-guardar[disabled] {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-guardar:hover:enabled {
+    transform: scale(1.03);
     background: linear-gradient(135deg, #218838, #1e7e34);
 }
 
@@ -93,14 +126,21 @@
 }
 
 .btn-volver:hover {
-    transform: scale(1.05);
+    transform: scale(1.03);
     background: linear-gradient(135deg, #0056b3, #004099);
 }
 
-/* Para mantener consistencia con Home */
 .titulo-centrado {
     text-align: center;
     font-size: 1.5rem;
     color: #333;
     font-weight: 600;
+}
+
+/* loader simple, único */
+.loading-container {
+    text-align: center;
+    margin-top: 2rem;
+    font-size: 1.05rem;
+    color: #444;
 }

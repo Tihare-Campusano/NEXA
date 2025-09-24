@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useHistory } from "react-router-dom";
 import { createClient } from "@supabase/supabase-js";
 import { FaBoxOpen } from "react-icons/fa";
@@ -34,11 +34,12 @@ export default function EditorProducto() {
     const history = useHistory();
 
     const [producto, setProducto] = useState<Producto | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState<boolean>(false);
     const [editData, setEditData] = useState<Partial<Producto>>({});
-    const [changed, setChanged] = useState(false);
+    const [changed, setChanged] = useState<boolean>(false);
+    const mountedRef = useRef(true);
 
-    // Campos editables
+    // campos editables
     const editableFields: (keyof Producto)[] = [
         "nombre",
         "marca",
@@ -48,73 +49,111 @@ export default function EditorProducto() {
     ];
 
     useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false; // marcar desmontado
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!id) return;
+
+        let ignore = false;
         const fetchProducto = async () => {
-            setProducto(null); // limpiar estado previo
-            setEditData({});
-            setChanged(false);
-            setLoading(true);
+            // limpiamos estado y mostramos loader una sola vez
+            if (mountedRef.current && !ignore) {
+                setProducto(null);
+                setEditData({});
+                setChanged(false);
+                setLoading(true);
+            }
 
             const { data, error } = await supabase
                 .from("productos")
-                .select(
-                    `
-            *,
-            categoria:categorias(nombre)
-            `
-                )
+                .select("*, categoria:categorias(nombre)")
                 .eq("id", id)
                 .single();
 
+            // si el componente ya fue desmontado, no hacemos setState
+            if (!mountedRef.current || ignore) return;
+
             if (error) {
                 console.error("Error al obtener producto:", error.message);
+                setProducto(null);
             } else {
                 setProducto(data as Producto);
             }
-
             setLoading(false);
         };
 
-        if (id) fetchProducto();
+        fetchProducto();
+
+        // cleanup en caso de remounts rápidos
+        return () => {
+            ignore = true;
+        };
     }, [id]);
 
-    if (loading) return <p>Cargando producto...</p>;
-    if (!producto) return <p>No se encontró el producto</p>;
-
-    // función para formatear fechas
-    const formatFecha = (fecha: string | null) => {
-        if (!fecha) return "N/A";
-        return new Date(fecha).toLocaleString("es-CL");
-    };
+    const formatFecha = (fecha: string | null) =>
+        fecha ? new Date(fecha).toLocaleString("es-CL") : "N/A";
 
     const handleEdit = (field: keyof Producto, value: string) => {
-        setEditData((prev) => ({
-            ...prev,
-            [field]: value,
-        }));
+        setEditData((prev) => ({ ...prev, [field]: value }));
         setChanged(true);
     };
 
     const handleSave = async () => {
         if (!id || !changed) return;
 
-        const { error } = await supabase
-            .from("productos")
-            .update(editData)
-            .eq("id", id);
+        // sólo los campos que se cambiaron
+        const payload: Record<string, any> = {};
+        Object.keys(editData).forEach((k) => {
+            payload[k] = (editData as any)[k];
+        });
 
+        const { error } = await supabase.from("productos").update(payload).eq("id", id);
         if (error) {
             console.error("Error al actualizar producto:", error.message);
+            alert("Error al guardar cambios");
             return;
         }
 
-        // refrescar datos después de guardar
-        setProducto((prev) =>
-            prev ? { ...prev, ...editData } : prev
-        );
+        // refrescar localmente
+        setProducto((prev) => (prev ? ({ ...prev, ...payload } as Producto) : prev));
         setEditData({});
         setChanged(false);
-        alert("Cambios guardados con éxito ✅");
+        alert("Cambios guardados ✅");
     };
+
+    // Si está cargando, mostramos UN ÚNICO loader (early return)
+    if (loading) {
+        return (
+            <div className="editor-container">
+                <h2 className="titulo-centrado">
+                    <FaBoxOpen /> Detalle del Producto
+                </h2>
+                <div className="loading-container">
+                    <p>Cargando producto...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!producto) {
+        return (
+            <div className="editor-container">
+                <h2 className="titulo-centrado">
+                    <FaBoxOpen /> Detalle del Producto
+                </h2>
+                <p style={{ textAlign: "center", marginTop: 24 }}>No se encontró el producto</p>
+                <div style={{ display: "flex", justifyContent: "center", marginTop: 12 }}>
+                    <button className="btn-volver" onClick={() => history.replace("/productos")}>
+                        ⬅ Volver
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="editor-container">
@@ -124,97 +163,88 @@ export default function EditorProducto() {
 
             <div className="editor-producto-card">
                 <div className="editor-body">
-                    {Object.entries(producto).map(([key, value]) => {
-                        if (key === "categoria") {
-                            return (
-                                <p key={key}>
-                                    <strong>Categoría:</strong>{" "}
-                                    {producto.categoria?.nombre || "Sin categoría"}
-                                </p>
-                            );
-                        }
+                    <p><strong>ID:</strong> {String(producto.id)}</p>
 
-                        // solo mostrar campos que nos interesan
-                        if ([
-                            "id", "codigo_barras", "sku", "categoria_id", "unidad",
-                            "stock_minimo", "activo", "creado_en", "created_at", "updated_at"
-                        ].includes(key)) {
-                            if (key === "activo") {
-                                return (
-                                    <p key={key}>
-                                        <strong>Activo:</strong>{" "}
-                                        {producto.activo ? (
-                                            <span className="activo">✔ Sí</span>
-                                        ) : (
-                                            <span className="inactivo">✘ No</span>
-                                        )}
-                                    </p>
-                                );
-                            }
+                    <p>
+                        <strong>Código de Barras:</strong>{" "}
+                        {producto.codigo_barras ?? "N/A"}
+                    </p>
 
-                            if (key === "creado_en" || key === "updated_at") {
-                                return (
-                                    <p key={key}>
-                                        <strong>
-                                            {key === "creado_en"
-                                                ? "Creado en"
-                                                : "Última actualización"}
-                                            :
-                                        </strong>{" "}
-                                        {formatFecha(value as string | null)}
-                                    </p>
-                                );
-                            }
+                    <p>
+                        <strong>Nombre:</strong>
+                        <input
+                            title={String(editData.nombre ?? producto.nombre ?? "")}
+                            value={String(editData.nombre ?? producto.nombre ?? "")}
+                            onChange={(e) => handleEdit("nombre", e.target.value)}
+                        />
+                    </p>
 
-                            return (
-                                <p key={key}>
-                                    <strong>{key.replace("_", " ")}:</strong>{" "}
-                                    {typeof value === "boolean"
-                                        ? value
-                                            ? "Sí"
-                                            : "No"
-                                        : value !== null && value !== undefined
-                                            ? String(value)
-                                            : "N/A"}
-                                </p>
-                            );
-                        }
+                    <p>
+                        <strong>Marca:</strong>
+                        <input
+                            title={String(editData.marca ?? producto.marca ?? "")}
+                            value={String(editData.marca ?? producto.marca ?? "")}
+                            onChange={(e) => handleEdit("marca", e.target.value)}
+                        />
+                    </p>
 
-                        // campos editables
-                        if (editableFields.includes(key as keyof Producto)) {
-                            return (
-                                <p key={key}>
-                                    <strong>{key}:</strong>{" "}
-                                    <input
-                                        type="text"
-                                        value={
-                                            String(
-                                                editData[key as keyof Producto] ??
-                                                (value as string | number | boolean | null) ??
-                                                ""
-                                            )
-                                        }
-                                        onChange={(e) =>
-                                            handleEdit(key as keyof Producto, e.target.value)
-                                        }
-                                    />
-                                </p>
-                            );
-                        }
+                    <p>
+                        <strong>Modelo:</strong>
+                        <input
+                            title={String(editData.modelo ?? producto.modelo ?? "")}
+                            value={String(editData.modelo ?? producto.modelo ?? "")}
+                            onChange={(e) => handleEdit("modelo", e.target.value)}
+                        />
+                    </p>
 
-                        return null;
-                    })}
+                    <p>
+                        <strong>Compatibilidad:</strong>
+                        <textarea
+                            title={String(editData.compatibilidad ?? producto.compatibilidad ?? "")}
+                            value={String(editData.compatibilidad ?? producto.compatibilidad ?? "")}
+                            onChange={(e) => handleEdit("compatibilidad", e.target.value)}
+                        />
+                    </p>
+
+                    <p><strong>SKU:</strong> {producto.sku ?? "N/A"}</p>
+
+                    <p><strong>Categoría:</strong> {producto.categoria?.nombre ?? "Sin categoría"}</p>
+
+                    <p><strong>Unidad:</strong> {producto.unidad ?? "N/A"}</p>
+
+                    <p><strong>Stock mínimo:</strong> {producto.stock_minimo ?? "N/A"}</p>
+
+                    <p>
+                        <strong>Observaciones:</strong>
+                        <textarea
+                            title={String(editData.observaciones ?? producto.observaciones ?? "")}
+                            value={String(editData.observaciones ?? producto.observaciones ?? "")}
+                            onChange={(e) => handleEdit("observaciones", e.target.value)}
+                        />
+                    </p>
+
+                    <p>
+                        <strong>Activo:</strong>{" "}
+                        {producto.activo ? <span className="activo">✔ Sí</span> : <span className="inactivo">✘ No</span>}
+                    </p>
+
+                    <p><strong>Creado en:</strong> {formatFecha(producto.creado_en)}</p>
+                    <p><strong>Última actualización:</strong> {formatFecha(producto.updated_at)}</p>
                 </div>
 
                 <div className="editor-actions">
-                    {changed && (
-                        <button className="btn-guardar" onClick={handleSave}>
-                            💾 Guardar cambios
-                        </button>
-                    )}
+                    <button
+                        className="btn-guardar"
+                        onClick={handleSave}
+                        disabled={!changed}
+                        title={!changed ? "No hay cambios para guardar" : "Guardar cambios"}
+                    >
+                        💾 Guardar cambios
+                    </button>
+
                     <button
                         className="btn-volver"
-                        onClick={() => history.push("/productos")}
+                        onClick={() => history.replace("/productos")}
                     >
                         ⬅ Volver
                     </button>
