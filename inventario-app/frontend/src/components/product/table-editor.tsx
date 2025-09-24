@@ -22,7 +22,7 @@ type Props = {
 export default function ProductosTable({ productos: productosProp }: Props) {
     const [productos, setProductos] = useState<Producto[]>([]);
     const [loading, setLoading] = useState(true);
-    const history = useHistory(); 
+    const history = useHistory();
 
     useEffect(() => {
         if (productosProp) {
@@ -52,36 +52,50 @@ export default function ProductosTable({ productos: productosProp }: Props) {
     if (loading) return <p>Cargando productos...</p>;
 
     return (
-        <div className="tabla-wrapper">
-            <div className="tabla-card">
-                <h2 className="tabla-header">📦 Productos registrados </h2>
-                <div className="tabla-container">
-                    <table className="tabla-productos">
-                        <thead>
-                            <tr>
-                                <th>Código de Barras</th>
-                                <th>Nombre</th>
-                                <th>Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {productos.map((prod) => (
+        <div className="productos-card-outer">
+            {/* Card interna solo para encabezado */}
+            <div className="productos-card">
+                <div className="productos-header">
+                    <span className="productos-icon">📦</span>
+                    <h3 className="productos-title">Productos Registrados</h3>
+                </div>
+            </div>
+
+            {/* Tabla con estilos mejorados */}
+            <div className="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Código de Barras</th>
+                            <th>Nombre</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {productos.length > 0 ? (
+                            productos.map((prod) => (
                                 <tr key={prod.id}>
                                     <td>{prod.codigo_barras || "N/A"}</td>
                                     <td>{prod.nombre}</td>
                                     <td>
                                         <button
                                             className="btn-ver"
-                                            onClick={() => history.push(`/product/${prod.id}`)} 
+                                            onClick={() => history.push(`/product/${prod.id}`)}
                                         >
                                             Ver producto
                                         </button>
                                     </td>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                            ))
+                        ) : (
+                            <tr>
+                                <td colSpan={3} style={{ textAlign: "center", padding: "10px" }}>
+                                    No hay productos
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
             </div>
         </div>
     );

@@ -15,6 +15,7 @@ export type Producto = {
     estado: string;
     activo: boolean;
     fecha: string;
+    disponibilidad: string;
 };
 
 type Props = {
@@ -37,27 +38,30 @@ export default function ProductosTable({ productos: productosProp }: Props) {
             const { data, error } = await supabase
                 .from("productos")
                 .select(`
-            id,
-            nombre,
-            activo,
-            stock (
-                cantidad,
-                estado,
-                ultima_actualizacion
-                )
-            `)
+                        id,
+                        nombre,
+                        activo,
+                        created_at,
+                        stock (
+                            cantidad,
+                            estado,
+                            disponibilidad,
+                            ultima_actualizacion
+                            )
+                        `)
                 .order("id", { ascending: false });
 
             if (error) {
                 console.error("Error al cargar productos:", error.message);
             } else {
-                const productosConStock = data.map((p: any) => ({
+                const productosConStock: Producto[] = data.map((p: any) => ({
                     id: p.id,
                     nombre: p.nombre,
                     activo: p.activo,
                     stock: p.stock?.cantidad ?? 0,
                     estado: p.stock?.estado ?? "N/A",
-                    fecha: p.stock?.ultima_actualizacion ?? "-",
+                    disponibilidad: p.stock?.disponibilidad ?? "Baja",
+                    fecha: p.created_at ?? "-",
                 }));
                 setProductos(productosConStock);
             }
@@ -89,6 +93,7 @@ export default function ProductosTable({ productos: productosProp }: Props) {
                             <th>Stock</th>
                             <th>Fecha</th>
                             <th>Estado</th>
+                            <th>Disponibilidad</th>
                             <th>Activo</th>
                         </tr>
                     </thead>
@@ -100,18 +105,8 @@ export default function ProductosTable({ productos: productosProp }: Props) {
                                     <td>{p.nombre}</td>
                                     <td>{p.stock}</td>
                                     <td>{p.fecha}</td>
-                                    <td>
-                                        <span
-                                            className={`badge ${p.estado === "Disponible"
-                                                ? "disponible"
-                                                : p.estado === "Agotado"
-                                                    ? "agotado"
-                                                    : "na"
-                                                }`}
-                                        >
-                                            {p.estado}
-                                        </span>
-                                    </td>
+                                    <td>{p.estado}</td>
+                                    <td>{p.disponibilidad}</td>
                                     <td className="check">{p.activo ? "✅" : "❌"}</td>
                                 </tr>
                             ))

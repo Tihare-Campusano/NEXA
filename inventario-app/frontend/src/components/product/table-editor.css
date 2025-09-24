@@ -1,73 +1,86 @@
-/* Wrapper general */
-.tabla-wrapper {
-    width: 100%;
-    position: relative;
+/* Card exterior */
+.productos-card-outer {
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #2c2c2c;
+    padding: 16px;
+    margin-bottom: 20px;
+    box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.2);
 }
 
-/* Header fijo */
-.tabla-header {
-    position: sticky;
-    top: 0;
+/* Card interior (solo encabezado con línea verde) */
+.productos-card {
     background: #fff;
-    z-index: 20;
-    padding: 1rem 0.5rem;
-    font-size: 1.4rem;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+/* Encabezado */
+.productos-header {
+    display: flex;
+    align-items: center;
+    padding: 16px 20px;
+    border-left: 4px solid #28a745;
+    background: #fff;
+}
+
+.productos-icon {
+    font-size: 22px;
+    margin-right: 12px;
+}
+
+.productos-title {
+    font-size: 20px;
     font-weight: 600;
     color: #333;
-    border-left: 4px solid #28a745;
+    margin: 0;
 }
 
-/* Contenedor solo para scroll horizontal de la tabla */
-.tabla-container {
-    overflow-x: auto;
-    margin-top: 1rem;
-}
-
-/* Card contenedor de la tabla */
-.tabla-card {
-    background: #fff;
-    border-radius: 5px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-    padding: 1rem;
+/* Contenedor tabla */
+.table-container {
+    max-height: 340px;
+    overflow-y: auto;
+    border-top: 1px solid #ddd;
+    padding-top: 8px;
 }
 
 /* Tabla */
-.tabla-productos {
+.table-container table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.95rem;
+    font-size: 16px;
 }
 
-.tabla-productos th,
-.tabla-productos td {
-    padding: 0.9rem 1rem;
-    text-align: left;
-    border-bottom: 1px solid #e9ecef;
-}
-
-.tabla-productos th {
-    background: #f8f9fa;
-    font-weight: 600;
-    color: #495057;
-    text-transform: uppercase;
-    font-size: 0.85rem;
+/* Encabezado tabla */
+.table-container thead {
     position: sticky;
-    /* header de columna fijo */
-    top: 3.5rem;
-    /* justo debajo del h2 */
-    z-index: 10;
+    top: 0;
+    background: #f4f4f4;
+    color: #333;
+    font-weight: 600;
+    text-transform: uppercase;
+    border-bottom: 2px solid #ddd;
 }
 
-.tabla-productos tr {
-    transition: background 0.2s ease;
+.table-container th {
+    padding: 14px;
+    text-align: left;
 }
 
-.tabla-productos tr:hover {
-    background: #f1f3f5;
+/* Filas */
+.table-container td {
+    padding: 14px;
+    border-bottom: 1px solid #eee;
+    color: #333;
+    font-size: 16px;
 }
 
-.tabla-productos td {
-    color: #212529;
+/* Hover fila */
+.table-container tbody tr:hover {
+    background: #f9f9f9;
+    transition: background 0.2s;
 }
 
 /* Botón acción */
@@ -76,7 +89,7 @@
     color: white;
     padding: 0.5rem 1rem;
     border: none;
-    border-radius: 4px;
+    border-radius: 6px;
     font-size: 0.85rem;
     cursor: pointer;
     transition: background 0.2s ease;
@@ -84,22 +97,4 @@
 
 .btn-ver:hover {
     background-color: #0056b3;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    .tabla-header {
-        font-size: 1.2rem;
-    }
-
-    .tabla-productos th,
-    .tabla-productos td {
-        padding: 0.6rem 0.7rem;
-        font-size: 0.85rem;
-    }
-
-    .btn-ver {
-        padding: 0.4rem 0.7rem;
-        font-size: 0.8rem;
-    }
 }
