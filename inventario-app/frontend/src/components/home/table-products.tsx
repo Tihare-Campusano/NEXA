@@ -70,14 +70,16 @@ export default function ProductosTable({ productos: productosProp }: Props) {
     if (loading) return <p>Cargando productos...</p>;
 
     return (
-        <div className="productos-card">
-            {/* Encabezado con icono y título */}
-            <div className="productos-header">
-                <span className="productos-icon">📦</span>
-                <h3 className="productos-title">Lista de Productos</h3>
+        <div className="productos-card-outer">
+            {/* Card interna solo para el encabezado */}
+            <div className="productos-card">
+                <div className="productos-header">
+                    <span className="productos-icon">📦</span>
+                    <h3 className="productos-title">Lista de Productos</h3>
+                </div>
             </div>
 
-            {/* Tabla */}
+            {/* Tabla afuera de la card interna */}
             <div className="table-container">
                 <table>
                     <thead>
@@ -101,10 +103,10 @@ export default function ProductosTable({ productos: productosProp }: Props) {
                                     <td>
                                         <span
                                             className={`badge ${p.estado === "Disponible"
-                                                    ? "disponible"
-                                                    : p.estado === "Agotado"
-                                                        ? "agotado"
-                                                        : "na"
+                                                ? "disponible"
+                                                : p.estado === "Agotado"
+                                                    ? "agotado"
+                                                    : "na"
                                                 }`}
                                         >
                                             {p.estado}

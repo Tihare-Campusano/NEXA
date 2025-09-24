@@ -1,29 +1,38 @@
-/* Caja principal de la tarjeta */
+/* Card exterior (sin línea verde) */
+.productos-card-outer {
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #2c2c2c;
+    padding: 16px;
+    margin-bottom: 20px;
+    box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Card interior (solo para encabezado con línea verde) */
 .productos-card {
     background: #fff;
     border-radius: 8px;
-    border: 1px solid #2c2c2c;
-    box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.2);
+    border: 1px solid #ddd;
     overflow: hidden;
+    margin-bottom: 12px; /* separa del table-container */
 }
 
-/* Encabezado */
+/* Encabezado con línea verde */
 .productos-header {
     display: flex;
     align-items: center;
-    padding: 12px 16px;
-    border-left: 4px solid #28a745;
-    /* Línea verde */
+    padding: 16px 20px;
+    border-left: 4px solid #28a745; /* línea verde */
     background: #fff;
 }
 
 .productos-icon {
-    font-size: 18px;
-    margin-right: 8px;
+    font-size: 22px; /* un poco más grande */
+    margin-right: 12px;
 }
 
 .productos-title {
-    font-size: 16px;
+    font-size: 20px; /* más grande */
     font-weight: 600;
     color: #333;
     margin: 0;
@@ -31,16 +40,17 @@
 
 /* Contenedor de tabla */
 .table-container {
-    max-height: 300px;
+    max-height: 340px; /* un poco más grande */
     overflow-y: auto;
     border-top: 1px solid #ddd;
+    padding-top: 8px;
 }
 
 /* Tabla */
 .table-container table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 14px;
+    font-size: 16px; /* letra más grande */
 }
 
 /* Encabezado de tabla */
@@ -55,15 +65,16 @@
 }
 
 .table-container th {
-    padding: 10px;
+    padding: 14px;
     text-align: left;
 }
 
 /* Filas */
 .table-container td {
-    padding: 10px;
+    padding: 14px;
     border-bottom: 1px solid #eee;
     color: #333;
+    font-size: 16px;
 }
 
 /* Hover */
@@ -74,9 +85,9 @@
 
 /* Badges */
 .badge {
-    padding: 3px 8px;
+    padding: 5px 12px;
     border-radius: 12px;
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 500;
     display: inline-block;
 }
@@ -98,5 +109,6 @@
 
 /* Activo */
 .check {
-    font-size: 16px;
+    font-size: 18px;
+    text-align: center;
 }
