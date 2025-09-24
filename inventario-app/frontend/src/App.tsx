@@ -41,6 +41,7 @@ import Home from "./pages/home/home";
 import Reportes from "./pages/reports/reports";
 import Registro from "./pages/register-product/register-manual";
 import Productos from "./pages/product/mostrar-products";
+import EditorProducto from "./pages/product/editor-product";
 import Perfil from "./pages/perfil/perfil";
 
 setupIonicReact();
@@ -60,6 +61,7 @@ const App: React.FC = () => (
           <Route exact path="/reportes" component={Reportes} />
           <Route exact path="/registro" component={Registro} />
           <Route exact path="/productos" component={Productos} />
+          <Route exact path="/product/:id" component={EditorProducto} />
           <Route exact path="/perfil" component={Perfil} />
         </IonRouterOutlet>
 

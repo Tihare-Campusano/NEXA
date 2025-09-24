@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useParams, useHistory } from "react-router-dom";
 import { createClient } from "@supabase/supabase-js";
-import "./editor-producto.css";
+import { FaBoxOpen } from "react-icons/fa";
+import "./editor-product.css";
 
-// Configura el cliente de Supabase
+// Configuración de Supabase
 const supabase = createClient(
     import.meta.env.VITE_SUPABASE_URL as string,
     import.meta.env.VITE_SUPABASE_ANON_KEY as string
@@ -12,12 +13,20 @@ const supabase = createClient(
 export type Producto = {
     id: number;
     codigo_barras: string | null;
+    marca: string | null;
+    modelo: string | null;
+    compatibilidad: string | null;
+    sku: string | null;
     nombre: string;
-    descripcion?: string | null;
-    precio?: number | null;
-    stock?: number | null;
-    categoria?: string | null;
-    fecha_creacion?: string | null;
+    categoria_id: number | null;
+    unidad: string | null;
+    stock_minimo: number | null;
+    observaciones: string | null;
+    activo: boolean;
+    creado_en: string | null;
+    created_at: string | null;
+    updated_at: string | null;
+    categoria?: { nombre: string | null };
 };
 
 export default function EditorProducto() {
@@ -29,51 +38,80 @@ export default function EditorProducto() {
 
     useEffect(() => {
         const fetchProducto = async () => {
+            setProducto(null);
             setLoading(true);
+
             const { data, error } = await supabase
                 .from("productos")
-                .select("*") // traemos todos los campos
+                .select(
+                    `
+          *,
+          categoria:categorias(nombre)
+        `
+                )
                 .eq("id", id)
-                .single(); // porque solo debe traer uno
+                .single();
 
             if (error) {
                 console.error("Error al obtener producto:", error.message);
             } else {
-                setProducto(data);
+                setProducto(data as Producto);
             }
+
             setLoading(false);
         };
 
-        if (id) {
-            fetchProducto();
-        }
+        if (id) fetchProducto();
     }, [id]);
 
     if (loading) return <p>Cargando producto...</p>;
     if (!producto) return <p>No se encontró el producto</p>;
 
+    // función para formatear fechas
+    const formatFecha = (fecha: string | null) => {
+        if (!fecha) return "N/A";
+        return new Date(fecha).toLocaleString("es-CL");
+    };
+
     return (
-        <div className="editor-producto-card">
-            <div className="editor-header">
-                <span className="editor-icon">📝</span>
-                <h2>Detalle del Producto</h2>
-            </div>
+        <div className="editor-container">
+            <h2 className="titulo-centrado">
+                <FaBoxOpen /> Detalle del Producto
+            </h2>
 
-            <div className="editor-body">
-                <p><strong>ID:</strong> {producto.id}</p>
-                <p><strong>Código de Barras:</strong> {producto.codigo_barras || "N/A"}</p>
-                <p><strong>Nombre:</strong> {producto.nombre}</p>
-                <p><strong>Descripción:</strong> {producto.descripcion || "Sin descripción"}</p>
-                <p><strong>Precio:</strong> {producto.precio != null ? `$${producto.precio}` : "N/A"}</p>
-                <p><strong>Stock:</strong> {producto.stock != null ? producto.stock : "N/A"}</p>
-                <p><strong>Categoría:</strong> {producto.categoria || "Sin categoría"}</p>
-                <p><strong>Fecha de creación:</strong> {producto.fecha_creacion || "N/A"}</p>
-            </div>
+            <div className="editor-producto-card">
+                <div className="editor-body">
+                    <p><strong>ID:</strong> {producto.id}</p>
+                    <p><strong>Código de Barras:</strong> {producto.codigo_barras || "N/A"}</p>
+                    <p><strong>Nombre:</strong> {producto.nombre}</p>
+                    <p><strong>Marca:</strong> {producto.marca || "N/A"}</p>
+                    <p><strong>Modelo:</strong> {producto.modelo || "N/A"}</p>
+                    <p><strong>Compatibilidad:</strong> {producto.compatibilidad || "N/A"}</p>
+                    <p><strong>SKU:</strong> {producto.sku || "N/A"}</p>
+                    <p><strong>Categoría:</strong> {producto.categoria?.nombre || "Sin categoría"}</p>
+                    <p><strong>Unidad:</strong> {producto.unidad || "N/A"}</p>
+                    <p><strong>Stock mínimo:</strong> {producto.stock_minimo ?? "N/A"}</p>
+                    <p><strong>Observaciones:</strong> {producto.observaciones || "Ninguna"}</p>
+                    <p>
+                        <strong>Activo:</strong>{" "}
+                        {producto.activo ? (
+                            <span className="activo">✔ Sí</span>
+                        ) : (
+                            <span className="inactivo">✘ No</span>
+                        )}
+                    </p>
+                    <p><strong>Creado en:</strong> {formatFecha(producto.creado_en)}</p>
+                    <p><strong>Última actualización:</strong> {formatFecha(producto.updated_at)}</p>
+                </div>
 
-            <div className="editor-actions">
-                <button className="btn-volver" onClick={() => history.push("/")}>
-                    ⬅ Volver
-                </button>
+                <div className="editor-actions">
+                    <button
+                        className="btn-volver"
+                        onClick={() => history.push("/productos")}
+                    >
+                        ⬅ Volver
+                    </button>
+                </div>
             </div>
         </div>
     );

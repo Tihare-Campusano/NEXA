@@ -1,0 +1,78 @@
+.editor-container {
+    padding: 1rem;
+}
+
+.editor-producto-card {
+    background: #fff;
+    padding: 1.5rem 2rem;
+    border-radius: 14px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    margin: 2rem auto;
+    max-width: 750px;
+}
+
+.editor-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.9rem 1.4rem;
+}
+
+.editor-body p {
+    margin: 0;
+    font-size: 0.95rem;
+    color: #333;
+    padding: 0.55rem 0.75rem;
+    border-radius: 8px;
+    background: #fafafa;
+    border: 1px solid #eee;
+    transition: background 0.2s;
+}
+
+.editor-body p:hover {
+    background: #f5f7fa;
+}
+
+.editor-body strong {
+    color: #111;
+    font-weight: 600;
+}
+
+.activo {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.inactivo {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.editor-actions {
+    margin-top: 1.5rem;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.btn-volver {
+    padding: 0.6rem 1.2rem;
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.3s ease;
+    font-weight: 500;
+}
+
+.btn-volver:hover {
+    transform: scale(1.05);
+    background: linear-gradient(135deg, #0056b3, #004099);
+}
+
+/* Para mantener consistencia con Home */
+.titulo-centrado {
+    text-align: center;
+    font-size: 1.5rem;
+    color: #333;
+    font-weight: 600;
+}
