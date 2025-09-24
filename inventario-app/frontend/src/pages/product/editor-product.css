@@ -5,7 +5,8 @@
 .editor-producto-card {
     background: #fff;
     padding: 1.5rem 2rem;
-    border-radius: 14px;
+    border-radius: 6px;
+    /* reducido */
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
     margin: 2rem auto;
     max-width: 750px;
@@ -22,7 +23,8 @@
     font-size: 0.95rem;
     color: #333;
     padding: 0.55rem 0.75rem;
-    border-radius: 8px;
+    border-radius: 4px;
+    /* reducido */
     background: #fafafa;
     border: 1px solid #eee;
     transition: background 0.2s;
@@ -35,6 +37,16 @@
 .editor-body strong {
     color: #111;
     font-weight: 600;
+}
+
+.editor-body input {
+    border: none;
+    background: transparent;
+    border-bottom: 1px solid #ccc;
+    outline: none;
+    width: 70%;
+    font-size: 0.9rem;
+    padding: 2px;
 }
 
 .activo {
@@ -51,6 +63,22 @@
     margin-top: 1.5rem;
     display: flex;
     justify-content: flex-end;
+}
+
+.btn-guardar {
+    padding: 0.6rem 1.2rem;
+    background: linear-gradient(135deg, #28a745, #218838);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-right: 1rem;
+    transition: transform 0.2s ease, background 0.3s ease;
+}
+
+.btn-guardar:hover {
+    transform: scale(1.05);
+    background: linear-gradient(135deg, #218838, #1e7e34);
 }
 
 .btn-volver {

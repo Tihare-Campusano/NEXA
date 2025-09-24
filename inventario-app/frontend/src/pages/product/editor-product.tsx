@@ -35,19 +35,32 @@ export default function EditorProducto() {
 
     const [producto, setProducto] = useState<Producto | null>(null);
     const [loading, setLoading] = useState(true);
+    const [editData, setEditData] = useState<Partial<Producto>>({});
+    const [changed, setChanged] = useState(false);
+
+    // Campos editables
+    const editableFields: (keyof Producto)[] = [
+        "nombre",
+        "marca",
+        "modelo",
+        "compatibilidad",
+        "observaciones",
+    ];
 
     useEffect(() => {
         const fetchProducto = async () => {
-            setProducto(null);
+            setProducto(null); // limpiar estado previo
+            setEditData({});
+            setChanged(false);
             setLoading(true);
 
             const { data, error } = await supabase
                 .from("productos")
                 .select(
                     `
-          *,
-          categoria:categorias(nombre)
-        `
+            *,
+            categoria:categorias(nombre)
+            `
                 )
                 .eq("id", id)
                 .single();
@@ -73,6 +86,36 @@ export default function EditorProducto() {
         return new Date(fecha).toLocaleString("es-CL");
     };
 
+    const handleEdit = (field: keyof Producto, value: string) => {
+        setEditData((prev) => ({
+            ...prev,
+            [field]: value,
+        }));
+        setChanged(true);
+    };
+
+    const handleSave = async () => {
+        if (!id || !changed) return;
+
+        const { error } = await supabase
+            .from("productos")
+            .update(editData)
+            .eq("id", id);
+
+        if (error) {
+            console.error("Error al actualizar producto:", error.message);
+            return;
+        }
+
+        // refrescar datos después de guardar
+        setProducto((prev) =>
+            prev ? { ...prev, ...editData } : prev
+        );
+        setEditData({});
+        setChanged(false);
+        alert("Cambios guardados con éxito ✅");
+    };
+
     return (
         <div className="editor-container">
             <h2 className="titulo-centrado">
@@ -81,30 +124,94 @@ export default function EditorProducto() {
 
             <div className="editor-producto-card">
                 <div className="editor-body">
-                    <p><strong>ID:</strong> {producto.id}</p>
-                    <p><strong>Código de Barras:</strong> {producto.codigo_barras || "N/A"}</p>
-                    <p><strong>Nombre:</strong> {producto.nombre}</p>
-                    <p><strong>Marca:</strong> {producto.marca || "N/A"}</p>
-                    <p><strong>Modelo:</strong> {producto.modelo || "N/A"}</p>
-                    <p><strong>Compatibilidad:</strong> {producto.compatibilidad || "N/A"}</p>
-                    <p><strong>SKU:</strong> {producto.sku || "N/A"}</p>
-                    <p><strong>Categoría:</strong> {producto.categoria?.nombre || "Sin categoría"}</p>
-                    <p><strong>Unidad:</strong> {producto.unidad || "N/A"}</p>
-                    <p><strong>Stock mínimo:</strong> {producto.stock_minimo ?? "N/A"}</p>
-                    <p><strong>Observaciones:</strong> {producto.observaciones || "Ninguna"}</p>
-                    <p>
-                        <strong>Activo:</strong>{" "}
-                        {producto.activo ? (
-                            <span className="activo">✔ Sí</span>
-                        ) : (
-                            <span className="inactivo">✘ No</span>
-                        )}
-                    </p>
-                    <p><strong>Creado en:</strong> {formatFecha(producto.creado_en)}</p>
-                    <p><strong>Última actualización:</strong> {formatFecha(producto.updated_at)}</p>
+                    {Object.entries(producto).map(([key, value]) => {
+                        if (key === "categoria") {
+                            return (
+                                <p key={key}>
+                                    <strong>Categoría:</strong>{" "}
+                                    {producto.categoria?.nombre || "Sin categoría"}
+                                </p>
+                            );
+                        }
+
+                        // solo mostrar campos que nos interesan
+                        if ([
+                            "id", "codigo_barras", "sku", "categoria_id", "unidad",
+                            "stock_minimo", "activo", "creado_en", "created_at", "updated_at"
+                        ].includes(key)) {
+                            if (key === "activo") {
+                                return (
+                                    <p key={key}>
+                                        <strong>Activo:</strong>{" "}
+                                        {producto.activo ? (
+                                            <span className="activo">✔ Sí</span>
+                                        ) : (
+                                            <span className="inactivo">✘ No</span>
+                                        )}
+                                    </p>
+                                );
+                            }
+
+                            if (key === "creado_en" || key === "updated_at") {
+                                return (
+                                    <p key={key}>
+                                        <strong>
+                                            {key === "creado_en"
+                                                ? "Creado en"
+                                                : "Última actualización"}
+                                            :
+                                        </strong>{" "}
+                                        {formatFecha(value as string | null)}
+                                    </p>
+                                );
+                            }
+
+                            return (
+                                <p key={key}>
+                                    <strong>{key.replace("_", " ")}:</strong>{" "}
+                                    {typeof value === "boolean"
+                                        ? value
+                                            ? "Sí"
+                                            : "No"
+                                        : value !== null && value !== undefined
+                                            ? String(value)
+                                            : "N/A"}
+                                </p>
+                            );
+                        }
+
+                        // campos editables
+                        if (editableFields.includes(key as keyof Producto)) {
+                            return (
+                                <p key={key}>
+                                    <strong>{key}:</strong>{" "}
+                                    <input
+                                        type="text"
+                                        value={
+                                            String(
+                                                editData[key as keyof Producto] ??
+                                                (value as string | number | boolean | null) ??
+                                                ""
+                                            )
+                                        }
+                                        onChange={(e) =>
+                                            handleEdit(key as keyof Producto, e.target.value)
+                                        }
+                                    />
+                                </p>
+                            );
+                        }
+
+                        return null;
+                    })}
                 </div>
 
                 <div className="editor-actions">
+                    {changed && (
+                        <button className="btn-guardar" onClick={handleSave}>
+                            💾 Guardar cambios
+                        </button>
+                    )}
                     <button
                         className="btn-volver"
                         onClick={() => history.push("/productos")}
