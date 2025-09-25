@@ -244,7 +244,7 @@ export default function EditorProducto() {
 
                     <button
                         className="btn-volver"
-                        onClick={() => history.push("/productos")}
+                        onClick={() => history.replace("/product")}
                     >
                         ⬅ Volver
                     </button>

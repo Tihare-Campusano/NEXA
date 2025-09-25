@@ -60,7 +60,7 @@ const App: React.FC = () => (
           <Route exact path="/home" component={Home} />
           <Route exact path="/reportes" component={Reportes} />
           <Route exact path="/registro" component={Registro} />
-          <Route exact path="/productos" component={Productos} />
+          <Route exact path="/product" component={Productos} />
           <Route exact path="/product/:id" component={EditorProducto} />
           <Route exact path="/perfil" component={Perfil} />
         </IonRouterOutlet>
@@ -82,7 +82,7 @@ const App: React.FC = () => (
             <IonLabel>Registro</IonLabel>
           </IonTabButton>
 
-          <IonTabButton tab="productos" href="/productos">
+          <IonTabButton tab="productos" href="/product">
             <IonIcon aria-hidden="true" icon={list} />
             <IonLabel>Productos</IonLabel>
           </IonTabButton>
