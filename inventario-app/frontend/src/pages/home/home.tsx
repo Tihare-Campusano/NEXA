@@ -2,7 +2,6 @@ import { useState } from "react";
 import ProductosTable from "../../components/home/table-products";
 import ProductosSearch from "../../components/home/productos-search";
 import { FaBoxes } from "react-icons/fa";
-import "./Home.css"; 
 
 export default function Home() {
   const [productosFiltrados, setProductosFiltrados] = useState<any[] | null>(null);
