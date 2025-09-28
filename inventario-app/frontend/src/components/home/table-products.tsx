@@ -27,28 +27,33 @@ export default function ProductosTable({ productos: productosProp }: Props) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (productosProp) {
+        // Si vienen productos por props, úsalos y no los sobreescribas
+        if (productosProp && productosProp.length > 0) {
             setProductos(productosProp);
             setLoading(false);
             return;
         }
 
+        // Si ya tenemos productos cargados, no vuelvas a resetearlos
+        if (productos.length > 0) return;
+
         const fetchProductos = async () => {
             setLoading(true);
+
             const { data, error } = await supabase
                 .from("productos")
                 .select(`
-                        id,
-                        nombre,
-                        activo,
-                        created_at,
-                        stock (
-                            cantidad,
-                            estado,
-                            disponibilidad,
-                            ultima_actualizacion
-                            )
-                        `)
+          id,
+          nombre,
+          activo,
+          created_at,
+          stock (
+            cantidad,
+            estado,
+            disponibilidad,
+            ultima_actualizacion
+          )
+        `)
                 .order("id", { ascending: false });
 
             if (error) {
@@ -65,13 +70,17 @@ export default function ProductosTable({ productos: productosProp }: Props) {
                 }));
                 setProductos(productosConStock);
             }
+
             setLoading(false);
         };
 
         fetchProductos();
     }, [productosProp]);
 
-    if (loading) return <p>Cargando productos...</p>;
+    // Solo mostrar "Cargando..." si no hay nada cargado aún
+    if (loading && productos.length === 0) {
+        return <p>Cargando productos...</p>;
+    }
 
     return (
         <div className="productos-card-outer">
@@ -112,7 +121,7 @@ export default function ProductosTable({ productos: productosProp }: Props) {
                             ))
                         ) : (
                             <tr>
-                                <td colSpan={6} style={{ textAlign: "center", padding: "10px" }}>
+                                <td colSpan={7} style={{ textAlign: "center", padding: "10px" }}>
                                     No hay productos
                                 </td>
                             </tr>
