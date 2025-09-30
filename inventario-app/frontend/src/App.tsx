@@ -1,4 +1,10 @@
-import { Redirect, Route } from "react-router-dom";
+import ReportAllProducts from "./components/reports/reporte_productos_almacenados/report_all_products";
+import ReportBadState from "./components/reports/reporte_productos_mal_estado/report_bad_state";
+import ReportUsedProduct from "./components/reports/reporte_productos_usados/report_used_product";
+import ReportNewProduct from "./components/reports/reporte_productos_nuevos/report_new_product";
+import ReportStockMonth from "./components/reports/reporte_stock_mensual/report_stock_month";
+
+import { Redirect, Route, Switch } from "react-router-dom";
 import {
   IonApp,
   IonIcon,
@@ -14,29 +20,23 @@ import { IonReactRouter } from "@ionic/react-router";
 /* Importar iconos */
 import { home, barChart, create, list, person } from "ionicons/icons";
 
-/* Core CSS required for Ionic components to work properly */
+/* Ionic core styles */
 import "@ionic/react/css/core.css";
-
-/* Basic CSS for apps built with Ionic */
 import "@ionic/react/css/normalize.css";
 import "@ionic/react/css/structure.css";
 import "@ionic/react/css/typography.css";
-
-/* Optional CSS utils that can be commented out */
 import "@ionic/react/css/padding.css";
 import "@ionic/react/css/float-elements.css";
 import "@ionic/react/css/text-alignment.css";
 import "@ionic/react/css/text-transformation.css";
 import "@ionic/react/css/flex-utils.css";
 import "@ionic/react/css/display.css";
-
-/* Dark mode */
 import "@ionic/react/css/palettes/dark.system.css";
 
-/* Theme variables */
+/* Variables */
 import "./theme/variables.css";
 
-/* Importar las páginas */
+/* Páginas */
 import Home from "./pages/home/home";
 import Reportes from "./pages/reports/reports";
 import Registro from "./pages/register-product/register-manual";
@@ -51,21 +51,29 @@ const App: React.FC = () => (
     <IonReactRouter>
       <IonTabs>
         <IonRouterOutlet>
-          {/* Redirigir la raíz hacia /home */}
-          <Route exact path="/">
-            <Redirect to="/home" />
+          <Switch>
+            <Route exact path="/" render={() => <Redirect to="/home" />} />
 
-            {/* rutas */}
-          </Route>
-          <Route exact path="/home" component={Home} />
-          <Route exact path="/reportes" component={Reportes} />
-          <Route exact path="/registro" component={Registro} />
-          <Route exact path="/productos" component={Productos} />
-          <Route exact path="/product/:id" component={EditorProducto} />
-          <Route exact path="/perfil" component={Perfil} />
+            {/* Hijas de reportes */}
+            <Route exact path="/reportes/productos-almacenados" component={ReportAllProducts} />
+            <Route exact path="/reportes/productos-mal-estado" component={ReportBadState} />
+            <Route exact path="/reportes/productos-usados" component={ReportUsedProduct} />
+            <Route exact path="/reportes/productos-nuevos" component={ReportNewProduct} />
+            <Route exact path="/reportes/stock-mensual" component={ReportStockMonth} />
+
+            {/* Padre */}
+            <Route exact path="/reportes" component={Reportes} />
+
+            {/* Otras */}
+            <Route exact path="/home" component={Home} />
+            <Route exact path="/registro" component={Registro} />
+            <Route exact path="/productos" component={Productos} />
+            <Route exact path="/product/:id" component={EditorProducto} />
+            <Route exact path="/perfil" component={Perfil} />
+          </Switch>
         </IonRouterOutlet>
 
-        {/* Rutas para los tabs inferiores */}
+        {/* TAB BAR */}
         <IonTabBar slot="bottom">
           <IonTabButton tab="home" href="/home">
             <IonIcon aria-hidden="true" icon={home} />
