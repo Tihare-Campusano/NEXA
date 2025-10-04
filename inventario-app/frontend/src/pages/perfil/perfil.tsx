@@ -14,6 +14,10 @@ export default function Perfil() {
     console.log("Cerrar sesión");
   };
 
+  const handleSoporte = () => {
+    console.log("Ir a Soporte");
+  };
+
   return (
     <div style={{ padding: "1rem" }}>
       <br />
@@ -45,6 +49,26 @@ export default function Perfil() {
           <p className="perfil-value">{usuario.fechaIngreso}</p>
         </div>
       </div>
+
+      {/* Botón soporte */}
+      <button
+        className="btn-soporte"
+        onClick={handleSoporte}
+        style={{
+          backgroundColor: "#00bfff", // celeste
+          color: "white",
+          padding: "10px 20px",
+          marginTop: "20px",
+          border: "none",
+          borderRadius: "8px",
+          cursor: "pointer",
+          display: "block",
+          width: "100%",
+        }}
+      >
+        Soporte
+      </button>
+      <br />
 
       {/* Botón cerrar sesión */}
       <button className="btn-logout" onClick={handleLogout}>

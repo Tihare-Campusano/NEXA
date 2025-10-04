@@ -134,6 +134,6 @@ Envía un pull request
 MIT License © 2025 — Equipo NEXA
 
 👥 Créditos / Contribuidores
-Tihare-Campusano / Tiharé Campusano
+Tihare-Campusano / Tihare Campusano
 YeremG / Yeremi Guerrero
 Octavio / Octavio Yañez
