@@ -3,6 +3,7 @@ import { IonPage, IonContent } from "@ionic/react";
 import StockChart from "../../components/reports/graficos/prod_mas_stock";
 import EstadoProductosChart from "../../components/reports/graficos/porcen_prod_por_estado";
 import ReportesDropdown from "../../components/reports/ReportesDropdown";
+import HeaderApp from "../../components/header_app";
 
 // 👇 ejemplo: aquí podrías abrir tus otros componentes de reportes
 function abrirReporte1() {
@@ -16,12 +17,9 @@ function abrirReporte2() {
 export default function Home() {
   return (
     <IonPage>
+      {/* 🔹 Header reutilizable */}      
+      <HeaderApp title="Reportes" icon={<FaFileAlt size={28} className="text-green-400" />} />
       <IonContent className="ion-padding">
-        <h2 className="titulo-centrado">
-          <FaFileAlt style={{ marginRight: "0.5rem" }} />
-          Reportes
-        </h2>
-
         {/* 🔹 Botón desplegable con margen y alineado a la izquierda */}
         <div style={{ margin: "1rem 0", display: "flex", justifyContent: "flex-start" }}>
           <ReportesDropdown
@@ -31,7 +29,6 @@ export default function Home() {
             ]}
           />
         </div>
-
         <StockChart />
         <br />
         <EstadoProductosChart />

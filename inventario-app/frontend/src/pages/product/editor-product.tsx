@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useHistory } from "react-router-dom";
 import { createClient } from "@supabase/supabase-js";
-import { FaBoxOpen } from "react-icons/fa";
+import { FaBoxOpen, FaEdit } from "react-icons/fa";
 import "./editor-product.css";
-import { IonPage } from "@ionic/react";
+import { IonPage, IonContent } from "@ionic/react";
+import HeaderApp from "../../components/header_app";
 
 // Configuración de Supabase
 const supabase = createClient(
@@ -40,7 +41,6 @@ export default function EditorProducto() {
     const [changed, setChanged] = useState<boolean>(false);
     const mountedRef = useRef(true);
 
-    // campos editables
     const editableFields: (keyof Producto)[] = [
         "nombre",
         "marca",
@@ -52,7 +52,7 @@ export default function EditorProducto() {
     useEffect(() => {
         mountedRef.current = true;
         return () => {
-            mountedRef.current = false; // marcar desmontado
+            mountedRef.current = false;
         };
     }, []);
 
@@ -61,7 +61,6 @@ export default function EditorProducto() {
 
         let ignore = false;
         const fetchProducto = async () => {
-            // limpiamos estado y mostramos loader una sola vez
             if (mountedRef.current && !ignore) {
                 setProducto(null);
                 setEditData({});
@@ -75,7 +74,6 @@ export default function EditorProducto() {
                 .eq("id", id)
                 .single();
 
-            // si el componente ya fue desmontado, no hacemos setState
             if (!mountedRef.current || ignore) return;
 
             if (error) {
@@ -89,7 +87,6 @@ export default function EditorProducto() {
 
         fetchProducto();
 
-        // cleanup en caso de remounts rápidos
         return () => {
             ignore = true;
         };
@@ -106,7 +103,6 @@ export default function EditorProducto() {
     const handleSave = async () => {
         if (!id || !changed) return;
 
-        // sólo los campos que se cambiaron
         const payload: Record<string, any> = {};
         Object.keys(editData).forEach((k) => {
             payload[k] = (editData as any)[k];
@@ -119,140 +115,127 @@ export default function EditorProducto() {
             return;
         }
 
-        // refrescar localmente
         setProducto((prev) => (prev ? ({ ...prev, ...payload } as Producto) : prev));
         setEditData({});
         setChanged(false);
         alert("Cambios guardados ✅");
     };
 
-    // Si está cargando, mostramos UN ÚNICO loader (early return)
+    // Loader
     if (loading) {
         return (
-            <div className="editor-container">
-                <h2 className="titulo-centrado">
-                    <FaBoxOpen /> Detalle del Producto
-                </h2>
-                <div className="loading-container">
-                    <p>Cargando producto...</p>
-                </div>
-            </div>
+            <IonPage>
+                <HeaderApp icon={<FaBoxOpen />} title="Detalle del Producto" />
+                <IonContent className="ion-padding">
+                    <div className="loading-container">
+                        <p>Cargando producto...</p>
+                    </div>
+                </IonContent>
+            </IonPage>
         );
     }
 
+    // Producto no encontrado
     if (!producto) {
         return (
-            <div className="editor-container">
-                <h2 className="titulo-centrado">
-                    <FaBoxOpen /> Detalle del Producto
-                </h2>
-                <p style={{ textAlign: "center", marginTop: 24 }}>No se encontró el producto</p>
-                <div style={{ display: "flex", justifyContent: "center", marginTop: 12 }}>
-                    <button className="btn-volver" onClick={() => history.replace("/productos")}>
-                        ⬅ Volver
-                    </button>
-                </div>
-            </div>
+            <IonPage>
+                <HeaderApp icon={<FaBoxOpen />} title="Detalle del Producto" />
+                <IonContent className="ion-padding">
+                    <p style={{ textAlign: "center", marginTop: 24 }}>No se encontró el producto</p>
+                    <div style={{ display: "flex", justifyContent: "center", marginTop: 12 }}>
+                        <button className="btn-volver" onClick={() => history.replace("/productos")}>
+                            ⬅ Volver
+                        </button>
+                    </div>
+                </IonContent>
+            </IonPage>
         );
     }
 
     return (
         <IonPage>
-            <div className="editor-container">
-                <h2 className="titulo-centrado">
-                    <FaBoxOpen /> Detalle del Producto
-                </h2>
+            <HeaderApp icon={<FaEdit size={28} className="text-green-400" />} title="Editar producto" />
 
-                <div className="editor-producto-card">
-                    <div className="editor-body">
-                        <p><strong>ID:</strong> {String(producto.id)}</p>
+            <IonContent fullscreen className="ion-padding">
+                <div className="editor-container">
+                    <div className="editor-producto-card">
+                        <div className="editor-body">
+                            <p><strong>ID:</strong> {String(producto.id)}</p>
+                            <p><strong>Código de Barras:</strong> {producto.codigo_barras ?? "N/A"}</p>
+                            <p>
+                                <strong>Nombre:</strong>
+                                <input
+                                    title={String(editData.nombre ?? producto.nombre ?? "")}
+                                    value={String(editData.nombre ?? producto.nombre ?? "")}
+                                    onChange={(e) => handleEdit("nombre", e.target.value)}
+                                />
+                            </p>
+                            <p>
+                                <strong>Marca:</strong>
+                                <input
+                                    title={String(editData.marca ?? producto.marca ?? "")}
+                                    value={String(editData.marca ?? producto.marca ?? "")}
+                                    onChange={(e) => handleEdit("marca", e.target.value)}
+                                />
+                            </p>
+                            <p>
+                                <strong>Modelo:</strong>
+                                <input
+                                    title={String(editData.modelo ?? producto.modelo ?? "")}
+                                    value={String(editData.modelo ?? producto.modelo ?? "")}
+                                    onChange={(e) => handleEdit("modelo", e.target.value)}
+                                />
+                            </p>
+                            <p>
+                                <strong>Compatibilidad:</strong>
+                                <textarea
+                                    title={String(editData.compatibilidad ?? producto.compatibilidad ?? "")}
+                                    value={String(editData.compatibilidad ?? producto.compatibilidad ?? "")}
+                                    onChange={(e) => handleEdit("compatibilidad", e.target.value)}
+                                    style={{ maxHeight: 120, overflowY: "auto" }}
+                                />
+                            </p>
+                            <p><strong>SKU:</strong> {producto.sku ?? "N/A"}</p>
+                            <p><strong>Categoría:</strong> {producto.categoria?.nombre ?? "Sin categoría"}</p>
+                            <p><strong>Unidad:</strong> {producto.unidad ?? "N/A"}</p>
+                            <p><strong>Stock mínimo:</strong> {producto.stock_minimo ?? "N/A"}</p>
+                            <p>
+                                <strong>Observaciones:</strong>
+                                <textarea
+                                    title={String(editData.observaciones ?? producto.observaciones ?? "")}
+                                    value={String(editData.observaciones ?? producto.observaciones ?? "")}
+                                    onChange={(e) => handleEdit("observaciones", e.target.value)}
+                                    style={{ maxHeight: 120, overflowY: "auto" }}
+                                />
+                            </p>
+                            <p>
+                                <strong>Activo:</strong>{" "}
+                                {producto.activo ? <span className="activo">✔ Sí</span> : <span className="inactivo">✘ No</span>}
+                            </p>
+                            <p><strong>Creado en:</strong> {formatFecha(producto.creado_en)}</p>
+                            <p><strong>Última actualización:</strong> {formatFecha(producto.updated_at)}</p>
+                        </div>
 
-                        <p>
-                            <strong>Código de Barras:</strong>{" "}
-                            {producto.codigo_barras ?? "N/A"}
-                        </p>
+                        <div className="editor-actions">
+                            <button
+                                className="btn-guardar"
+                                onClick={handleSave}
+                                disabled={!changed}
+                                title={!changed ? "No hay cambios para guardar" : "Guardar cambios"}
+                            >
+                                💾 Guardar cambios
+                            </button>
 
-                        <p>
-                            <strong>Nombre:</strong>
-                            <input
-                                title={String(editData.nombre ?? producto.nombre ?? "")}
-                                value={String(editData.nombre ?? producto.nombre ?? "")}
-                                onChange={(e) => handleEdit("nombre", e.target.value)}
-                            />
-                        </p>
-
-                        <p>
-                            <strong>Marca:</strong>
-                            <input
-                                title={String(editData.marca ?? producto.marca ?? "")}
-                                value={String(editData.marca ?? producto.marca ?? "")}
-                                onChange={(e) => handleEdit("marca", e.target.value)}
-                            />
-                        </p>
-
-                        <p>
-                            <strong>Modelo:</strong>
-                            <input
-                                title={String(editData.modelo ?? producto.modelo ?? "")}
-                                value={String(editData.modelo ?? producto.modelo ?? "")}
-                                onChange={(e) => handleEdit("modelo", e.target.value)}
-                            />
-                        </p>
-
-                        <p>
-                            <strong>Compatibilidad:</strong>
-                            <textarea
-                                title={String(editData.compatibilidad ?? producto.compatibilidad ?? "")}
-                                value={String(editData.compatibilidad ?? producto.compatibilidad ?? "")}
-                                onChange={(e) => handleEdit("compatibilidad", e.target.value)}
-                            />
-                        </p>
-
-                        <p><strong>SKU:</strong> {producto.sku ?? "N/A"}</p>
-
-                        <p><strong>Categoría:</strong> {producto.categoria?.nombre ?? "Sin categoría"}</p>
-
-                        <p><strong>Unidad:</strong> {producto.unidad ?? "N/A"}</p>
-
-                        <p><strong>Stock mínimo:</strong> {producto.stock_minimo ?? "N/A"}</p>
-
-                        <p>
-                            <strong>Observaciones:</strong>
-                            <textarea
-                                title={String(editData.observaciones ?? producto.observaciones ?? "")}
-                                value={String(editData.observaciones ?? producto.observaciones ?? "")}
-                                onChange={(e) => handleEdit("observaciones", e.target.value)}
-                            />
-                        </p>
-
-                        <p>
-                            <strong>Activo:</strong>{" "}
-                            {producto.activo ? <span className="activo">✔ Sí</span> : <span className="inactivo">✘ No</span>}
-                        </p>
-
-                        <p><strong>Creado en:</strong> {formatFecha(producto.creado_en)}</p>
-                        <p><strong>Última actualización:</strong> {formatFecha(producto.updated_at)}</p>
-                    </div>
-
-                    <div className="editor-actions">
-                        <button
-                            className="btn-guardar"
-                            onClick={handleSave}
-                            disabled={!changed}
-                            title={!changed ? "No hay cambios para guardar" : "Guardar cambios"}
-                        >
-                            💾 Guardar cambios
-                        </button>
-
-                        <button
-                            className="btn-volver"
-                            onClick={() => history.replace("/product")}
-                        >
-                            ⬅ Volver
-                        </button>
+                            <button
+                                className="btn-volver"
+                                onClick={() => history.replace("/product")}
+                            >
+                                ⬅ Volver
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </IonContent>
         </IonPage>
     );
 }

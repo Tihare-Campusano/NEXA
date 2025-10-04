@@ -3,6 +3,7 @@ import { IonPage, IonContent } from "@ionic/react";
 import ProductosTable from "../../components/product/table-editor";
 import ProductosSearch from "../../components/home/productos-search";
 import { FaBoxOpen } from "react-icons/fa";
+import HeaderApp from "../../components/header_app";
 import "./mostrar-products.css";
 
 export default function Productos() {
@@ -10,11 +11,9 @@ export default function Productos() {
 
   return (
     <IonPage>
-      <IonContent className="ion-padding">
-        <h2 className="titulo-centrado">
-          <FaBoxOpen /> Productos para editar
-        </h2>
-
+      {/* 🔹 Header reutilizable */}
+      <HeaderApp icon={<FaBoxOpen size={28} className="text-green-400" />} title="Productos para editar" />
+      <IonContent className="ion-padding"> 
         {/* Buscador opcional */}
         <ProductosSearch onResults={setProductosFiltrados} />
         <br />
