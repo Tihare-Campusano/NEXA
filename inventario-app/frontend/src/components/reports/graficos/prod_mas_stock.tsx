@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import ReactApexChart from "react-apexcharts";
+import ApexCharts from "apexcharts";
 
 type Product = {
     name: string;
@@ -36,9 +37,9 @@ export default function StockChart() {
         },
     ];
 
-    const options = {
+    const options: ApexCharts.ApexOptions = {
         chart: {
-            type: "bar",
+            type: 'bar', // <-- Literal 'bar', no string genérico
             toolbar: { show: true },
             animations: { enabled: true }
         },
@@ -64,7 +65,7 @@ export default function StockChart() {
             <ReactApexChart
                 options={options}
                 series={series}
-                type="bar"
+                type="bar" 
                 height={350}
             />
         </div>
