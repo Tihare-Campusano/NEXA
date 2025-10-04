@@ -3,20 +3,20 @@ import ReactApexChart from "react-apexcharts";
 import { getSupabase } from "../../../../../backend/app/services/supabase_service";
 import type { ApexOptions } from "apexcharts";
 
-type Product = {
-    name: string;
-    stock: number;
+type ProductStock = {
+    productos: { nombre: string }[];
+    cantidad: number;
 };
 
 export default function StockChart() {
-    const [products, setProducts] = useState<Product[]>([]);
+    const [products, setProducts] = useState<ProductStock[]>([]);
 
     // Cargar datos desde Supabase
     async function loadData() {
         const { data, error } = await getSupabase()
-            .from("products")
-            .select("name, stock")
-            .order("stock", { ascending: false })
+            .from("stock")
+            .select("cantidad, productos(nombre)")
+            .order("cantidad", { ascending: false })
             .limit(5);
 
         if (error) {
@@ -34,13 +34,16 @@ export default function StockChart() {
     const series = [
         {
             name: "Stock",
-            data: products.map((p) => p.stock),
+            data: products.map((p) => p.cantidad),
         },
     ];
 
     const options: ApexOptions = {
-        chart: { type: "bar" as const, toolbar: { show: true } }, 
-        xaxis: { categories: products.map((p) => p.name), title: { text: "Productos" } },
+        chart: { type: "bar" as const, toolbar: { show: true } },
+        xaxis: {
+            categories: products.map((p) => p.productos[0]?.nombre || "Desconocido"),
+            title: { text: "Productos" },
+        },
         yaxis: { title: { text: "Stock disponible" } },
         title: { text: "Top 5 productos con más stock", align: "center" },
         plotOptions: { bar: { borderRadius: 8, horizontal: false } },
