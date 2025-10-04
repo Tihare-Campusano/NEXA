@@ -99,6 +99,7 @@ En este proyecto se emplean tecnologías modernas que abarcan todo el ciclo de d
 cd backend
 pip install -r requirements.txt
 uvicorn main:app --reload
+npm install apexcharts react-apexcharts @supabase/supabase-js
 El servidor correrá en http://127.0.0.1:8000.
 
 Frontend (Ionic + React)
