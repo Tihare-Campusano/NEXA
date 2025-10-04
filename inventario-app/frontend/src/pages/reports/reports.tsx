@@ -1,6 +1,6 @@
 import { FaFileAlt } from "react-icons/fa"; 
 import StockChart from "../../components/reports/graficos/prod_mas_stock";
-// import "./reports.css";
+import EstadoProductosChart from "../../components/reports/graficos/porcen_prod_por_estado";
 
 export default function Home() {
   return (
@@ -12,6 +12,8 @@ export default function Home() {
       </h2>
       <br />
       <StockChart />
+      <br />
+      <EstadoProductosChart />
     </div>
   );
 }
