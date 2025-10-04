@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import ReactApexChart from "react-apexcharts";
-import { supabase } from "../../../../../backend/app/services/supabase_service";
+import { getSupabase } from "../../../../../backend/app/services/supabase_service";
 import type { ApexOptions } from "apexcharts";
 
 type Product = {
@@ -13,7 +13,7 @@ export default function StockChart() {
 
     // Cargar datos desde Supabase
     async function loadData() {
-        const { data, error } = await supabase
+        const { data, error } = await getSupabase()
             .from("products")
             .select("name, stock")
             .order("stock", { ascending: false })
