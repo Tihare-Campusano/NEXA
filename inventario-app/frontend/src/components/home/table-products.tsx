@@ -27,16 +27,14 @@ export default function ProductosTable({ productos: productosProp }: Props) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Si vienen productos por props, úsalos y no los sobreescribas
-        if (productosProp && productosProp.length > 0) {
+        // 🔹 Si recibimos productos desde props (ej: búsqueda), usamos esos
+        if (productosProp) {
             setProductos(productosProp);
             setLoading(false);
             return;
         }
 
-        // Si ya tenemos productos cargados, no vuelvas a resetearlos
-        if (productos.length > 0) return;
-
+        // 🔹 Si no hay props, cargamos todos los productos desde Supabase
         const fetchProductos = async () => {
             setLoading(true);
 
@@ -77,7 +75,7 @@ export default function ProductosTable({ productos: productosProp }: Props) {
         fetchProductos();
     }, [productosProp]);
 
-    // Solo mostrar "Cargando..." si no hay nada cargado aún
+    // 🔹 Mostrar mensaje de carga solo al inicio
     if (loading && productos.length === 0) {
         return <p>Cargando productos...</p>;
     }
@@ -92,7 +90,7 @@ export default function ProductosTable({ productos: productosProp }: Props) {
                 </div>
             </div>
 
-            {/* Tabla afuera de la card interna */}
+            {/* Tabla */}
             <div className="table-container">
                 <table>
                     <thead>
@@ -121,7 +119,10 @@ export default function ProductosTable({ productos: productosProp }: Props) {
                             ))
                         ) : (
                             <tr>
-                                <td colSpan={7} style={{ textAlign: "center", padding: "10px" }}>
+                                <td
+                                    colSpan={7}
+                                    style={{ textAlign: "center", padding: "10px" }}
+                                >
                                     No hay productos
                                 </td>
                             </tr>
