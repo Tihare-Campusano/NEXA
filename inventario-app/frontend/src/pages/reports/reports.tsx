@@ -1,18 +1,17 @@
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent } from "@ionic/react";
+import { FaFileAlt } from "react-icons/fa"; 
+import StockChart from "../../components/reports/graficos/prod_mas_stock";
+// import "./reports.css";
 
-const Reportes: React.FC = () => {
+export default function Home() {
   return (
-    <IonPage>
-      <IonHeader>
-        <IonToolbar>
-          <IonTitle>Reportes</IonTitle>
-        </IonToolbar>
-      </IonHeader>
-      <IonContent fullscreen>
-        <h1>Aquí verás los Reportes 📊</h1>
-      </IonContent>
-    </IonPage>
+    <div style={{ padding: "1rem" }}>
+      <br />
+      <h2 className="titulo-centrado">
+        <FaFileAlt style={{ marginRight: "0.5rem" }} />
+        Reportes
+      </h2>
+      <br />
+      <StockChart />
+    </div>
   );
-};
-
-export default Reportes;
+}

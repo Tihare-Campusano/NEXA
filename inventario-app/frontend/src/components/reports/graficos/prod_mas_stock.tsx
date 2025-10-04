@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import ReactApexChart from "react-apexcharts";
-import ApexCharts from "apexcharts";
+import { supabase } from "../../../../../backend/app/services/supabase_service";
+import type { ApexOptions } from "apexcharts";
 
 type Product = {
     name: string;
@@ -10,26 +11,26 @@ type Product = {
 export default function StockChart() {
     const [products, setProducts] = useState<Product[]>([]);
 
-    // Función para obtener los datos desde FastAPI
+    // Cargar datos desde Supabase
     async function loadData() {
-        try {
-            const res = await fetch(
-                `${process.env.REACT_APP_API_URL}/analytics/top_products?limit=5`
-            );
-            if (!res.ok) {
-                throw new Error("Error al obtener datos del backend");
-            }
-            const json = await res.json();
-            setProducts(json);
-        } catch (err) {
-            console.error("Error cargando productos:", err);
+        const { data, error } = await supabase
+            .from("products")
+            .select("name, stock")
+            .order("stock", { ascending: false })
+            .limit(5);
+
+        if (error) {
+            console.error("Error cargando productos:", error.message);
+            return;
         }
+        setProducts(data || []);
     }
 
     useEffect(() => {
         loadData();
     }, []);
 
+    // Configuración del gráfico
     const series = [
         {
             name: "Stock",
@@ -37,37 +38,18 @@ export default function StockChart() {
         },
     ];
 
-    const options: ApexCharts.ApexOptions = {
-        chart: {
-            type: 'bar', // <-- Literal 'bar', no string genérico
-            toolbar: { show: true },
-            animations: { enabled: true }
-        },
-        xaxis: {
-            categories: products.map((p) => p.name),
-            title: { text: "Productos" }
-        },
-        yaxis: {
-            title: { text: "Stock disponible" }
-        },
-        title: {
-            text: "Top 5 productos con más stock",
-            align: "center"
-        },
-        plotOptions: {
-            bar: { borderRadius: 8, horizontal: false }
-        },
+    const options: ApexOptions = {
+        chart: { type: "bar" as const, toolbar: { show: true } }, 
+        xaxis: { categories: products.map((p) => p.name), title: { text: "Productos" } },
+        yaxis: { title: { text: "Stock disponible" } },
+        title: { text: "Top 5 productos con más stock", align: "center" },
+        plotOptions: { bar: { borderRadius: 8, horizontal: false } },
         dataLabels: { enabled: true },
     };
 
     return (
         <div>
-            <ReactApexChart
-                options={options}
-                series={series}
-                type="bar" 
-                height={350}
-            />
+            <ReactApexChart options={options} series={series} type="bar" height={350} />
         </div>
     );
 }
