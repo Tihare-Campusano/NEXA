@@ -1,4 +1,3 @@
-# Inventario App (Ionic + React + FastAPI + Supabase)
 # NEXA — Inventario App (Ionic + React + FastAPI + Supabase)
 
 > Aplicación móvil de inventario desarrollada como proyecto Capstone, usando tecnologías modernas para frontend, backend y base de datos.
