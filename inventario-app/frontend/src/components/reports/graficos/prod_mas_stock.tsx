@@ -11,7 +11,6 @@ type ProductStock = {
 export default function StockChart() {
     const [products, setProducts] = useState<ProductStock[]>([]);
 
-    // Cargar datos desde Supabase
     async function loadData() {
         const { data, error } = await getSupabase()
             .from("stock")
@@ -30,7 +29,6 @@ export default function StockChart() {
         loadData();
     }, []);
 
-    // Configuración del gráfico
     const series = [
         {
             name: "Stock",
@@ -39,7 +37,11 @@ export default function StockChart() {
     ];
 
     const options: ApexOptions = {
-        chart: { type: "bar" as const, toolbar: { show: true } },
+        chart: {
+            type: "bar",
+            toolbar: { show: false }, // 🚫 oculta toolbar
+            zoom: { enabled: false }, // 🚫 desactiva zoom para permitir scroll
+        },
         xaxis: {
             categories: products.map((p) => p.productos[0]?.nombre || "Desconocido"),
             title: { text: "Productos" },

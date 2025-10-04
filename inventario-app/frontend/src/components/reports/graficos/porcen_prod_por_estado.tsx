@@ -11,11 +11,9 @@ type EstadoData = {
 export default function EstadoProductosChart() {
     const [dataEstados, setDataEstados] = useState<EstadoData[]>([]);
 
-    // Cargar datos desde Supabase
     async function loadData() {
         const supabase = getSupabase();
 
-        // Agrupar productos por estado
         const { data, error } = await supabase
             .from("productos")
             .select("estado, count:estado", { count: "exact", head: false });
@@ -25,8 +23,6 @@ export default function EstadoProductosChart() {
             return;
         }
 
-        // ⚠️ Si tu consulta no devuelve el conteo directamente, se puede usar otra forma
-        // como un RPC o procesar el array en JS. Ejemplo rápido:
         if (data) {
             const agrupados: Record<string, number> = {};
             data.forEach((item: any) => {
@@ -46,24 +42,19 @@ export default function EstadoProductosChart() {
         loadData();
     }, []);
 
-    // Configuración gráfico
     const series = dataEstados.map((e) => e.cantidad);
     const labels = dataEstados.map((e) => e.estado);
 
     const options: ApexOptions = {
-        chart: { type: "pie" },
+        chart: {
+            type: "pie",
+            toolbar: { show: false }, // 🚫 oculta toolbar
+            zoom: { enabled: false }, // 🚫 desactiva zoom para permitir scroll
+        },
         labels,
-        title: {
-            text: "Distribución de productos por estado",
-            align: "center",
-        },
-        legend: {
-            position: "bottom",
-        },
-        dataLabels: {
-            enabled: true,
-            formatter: (val: number) => `${val.toFixed(1)}%`,
-        },
+        title: { text: "Distribución de productos por estado", align: "center" },
+        legend: { position: "bottom" },
+        dataLabels: { enabled: true, formatter: (val: number) => `${val.toFixed(1)}%` },
     };
 
     return (

@@ -3,6 +3,7 @@ import { useParams, useHistory } from "react-router-dom";
 import { createClient } from "@supabase/supabase-js";
 import { FaBoxOpen } from "react-icons/fa";
 import "./editor-product.css";
+import { IonPage } from "@ionic/react";
 
 // Configuración de Supabase
 const supabase = createClient(
@@ -156,100 +157,102 @@ export default function EditorProducto() {
     }
 
     return (
-        <div className="editor-container">
-            <h2 className="titulo-centrado">
-                <FaBoxOpen /> Detalle del Producto
-            </h2>
+        <IonPage>
+            <div className="editor-container">
+                <h2 className="titulo-centrado">
+                    <FaBoxOpen /> Detalle del Producto
+                </h2>
 
-            <div className="editor-producto-card">
-                <div className="editor-body">
-                    <p><strong>ID:</strong> {String(producto.id)}</p>
+                <div className="editor-producto-card">
+                    <div className="editor-body">
+                        <p><strong>ID:</strong> {String(producto.id)}</p>
 
-                    <p>
-                        <strong>Código de Barras:</strong>{" "}
-                        {producto.codigo_barras ?? "N/A"}
-                    </p>
+                        <p>
+                            <strong>Código de Barras:</strong>{" "}
+                            {producto.codigo_barras ?? "N/A"}
+                        </p>
 
-                    <p>
-                        <strong>Nombre:</strong>
-                        <input
-                            title={String(editData.nombre ?? producto.nombre ?? "")}
-                            value={String(editData.nombre ?? producto.nombre ?? "")}
-                            onChange={(e) => handleEdit("nombre", e.target.value)}
-                        />
-                    </p>
+                        <p>
+                            <strong>Nombre:</strong>
+                            <input
+                                title={String(editData.nombre ?? producto.nombre ?? "")}
+                                value={String(editData.nombre ?? producto.nombre ?? "")}
+                                onChange={(e) => handleEdit("nombre", e.target.value)}
+                            />
+                        </p>
 
-                    <p>
-                        <strong>Marca:</strong>
-                        <input
-                            title={String(editData.marca ?? producto.marca ?? "")}
-                            value={String(editData.marca ?? producto.marca ?? "")}
-                            onChange={(e) => handleEdit("marca", e.target.value)}
-                        />
-                    </p>
+                        <p>
+                            <strong>Marca:</strong>
+                            <input
+                                title={String(editData.marca ?? producto.marca ?? "")}
+                                value={String(editData.marca ?? producto.marca ?? "")}
+                                onChange={(e) => handleEdit("marca", e.target.value)}
+                            />
+                        </p>
 
-                    <p>
-                        <strong>Modelo:</strong>
-                        <input
-                            title={String(editData.modelo ?? producto.modelo ?? "")}
-                            value={String(editData.modelo ?? producto.modelo ?? "")}
-                            onChange={(e) => handleEdit("modelo", e.target.value)}
-                        />
-                    </p>
+                        <p>
+                            <strong>Modelo:</strong>
+                            <input
+                                title={String(editData.modelo ?? producto.modelo ?? "")}
+                                value={String(editData.modelo ?? producto.modelo ?? "")}
+                                onChange={(e) => handleEdit("modelo", e.target.value)}
+                            />
+                        </p>
 
-                    <p>
-                        <strong>Compatibilidad:</strong>
-                        <textarea
-                            title={String(editData.compatibilidad ?? producto.compatibilidad ?? "")}
-                            value={String(editData.compatibilidad ?? producto.compatibilidad ?? "")}
-                            onChange={(e) => handleEdit("compatibilidad", e.target.value)}
-                        />
-                    </p>
+                        <p>
+                            <strong>Compatibilidad:</strong>
+                            <textarea
+                                title={String(editData.compatibilidad ?? producto.compatibilidad ?? "")}
+                                value={String(editData.compatibilidad ?? producto.compatibilidad ?? "")}
+                                onChange={(e) => handleEdit("compatibilidad", e.target.value)}
+                            />
+                        </p>
 
-                    <p><strong>SKU:</strong> {producto.sku ?? "N/A"}</p>
+                        <p><strong>SKU:</strong> {producto.sku ?? "N/A"}</p>
 
-                    <p><strong>Categoría:</strong> {producto.categoria?.nombre ?? "Sin categoría"}</p>
+                        <p><strong>Categoría:</strong> {producto.categoria?.nombre ?? "Sin categoría"}</p>
 
-                    <p><strong>Unidad:</strong> {producto.unidad ?? "N/A"}</p>
+                        <p><strong>Unidad:</strong> {producto.unidad ?? "N/A"}</p>
 
-                    <p><strong>Stock mínimo:</strong> {producto.stock_minimo ?? "N/A"}</p>
+                        <p><strong>Stock mínimo:</strong> {producto.stock_minimo ?? "N/A"}</p>
 
-                    <p>
-                        <strong>Observaciones:</strong>
-                        <textarea
-                            title={String(editData.observaciones ?? producto.observaciones ?? "")}
-                            value={String(editData.observaciones ?? producto.observaciones ?? "")}
-                            onChange={(e) => handleEdit("observaciones", e.target.value)}
-                        />
-                    </p>
+                        <p>
+                            <strong>Observaciones:</strong>
+                            <textarea
+                                title={String(editData.observaciones ?? producto.observaciones ?? "")}
+                                value={String(editData.observaciones ?? producto.observaciones ?? "")}
+                                onChange={(e) => handleEdit("observaciones", e.target.value)}
+                            />
+                        </p>
 
-                    <p>
-                        <strong>Activo:</strong>{" "}
-                        {producto.activo ? <span className="activo">✔ Sí</span> : <span className="inactivo">✘ No</span>}
-                    </p>
+                        <p>
+                            <strong>Activo:</strong>{" "}
+                            {producto.activo ? <span className="activo">✔ Sí</span> : <span className="inactivo">✘ No</span>}
+                        </p>
 
-                    <p><strong>Creado en:</strong> {formatFecha(producto.creado_en)}</p>
-                    <p><strong>Última actualización:</strong> {formatFecha(producto.updated_at)}</p>
-                </div>
+                        <p><strong>Creado en:</strong> {formatFecha(producto.creado_en)}</p>
+                        <p><strong>Última actualización:</strong> {formatFecha(producto.updated_at)}</p>
+                    </div>
 
-                <div className="editor-actions">
-                    <button
-                        className="btn-guardar"
-                        onClick={handleSave}
-                        disabled={!changed}
-                        title={!changed ? "No hay cambios para guardar" : "Guardar cambios"}
-                    >
-                        💾 Guardar cambios
-                    </button>
+                    <div className="editor-actions">
+                        <button
+                            className="btn-guardar"
+                            onClick={handleSave}
+                            disabled={!changed}
+                            title={!changed ? "No hay cambios para guardar" : "Guardar cambios"}
+                        >
+                            💾 Guardar cambios
+                        </button>
 
-                    <button
-                        className="btn-volver"
-                        onClick={() => history.replace("/product")}
-                    >
-                        ⬅ Volver
-                    </button>
+                        <button
+                            className="btn-volver"
+                            onClick={() => history.replace("/product")}
+                        >
+                            ⬅ Volver
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
+        </IonPage>
     );
 }

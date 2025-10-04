@@ -1,5 +1,6 @@
 import { FaUserCircle } from "react-icons/fa";
 import "./Perfil.css"; // 👈 CSS propio
+import { IonPage } from "@ionic/react";
 
 export default function Perfil() {
   // Datos de usuario mockeados (luego los puedes traer de Supabase)
@@ -19,61 +20,63 @@ export default function Perfil() {
   };
 
   return (
-    <div style={{ padding: "1rem" }}>
-      <br />
-      {/* Título con ícono */}
-      <h2 className="titulo-centrado">
-        <FaUserCircle /> Perfil
-      </h2>
-      <br />
+    <IonPage>
+      <div style={{ padding: "1rem" }}>
+        <br />
+        {/* Título con ícono */}
+        <h2 className="titulo-centrado">
+          <FaUserCircle /> Perfil
+        </h2>
+        <br />
 
-      {/* Tarjeta de perfil */}
-      <div className="perfil-card">
-        <div className="perfil-item">
-          <p className="perfil-label">Alias</p>
-          <p className="perfil-value">{usuario.alias}</p>
+        {/* Tarjeta de perfil */}
+        <div className="perfil-card">
+          <div className="perfil-item">
+            <p className="perfil-label">Alias</p>
+            <p className="perfil-value">{usuario.alias}</p>
+          </div>
+
+          <div className="perfil-item">
+            <p className="perfil-label">Correo</p>
+            <p className="perfil-value">{usuario.email}</p>
+          </div>
+
+          <div className="perfil-item">
+            <p className="perfil-label">Rol</p>
+            <p className="perfil-value">{usuario.rol}</p>
+          </div>
+
+          <div className="perfil-item">
+            <p className="perfil-label">Fecha de Ingreso</p>
+            <p className="perfil-value">{usuario.fechaIngreso}</p>
+          </div>
         </div>
 
-        <div className="perfil-item">
-          <p className="perfil-label">Correo</p>
-          <p className="perfil-value">{usuario.email}</p>
-        </div>
+        {/* Botón soporte */}
+        <button
+          className="btn-soporte"
+          onClick={handleSoporte}
+          style={{
+            backgroundColor: "#00bfff", // celeste
+            color: "white",
+            padding: "10px 20px",
+            marginTop: "20px",
+            border: "none",
+            borderRadius: "8px",
+            cursor: "pointer",
+            display: "block",
+            width: "100%",
+          }}
+        >
+          Soporte
+        </button>
+        <br />
 
-        <div className="perfil-item">
-          <p className="perfil-label">Rol</p>
-          <p className="perfil-value">{usuario.rol}</p>
-        </div>
-
-        <div className="perfil-item">
-          <p className="perfil-label">Fecha de Ingreso</p>
-          <p className="perfil-value">{usuario.fechaIngreso}</p>
-        </div>
+        {/* Botón cerrar sesión */}
+        <button className="btn-logout" onClick={handleLogout}>
+          Cerrar Sesión
+        </button>
       </div>
-
-      {/* Botón soporte */}
-      <button
-        className="btn-soporte"
-        onClick={handleSoporte}
-        style={{
-          backgroundColor: "#00bfff", // celeste
-          color: "white",
-          padding: "10px 20px",
-          marginTop: "20px",
-          border: "none",
-          borderRadius: "8px",
-          cursor: "pointer",
-          display: "block",
-          width: "100%",
-        }}
-      >
-        Soporte
-      </button>
-      <br />
-
-      {/* Botón cerrar sesión */}
-      <button className="btn-logout" onClick={handleLogout}>
-        Cerrar Sesión
-      </button>
-    </div>
+    </IonPage>
   );
 }
