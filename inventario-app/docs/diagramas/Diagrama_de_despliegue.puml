@@ -5,7 +5,7 @@ node "Cliente" {
     artifact "Navegador / App Móvil (Ionic React)"
 }
 
-node "Servidor Backend (FastAPI)" {
+node "Servidor Backend" {
     artifact "API REST"
 }
 
@@ -14,8 +14,8 @@ node "Servicios en la Nube" {
     artifact "Servicio de IA\n(TensorFlow - MobileNetV2)"
 }
 
-"Cliente" --> "Servidor Backend (FastAPI)" : HTTP/HTTPS
-"Servidor Backend (FastAPI)" --> "Supabase (BD + Auth)" : Consultas SQL / Autenticación
-"Servidor Backend (FastAPI)" --> "Servicio de IA\n(TensorFlow - MobileNetV2)" : Clasificación / Análisis de imágenes
+"Cliente" --> "Servidor Backend" : HTTP/HTTPS
+"Servidor Backend" --> "Supabase (BD + Auth)" : Consultas SQL / Autenticación
+"Servidor Backend" --> "Servicio de IA\n(TensorFlow - MobileNetV2)" : Clasificación / Análisis de imágenes
 
 @enduml
