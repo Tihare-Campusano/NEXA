@@ -1,165 +1,182 @@
+import {
+    IonList,
+    IonItem,
+    IonLabel,
+    IonInput,
+    IonButton,
+    IonSpinner,
+    IonCard,
+    IonCardHeader,
+    IonCardTitle,
+    IonCardContent,
+} from "@ionic/react";
 import { useState } from "react";
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonInput, IonButton, IonItem, IonLabel, IonSelect, IonSelectOption, IonToast } from "@ionic/react";
 import { createClient } from "@supabase/supabase-js";
+import { useHistory } from "react-router-dom";
+import "./product-form.css";
 
 const supabase = createClient(
-    import.meta.env.VITE_SUPABASE_URL!,
-    import.meta.env.VITE_SUPABASE_KEY!
+    import.meta.env.VITE_SUPABASE_URL as string,
+    import.meta.env.VITE_SUPABASE_ANON_KEY as string
 );
 
-export default function NuevoProducto() {
-    const [codigoBarra, setCodigoBarra] = useState("");
-    const [producto, setProducto] = useState<any>({});
-    const [categorias, setCategorias] = useState<any[]>([]);
-    const [mensaje, setMensaje] = useState("");
+export default function FormularioRegistro() {
+    const history = useHistory();
+    const [form, setForm] = useState({
+        codigo: "",
+        nombre: "",
+        marca: "",
+        modelo: "",
+        categoria_id: "",
+        compatibilidad: "",
+        observaciones: "",
+        stock: "",
+        disponibilidad: "",
+        estado: "",
+    });
+    const [loading, setLoading] = useState(false);
 
-    // Buscar producto por código de barras
-    const buscarProducto = async (codigo: string) => {
-        const { data } = await supabase
-            .from("productos")
-            .select("*")
-            .eq("codigo_barra", codigo)
-            .single();
+    const handleChange = (e: CustomEvent) => {
+        const { name, value } = e.detail;
+        setForm({ ...form, [name]: value });
+    };
 
-        if (data) {
-            // Producto encontrado → autocompletar
-            setProducto(data);
-            setMensaje("Producto encontrado y cargado automáticamente.");
-        } else {
-            // Nuevo producto
-            setProducto({ codigo_barra: codigo });
-            setMensaje("No existe un producto con ese código, completa los datos.");
+    const handleCodigoChange = async (e: CustomEvent) => {
+        const codigo = e.detail.value;
+        setForm({ ...form, codigo });
+
+        if (codigo.length >= 4) {
+            setLoading(true);
+            const { data: producto, error } = await supabase
+                .from("productos")
+                .select("*, stock(cantidad)")
+                .eq("codigo_barras", codigo)
+                .maybeSingle();
+
+            if (error) {
+                console.error(error);
+                setLoading(false);
+                return;
+            }
+
+            if (producto) {
+                const cantidadStock = producto.stock?.cantidad || 0;
+                let disponibilidad =
+                    cantidadStock <= 5 ? "Bajo stock" : cantidadStock <= 15 ? "Medio stock" : "Alto stock";
+
+                setForm({
+                    codigo: producto.codigo_barras,
+                    nombre: producto.nombre,
+                    marca: producto.marca,
+                    modelo: producto.modelo,
+                    categoria_id: producto.categoria_id || "",
+                    compatibilidad: producto.compatibilidad || "",
+                    observaciones: producto.observaciones || "",
+                    stock: cantidadStock.toString(),
+                    disponibilidad,
+                    estado: producto.estado || "-----",
+                });
+            } else {
+                setForm({ ...form, stock: "", disponibilidad: "", estado: "" });
+            }
+
+            setLoading(false);
         }
     };
 
-    // Calcular disponibilidad según stock
-    const calcularDisponibilidad = (stock: number) => {
-        if (stock <= 5) return "Baja";
-        if (stock <= 15) return "Media";
-        return "Alta";
-    };
-
-    // Guardar producto
-    const guardarProducto = async () => {
-        if (!producto.nombre || !producto.codigo_barra) {
-            setMensaje("Por favor, ingresa los datos mínimos requeridos.");
+    const handleSubmit = async () => {
+        if (!form.codigo || !form.nombre || !form.marca || !form.modelo) {
+            alert("Por favor completa todos los campos obligatorios.");
             return;
         }
+
+        setLoading(true);
 
         const { data: existente } = await supabase
             .from("productos")
             .select("id")
-            .eq("codigo_barra", producto.codigo_barra)
-            .single();
+            .eq("codigo_barras", form.codigo)
+            .maybeSingle();
 
         if (existente) {
-            // Si ya existe, actualizar stock
-            const { data: stockActual } = await supabase
-                .from("stock")
-                .select("cantidad")
-                .eq("producto_id", existente.id)
-                .single();
-
-            const nuevoStock = (stockActual?.cantidad || 0) + 1;
-            const disponibilidad = calcularDisponibilidad(nuevoStock);
-
             await supabase
-                .from("stock")
-                .update({
-                    cantidad: nuevoStock,
-                    disponibilidad,
-                    ultima_actualizacion: new Date().toISOString(),
-                })
-                .eq("producto_id", existente.id);
-
-            setMensaje("Stock actualizado correctamente.");
-        } else {
-            // Si no existe, crear nuevo producto y registro de stock
-            const { data: nuevo } = await supabase
                 .from("productos")
-                .insert({
-                    codigo_barra: producto.codigo_barra,
-                    nombre: producto.nombre,
-                    marca: producto.marca,
-                    modelo: producto.modelo,
-                    compatible: producto.compatible,
-                    categoria_id: producto.categoria_id,
-                    activo: true,
-                    creado_en: new Date().toISOString(),
+                .update({
+                    nombre: form.nombre,
+                    marca: form.marca,
+                    modelo: form.modelo,
+                    categoria_id: form.categoria_id || null,
+                    compatibilidad: form.compatibilidad,
+                    observaciones: form.observaciones,
                 })
-                .select()
-                .single();
-
-            await supabase.from("stock").insert({
-                producto_id: nuevo.id,
-                cantidad: 1,
-                disponibilidad: "Baja",
-                ultima_actualizacion: new Date().toISOString(),
-            });
-
-            setMensaje("Producto registrado correctamente.");
+                .eq("codigo_barras", form.codigo);
+        } else {
+            await supabase.from("productos").insert([
+                {
+                    codigo_barras: form.codigo,
+                    nombre: form.nombre,
+                    marca: form.marca,
+                    modelo: form.modelo,
+                    categoria_id: form.categoria_id || null,
+                    compatibilidad: form.compatibilidad,
+                    observaciones: form.observaciones,
+                    activo: true,
+                },
+            ]);
         }
+
+        setLoading(false);
+        history.push("/registro/camera");
     };
 
     return (
-        <IonPage>
-            <IonHeader>
-                <IonToolbar color="primary">
-                    <IonTitle>Registrar Producto</IonTitle>
-                </IonToolbar>
-            </IonHeader>
+        <IonCard className="form-card">
+            <IonCardContent>
+                <div className="form-list">
+                    {["codigo", "nombre", "marca", "modelo", "compatibilidad", "observaciones"].map((field) => (
+                        <div key={field} className="form-field">
+                            <label className="form-label">
+                                {field === "codigo" ? "Código" : field.charAt(0).toUpperCase() + field.slice(1)}
+                            </label>
+                            <IonInput
+                                name={field}
+                                value={form[field as keyof typeof form]}
+                                onIonChange={field === "codigo" ? handleCodigoChange : handleChange}
+                                className="form-input"
+                            />
+                        </div>
+                    ))}
 
-            <IonContent className="ion-padding space-y-4">
-                <IonItem>
-                    <IonLabel position="floating">Código de Barras</IonLabel>
-                    <IonInput
-                        value={codigoBarra}
-                        onIonChange={(e) => setCodigoBarra(e.detail.value!)}
-                        onIonBlur={() => buscarProducto(codigoBarra)}
-                    />
-                </IonItem>
+                    {["stock", "disponibilidad", "estado"].map((field) => (
+                        <div key={field} className="form-field readonly">
+                            <label className="form-label">
+                                {field.charAt(0).toUpperCase() + field.slice(1)}
+                            </label>
+                            <IonInput
+                                value={form[field as keyof typeof form]}
+                                readonly
+                                className="form-input readonly-input"
+                            />
+                        </div>
+                    ))}
+                </div>
 
-                <IonItem>
-                    <IonLabel position="floating">Nombre</IonLabel>
-                    <IonInput
-                        value={producto.nombre || ""}
-                        onIonChange={(e) =>
-                            setProducto({ ...producto, nombre: e.detail.value })
-                        }
-                    />
-                </IonItem>
 
-                <IonItem>
-                    <IonLabel position="floating">Marca</IonLabel>
-                    <IonInput
-                        value={producto.marca || ""}
-                        onIonChange={(e) =>
-                            setProducto({ ...producto, marca: e.detail.value })
-                        }
-                    />
-                </IonItem>
+                {loading && (
+                    <div className="spinner-container">
+                        <IonSpinner name="crescent" />
+                    </div>
+                )}
 
-                <IonItem>
-                    <IonLabel position="floating">Modelo</IonLabel>
-                    <IonInput
-                        value={producto.modelo || ""}
-                        onIonChange={(e) =>
-                            setProducto({ ...producto, modelo: e.detail.value })
-                        }
-                    />
-                </IonItem>
-
-                <IonButton expand="block" color="success" onClick={guardarProducto}>
-                    Guardar Producto
+                <IonButton
+                    color="success"
+                    expand="block"
+                    onClick={handleSubmit}
+                    disabled={loading}
+                >
+                    {loading ? "Procesando..." : "Siguiente"}
                 </IonButton>
-
-                <IonToast
-                    isOpen={!!mensaje}
-                    message={mensaje}
-                    duration={2500}
-                    onDidDismiss={() => setMensaje("")}
-                />
-            </IonContent>
-        </IonPage>
+            </IonCardContent>
+        </IonCard>
     );
 }

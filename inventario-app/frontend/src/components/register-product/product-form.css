@@ -1,0 +1,58 @@
+/* Forzar layout vertical (label arriba, input abajo) */
+.form-item.vertical,
+.readonly-item.vertical {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-bottom: 14px; /* 👈 espacio entre cada campo */
+    background: #fff;
+    border: 1px solid #e5e5e5;
+}
+
+/* Labels */
+.form-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 6px; 
+}
+
+/* Inputs editables */
+.form-input {
+    width: 100%;
+    font-size: 1rem;
+    margin-bottom: 8px; /* 👈 aire extra debajo del input */
+    --padding-bottom: 6px; /* 👈 padding interno del ion-input */
+}
+
+/* Inputs solo lectura */
+.readonly-item.vertical {
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+}
+
+.readonly-input {
+    width: 100%;
+    font-size: 1rem;
+    font-style: italic;
+    margin-bottom: 8px; /* 👈 también con aire */
+}
+
+/* Ajuste cuando el input está en focus */
+.form-input.has-focus::part(native) {
+    padding-bottom: 6px;
+}
+
+/* Spinner */
+.spinner-container {
+    text-align: center;
+    margin: 1rem 0;
+}
+
+/* Botón */
+ion-button {
+    font-size: 1rem;
+    padding: 12px 0;
+    border-radius: 8px;
+}
