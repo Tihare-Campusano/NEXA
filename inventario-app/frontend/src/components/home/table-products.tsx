@@ -41,17 +41,17 @@ export default function ProductosTable({ productos: productosProp }: Props) {
             const { data, error } = await supabase
                 .from("productos")
                 .select(`
-          id,
-          nombre,
-          activo,
-          created_at,
-          stock (
-            cantidad,
-            estado,
-            disponibilidad,
-            ultima_actualizacion
-          )
-        `)
+                    id,
+                    nombre,
+                    activo,
+                    created_at,
+                    stock (
+                    cantidad,
+                    estado,
+                    disponibilidad,
+                    ultima_actualizacion
+                )
+            `)
                 .order("id", { ascending: false });
 
             if (error) {
