@@ -6,8 +6,6 @@ import {
     IonButton,
     IonSpinner,
     IonCard,
-    IonCardHeader,
-    IonCardTitle,
     IonCardContent,
 } from "@ionic/react";
 import { useState } from "react";
@@ -45,6 +43,8 @@ export default function FormularioRegistro() {
         const codigo = e.detail.value;
         setForm({ ...form, codigo });
 
+        if (!codigo) return;
+
         if (codigo.length >= 4) {
             setLoading(true);
             const { data: producto, error } = await supabase
@@ -60,6 +60,7 @@ export default function FormularioRegistro() {
             }
 
             if (producto) {
+                // Si existe el producto, muestra datos para edición
                 const cantidadStock = producto.stock?.cantidad || 0;
                 let disponibilidad =
                     cantidadStock <= 5 ? "Bajo stock" : cantidadStock <= 15 ? "Medio stock" : "Alto stock";
@@ -77,7 +78,19 @@ export default function FormularioRegistro() {
                     estado: producto.estado || "-----",
                 });
             } else {
-                setForm({ ...form, stock: "", disponibilidad: "", estado: "" });
+                // No existe: limpia campos no obligatorios para crear nuevo
+                setForm(prev => ({
+                    ...prev,
+                    nombre: "",
+                    marca: "",
+                    modelo: "",
+                    categoria_id: "",
+                    compatibilidad: "",
+                    observaciones: "",
+                    stock: "",
+                    disponibilidad: "",
+                    estado: "",
+                }));
             }
 
             setLoading(false);
@@ -92,25 +105,42 @@ export default function FormularioRegistro() {
 
         setLoading(true);
 
+        // Verificar si ya existe un producto con el mismo código y nombre+modelo iguales
         const { data: existente } = await supabase
             .from("productos")
-            .select("id")
+            .select("id, nombre, modelo")
             .eq("codigo_barras", form.codigo)
             .maybeSingle();
 
         if (existente) {
-            await supabase
-                .from("productos")
-                .update({
-                    nombre: form.nombre,
-                    marca: form.marca,
-                    modelo: form.modelo,
-                    categoria_id: form.categoria_id || null,
-                    compatibilidad: form.compatibilidad,
-                    observaciones: form.observaciones,
-                })
-                .eq("codigo_barras", form.codigo);
+            // Si mismo código y mismo nombre+modelo → actualizar
+            if (existente.nombre === form.nombre && existente.modelo === form.modelo) {
+                await supabase
+                    .from("productos")
+                    .update({
+                        marca: form.marca,
+                        categoria_id: form.categoria_id || null,
+                        compatibilidad: form.compatibilidad,
+                        observaciones: form.observaciones,
+                    })
+                    .eq("codigo_barras", form.codigo);
+            } else {
+                // Diferente nombre o modelo → crear nuevo producto
+                await supabase.from("productos").insert([
+                    {
+                        codigo_barras: form.codigo,
+                        nombre: form.nombre,
+                        marca: form.marca,
+                        modelo: form.modelo,
+                        categoria_id: form.categoria_id || null,
+                        compatibilidad: form.compatibilidad,
+                        observaciones: form.observaciones,
+                        activo: true,
+                    },
+                ]);
+            }
         } else {
+            // Producto no existente → crear nuevo
             await supabase.from("productos").insert([
                 {
                     codigo_barras: form.codigo,
@@ -160,7 +190,6 @@ export default function FormularioRegistro() {
                         </div>
                     ))}
                 </div>
-
 
                 {loading && (
                     <div className="spinner-container">
