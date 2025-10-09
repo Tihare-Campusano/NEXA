@@ -6,9 +6,9 @@ import {
   IonTitle,
   IonContent,
 } from "@ionic/react";
-import "./report_register_for_month.css";
+import "./report_stock_month.css";
 import jsPDF from "jspdf";
-// @ts-ignore
+// @ts-ignore → ignoramos porque no hay tipos oficiales
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { supabase } from "../../../supabaseClient";
@@ -16,25 +16,27 @@ import { supabase } from "../../../supabaseClient";
 interface Producto {
   codigo: string;
   nombre: string;
-  marca: string;
-  fecha: string;
+  cantidad: number;
+  estado: string;
+  categoria: string;
 }
 
-const ReportRegisterForMonth: React.FC = () => {
+const ReportStockMonth: React.FC = () => {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [mes, setMes] = useState<string>("");
 
   useEffect(() => {
     const fetchProductos = async () => {
-      const date = new Date();
-      const primerDia = new Date(date.getFullYear(), date.getMonth(), 1);
-      const ultimoDia = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-
       const { data, error } = await supabase
         .from("productos")
-        .select("id, sku, nombre, marca, created_at")
-        .gte("created_at", primerDia.toISOString())
-        .lte("created_at", ultimoDia.toISOString());
+        .select(`
+          id,
+          sku,
+          nombre,
+          marca,
+          modelo,
+          stock ( cantidad, estado )
+        `);
 
       if (error) {
         console.error("❌ Error al obtener productos:", error.message);
@@ -42,17 +44,19 @@ const ReportRegisterForMonth: React.FC = () => {
         const mapped = data.map((p: any) => ({
           codigo: p.sku,
           nombre: p.nombre,
-          marca: p.marca || "General",
-          fecha: new Date(p.created_at).toLocaleDateString("es-CL"),
+          cantidad: p.stock?.cantidad || 0,
+          estado: p.stock?.estado || "desconocido",
+          categoria: p.marca || "general",
         }));
-        setProductos(mapped);
+
+        // ordenar por stock ascendente (menor primero)
+        const ordenados = mapped.sort((a, b) => a.cantidad - b.cantidad);
+        setProductos(ordenados);
       }
     };
 
-    const nombreMes = new Date().toLocaleString("es-ES", {
-      month: "long",
-      year: "numeric",
-    });
+    const date = new Date();
+    const nombreMes = date.toLocaleString("es-ES", { month: "long", year: "numeric" });
     setMes(nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1));
 
     fetchProductos();
@@ -61,37 +65,44 @@ const ReportRegisterForMonth: React.FC = () => {
   // Exportar PDF
   const exportarPDF = () => {
     const doc = new jsPDF();
-    doc.text(`🗓️ Reporte de Registros (${mes})`, 14, 15);
+    doc.text(`📊 Reporte de Stock Mensual (${mes})`, 14, 15);
 
     autoTable(doc, {
       startY: 20,
-      head: [["Código", "Nombre", "Marca", "Fecha de Registro"]],
-      body: productos.map((p) => [p.codigo, p.nombre, p.marca, p.fecha]),
+      head: [["Código", "Nombre", "Cantidad", "Estado", "Categoría"]],
+      body: productos.map((p) => [
+        p.codigo,
+        p.nombre,
+        p.cantidad,
+        p.estado,
+        p.categoria,
+      ]),
     });
 
     const finalY = (doc as any).lastAutoTable?.finalY || 30;
     doc.text(
-      `Este reporte corresponde a los productos registrados durante ${mes}.`,
+      `Este reporte corresponde al mes de ${mes}.  
+Los productos con menor stock aparecen arriba para identificar fácilmente cuáles están por agotarse.`,
       14,
       finalY + 10
     );
 
-    doc.save(`reporte_registros_${mes}.pdf`);
+    doc.save(`reporte_stock_${mes}.pdf`);
   };
 
   // Exportar Excel
   const exportarExcel = () => {
     const ws = XLSX.utils.json_to_sheet(productos);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, `Registros ${mes}`);
-    XLSX.writeFile(wb, `reporte_registros_${mes}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, `Stock ${mes}`);
+    XLSX.writeFile(wb, `reporte_stock_${mes}.xlsx`);
   };
 
   return (
     <IonPage>
       <IonHeader>
         <IonToolbar color="primary">
-          <IonTitle>🗓️ Reporte de Registros del Mes</IonTitle>
+          <IonTitle>📊 Reporte de Stock Mensual</IonTitle>
         </IonToolbar>
       </IonHeader>
 
@@ -103,8 +114,9 @@ const ReportRegisterForMonth: React.FC = () => {
             <tr>
               <th>Código</th>
               <th>Nombre</th>
-              <th>Marca</th>
-              <th>Fecha Registro</th>
+              <th>Cantidad</th>
+              <th>Estado</th>
+              <th>Categoría</th>
             </tr>
           </thead>
           <tbody>
@@ -112,8 +124,9 @@ const ReportRegisterForMonth: React.FC = () => {
               <tr key={i}>
                 <td>{p.codigo}</td>
                 <td>{p.nombre}</td>
-                <td>{p.marca}</td>
-                <td>{p.fecha}</td>
+                <td>{p.cantidad}</td>
+                <td>{p.estado}</td>
+                <td>{p.categoria}</td>
               </tr>
             ))}
           </tbody>
@@ -121,8 +134,8 @@ const ReportRegisterForMonth: React.FC = () => {
 
         <div className="resumen">
           <p>
-            Este reporte muestra todos los <b>productos registrados en {mes}</b>.
-            Úsalo para llevar control de los ingresos al inventario mes a mes.
+            Este reporte muestra el <b>stock mensual</b> de cada producto.  
+            Los productos con <b>menor stock</b> se listan primero para facilitar su reposición.
           </p>
         </div>
 
@@ -135,5 +148,6 @@ const ReportRegisterForMonth: React.FC = () => {
   );
 };
 
-export default ReportRegisterForMonth;
+export default ReportStockMonth;
+
 

@@ -1,3 +1,4 @@
+import React from "react";
 import { Redirect, Route } from "react-router-dom";
 import {
   IonApp,
@@ -10,95 +11,109 @@ import {
   setupIonicReact,
 } from "@ionic/react";
 import { IonReactRouter } from "@ionic/react-router";
-
-/* Importar iconos */
 import { home, barChart, create, list, person } from "ionicons/icons";
 
-/* Core CSS required for Ionic components to work properly */
-import "@ionic/react/css/core.css";
-
-/* Basic CSS for apps built with Ionic */
-import "@ionic/react/css/normalize.css";
-import "@ionic/react/css/structure.css";
-import "@ionic/react/css/typography.css";
-
-/* Optional CSS utils that can be commented out */
-import "@ionic/react/css/padding.css";
-import "@ionic/react/css/float-elements.css";
-import "@ionic/react/css/text-alignment.css";
-import "@ionic/react/css/text-transformation.css";
-import "@ionic/react/css/flex-utils.css";
-import "@ionic/react/css/display.css";
-
-/* Dark mode */
-import "@ionic/react/css/palettes/dark.system.css";
-
-/* Theme variables */
-import "./theme/variables.css";
-
-/* Importar las páginas */
+/* Páginas principales */
 import Home from "./pages/home/home";
 import Reportes from "./pages/reports/reports";
 import Registro from "./pages/register-product/register-manual";
 import Productos from "./pages/product/mostrar-products";
 import EditorProducto from "./pages/product/editor-product";
 import Perfil from "./pages/perfil/perfil";
-import RegistroPistola from "./pages/register-product/scanner-gun";
-import RegistroCamera from "./pages/register-product/scanner-camera";
+
+/* Componentes de reportes */
+import ReportAllProducts from "./components/reports/reporte_productos_almacenados/report_all_products";
+import ReportBadState from "./components/reports/reporte_productos_mal_estado/report_bad_state";
+import ReportUsedProduct from "./components/reports/reporte_productos_usados/report_used_product";
+import ReportNewProduct from "./components/reports/reporte_productos_nuevos/report_new_product";
+import ReportStockMonth from "./components/reports/reporte_stock_mensual/report_stock_month";
+import ReportRegisterForMonth from "./components/reports/reporte_registros_por_mes/report_register_for_month";
+import ReportRegisterForWeek from "./components/reports/reporte_registros_por_semana/report_register_for_week";
+
+/* Ionic setup */
+import "@ionic/react/css/core.css";
+import "@ionic/react/css/normalize.css";
+import "@ionic/react/css/structure.css";
+import "@ionic/react/css/typography.css";
+import "@ionic/react/css/padding.css";
+import "@ionic/react/css/float-elements.css";
+import "@ionic/react/css/text-alignment.css";
+import "@ionic/react/css/text-transformation.css";
+import "@ionic/react/css/flex-utils.css";
+import "@ionic/react/css/display.css";
+import "@ionic/react/css/palettes/dark.system.css";
+import "./theme/variables.css";
 
 setupIonicReact();
 
-const App: React.FC = () => (
-  <IonApp>
-    <IonReactRouter>
-      <IonTabs>
-        <IonRouterOutlet>
-          {/* Redirigir la raíz hacia /home */}
-          <Route exact path="/">
-            <Redirect to="/home" />
+const App: React.FC = () => {
+  return (
+    <IonApp>
+      <IonReactRouter>
+        <IonTabs>
+          <IonRouterOutlet>
+            {/* Redirección inicial */}
+            <Route exact path="/" render={() => <Redirect to="/tabs/home" />} />
 
-            {/* rutas */}
-          </Route>
-          <Route exact path="/home" component={Home} />
-          <Route exact path="/reportes" component={Reportes} />
-          <Route exact path="/registro" component={Registro} />
-          <Route exact path="/product" component={Productos} />
-          <Route exact path="/product/:id" component={EditorProducto} />
-          <Route exact path="/perfil" component={Perfil} />
-          <Route exact path="/registro/pistola" component={RegistroPistola} />
-          <Route exact path="/registro/camera" component={RegistroCamera} />
-        </IonRouterOutlet>
+            {/* ========== Rutas con Tabs (vista principal) ========== */}
+            <Route exact path="/tabs/home" component={Home} />
+            <Route exact path="/tabs/reportes" component={Reportes} />
+            <Route exact path="/tabs/registro" component={Registro} />
+            <Route exact path="/tabs/productos" component={Productos} />
+            <Route exact path="/tabs/perfil" component={Perfil} />
 
-        {/* Rutas para los tabs inferiores */}
-        <IonTabBar slot="bottom">
-          <IonTabButton tab="home" href="/home">
-            <IonIcon aria-hidden="true" icon={home} />
-            <IonLabel>Home</IonLabel>
-          </IonTabButton>
+            {/* ========== Rutas fuera del TabBar (reportes individuales) ========== */}
+            <Route exact path="/reportes/productos-almacenados" component={ReportAllProducts} />
+            <Route exact path="/reportes/productos-mal-estado" component={ReportBadState} />
+            <Route exact path="/reportes/productos-usados" component={ReportUsedProduct} />
+            <Route exact path="/reportes/productos-nuevos" component={ReportNewProduct} />
+            <Route exact path="/reportes/stock-mensual" component={ReportStockMonth} />
+            <Route exact path="/reportes/registros-mes" component={ReportRegisterForMonth} />
+            <Route exact path="/reportes/registros-semana" component={ReportRegisterForWeek} />
 
-          <IonTabButton tab="reportes" href="/reportes">
-            <IonIcon aria-hidden="true" icon={barChart} />
-            <IonLabel>Reportes</IonLabel>
-          </IonTabButton>
+            {/* Editor de producto (sin tabs) */}
+            <Route exact path="/product/:id" component={EditorProducto} />
+          </IonRouterOutlet>
 
-          <IonTabButton tab="registro" href="/registro">
-            <IonIcon aria-hidden="true" icon={create} />
-            <IonLabel>Registro</IonLabel>
-          </IonTabButton>
+          {/* ========== TAB BAR INFERIOR ========== */}
+          <IonTabBar slot="bottom">
+            <IonTabButton tab="home" href="/tabs/home">
+              <IonIcon icon={home} />
+              <IonLabel>Inicio</IonLabel>
+            </IonTabButton>
 
-          <IonTabButton tab="productos" href="/product">
-            <IonIcon aria-hidden="true" icon={list} />
-            <IonLabel>Productos</IonLabel>
-          </IonTabButton>
+            <IonTabButton tab="reportes" href="/tabs/reportes">
+              <IonIcon icon={barChart} />
+              <IonLabel>Reportes</IonLabel>
+            </IonTabButton>
 
-          <IonTabButton tab="perfil" href="/perfil">
-            <IonIcon aria-hidden="true" icon={person} />
-            <IonLabel>Perfil</IonLabel>
-          </IonTabButton>
-        </IonTabBar>
-      </IonTabs>
-    </IonReactRouter>
-  </IonApp>
-);
+            <IonTabButton tab="registro" href="/tabs/registro">
+              <IonIcon icon={create} />
+              <IonLabel>Registrar</IonLabel>
+            </IonTabButton>
+
+            <IonTabButton tab="productos" href="/tabs/productos">
+              <IonIcon icon={list} />
+              <IonLabel>Productos</IonLabel>
+            </IonTabButton>
+
+            <IonTabButton tab="perfil" href="/tabs/perfil">
+              <IonIcon icon={person} />
+              <IonLabel>Perfil</IonLabel>
+            </IonTabButton>
+          </IonTabBar>
+        </IonTabs>
+      </IonReactRouter>
+    </IonApp>
+  );
+};
 
 export default App;
+
+
+
+
+
+
+
+

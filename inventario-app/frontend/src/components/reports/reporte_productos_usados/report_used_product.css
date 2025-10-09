@@ -1,0 +1,32 @@
+.reporte-container {
+  padding: 20px;
+}
+
+.tabla-productos {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+.tabla-productos th,
+.tabla-productos td {
+  border: 1px solid #ccc;
+  padding: 8px;
+  text-align: left;
+}
+
+.resumen {
+  margin-top: 20px;
+  font-size: 14px;
+  color: #333;
+}
+
+.acciones {
+  margin-top: 20px;
+}
+
+button {
+  margin-right: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
