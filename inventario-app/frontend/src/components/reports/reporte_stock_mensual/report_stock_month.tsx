@@ -1,4 +1,11 @@
 import React, { useEffect, useState } from "react";
+import {
+  IonPage,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonContent,
+} from "@ionic/react";
 import "./report_stock_month.css";
 import jsPDF from "jspdf";
 // @ts-ignore → ignoramos porque no hay tipos oficiales
@@ -14,7 +21,7 @@ interface Producto {
   categoria: string;
 }
 
-const ReportStockMonth = (): React.ReactElement => {
+const ReportStockMonth: React.FC = () => {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [mes, setMes] = useState<string>("");
 
@@ -34,8 +41,6 @@ const ReportStockMonth = (): React.ReactElement => {
       if (error) {
         console.error("❌ Error al obtener productos:", error.message);
       } else if (data) {
-        console.log("✅ Datos recibidos de Supabase:", data);
-
         const mapped = data.map((p: any) => ({
           codigo: p.sku,
           nombre: p.nombre,
@@ -50,7 +55,6 @@ const ReportStockMonth = (): React.ReactElement => {
       }
     };
 
-    // Obtener mes actual (ej: "Febrero 2025")
     const date = new Date();
     const nombreMes = date.toLocaleString("es-ES", { month: "long", year: "numeric" });
     setMes(nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1));
@@ -61,7 +65,7 @@ const ReportStockMonth = (): React.ReactElement => {
   // Exportar PDF
   const exportarPDF = () => {
     const doc = new jsPDF();
-    doc.text(`Reporte de Stock Mensual (${mes})`, 14, 15);
+    doc.text(`📊 Reporte de Stock Mensual (${mes})`, 14, 15);
 
     autoTable(doc, {
       startY: 20,
@@ -95,46 +99,55 @@ Los productos con menor stock aparecen arriba para identificar fácilmente cuál
   };
 
   return (
-    <div className="reporte-container">
-      <h1>📊 Reporte de Stock Mensual</h1>
-      <h2>{mes}</h2>
-      <table className="tabla-productos">
-        <thead>
-          <tr>
-            <th>Código</th>
-            <th>Nombre</th>
-            <th>Cantidad</th>
-            <th>Estado</th>
-            <th>Categoría</th>
-          </tr>
-        </thead>
-        <tbody>
-          {productos.map((p, i) => (
-            <tr key={i}>
-              <td>{p.codigo}</td>
-              <td>{p.nombre}</td>
-              <td>{p.cantidad}</td>
-              <td>{p.estado}</td>
-              <td>{p.categoria}</td>
+    <IonPage>
+      <IonHeader>
+        <IonToolbar color="primary">
+          <IonTitle>📊 Reporte de Stock Mensual</IonTitle>
+        </IonToolbar>
+      </IonHeader>
+
+      <IonContent className="ion-padding">
+        <h2>{mes}</h2>
+
+        <table className="tabla-productos">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Nombre</th>
+              <th>Cantidad</th>
+              <th>Estado</th>
+              <th>Categoría</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {productos.map((p, i) => (
+              <tr key={i}>
+                <td>{p.codigo}</td>
+                <td>{p.nombre}</td>
+                <td>{p.cantidad}</td>
+                <td>{p.estado}</td>
+                <td>{p.categoria}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
-      <div className="resumen">
-        <p>
-          Este reporte muestra el <b>stock mensual</b> de cada producto.  
-          Los productos con <b>menor stock</b> se listan primero para facilitar su reposición.
-        </p>
-      </div>
+        <div className="resumen">
+          <p>
+            Este reporte muestra el <b>stock mensual</b> de cada producto.  
+            Los productos con <b>menor stock</b> se listan primero para facilitar su reposición.
+          </p>
+        </div>
 
-      <div className="acciones">
-        <button onClick={exportarPDF}>Exportar PDF</button>
-        <button onClick={exportarExcel}>Exportar Excel</button>
-      </div>
-    </div>
+        <div className="acciones">
+          <button onClick={exportarPDF}>Exportar PDF</button>
+          <button onClick={exportarExcel}>Exportar Excel</button>
+        </div>
+      </IonContent>
+    </IonPage>
   );
 };
 
 export default ReportStockMonth;
+
 
