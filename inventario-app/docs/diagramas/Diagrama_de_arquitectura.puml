@@ -2,7 +2,7 @@
 title Diagrama de Arquitectura - Proyecto APT
 
 rectangle "Frontend (Ionic React)" as FE
-rectangle "Backend/API (FastAPI)" as BE
+rectangle "Backend/API (API supabase)" as BE
 database "Base de Datos y Autenticación (Supabase)" as DB
 rectangle "Servicio de IA (Análisis de Imágenes)" as IA
 

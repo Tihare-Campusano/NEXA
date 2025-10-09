@@ -43,6 +43,8 @@ import Registro from "./pages/register-product/register-manual";
 import Productos from "./pages/product/mostrar-products";
 import EditorProducto from "./pages/product/editor-product";
 import Perfil from "./pages/perfil/perfil";
+import RegistroPistola from "./pages/register-product/scanner-gun";
+import RegistroCamera from "./pages/register-product/scanner-camera";
 
 setupIonicReact();
 
@@ -60,9 +62,11 @@ const App: React.FC = () => (
           <Route exact path="/home" component={Home} />
           <Route exact path="/reportes" component={Reportes} />
           <Route exact path="/registro" component={Registro} />
-          <Route exact path="/productos" component={Productos} />
+          <Route exact path="/product" component={Productos} />
           <Route exact path="/product/:id" component={EditorProducto} />
           <Route exact path="/perfil" component={Perfil} />
+          <Route exact path="/registro/pistola" component={RegistroPistola} />
+          <Route exact path="/registro/camera" component={RegistroCamera} />
         </IonRouterOutlet>
 
         {/* Rutas para los tabs inferiores */}
@@ -82,7 +86,7 @@ const App: React.FC = () => (
             <IonLabel>Registro</IonLabel>
           </IonTabButton>
 
-          <IonTabButton tab="productos" href="/productos">
+          <IonTabButton tab="productos" href="/product">
             <IonIcon aria-hidden="true" icon={list} />
             <IonLabel>Productos</IonLabel>
           </IonTabButton>

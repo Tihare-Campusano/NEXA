@@ -14,7 +14,7 @@
     border-radius: 8px;
     border: 1px solid #ddd;
     overflow: hidden;
-    margin-bottom: 12px; /* separa del table-container */
+    margin-bottom: 12px;
 }
 
 /* Encabezado con línea verde */
@@ -27,12 +27,12 @@
 }
 
 .productos-icon {
-    font-size: 22px; /* un poco más grande */
+    font-size: 22px;
     margin-right: 12px;
 }
 
 .productos-title {
-    font-size: 20px; /* más grande */
+    font-size: 20px;
     font-weight: 600;
     color: #333;
     margin: 0;
@@ -40,46 +40,50 @@
 
 /* Contenedor de tabla */
 .table-container {
-    max-height: 340px; /* un poco más grande */
+    max-height: 400px; /* o el alto que desees */
     overflow-y: auto;
-    border-top: 1px solid #ddd;
-    padding-top: 8px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #fff;
+    position: relative; /* 🧩 necesario para que el thead sticky funcione bien */
 }
 
 /* Tabla */
 .table-container table {
-    width: 100%;
     border-collapse: collapse;
-    font-size: 16px; /* letra más grande */
+    width: 100%;
+    font-size: 16px;
 }
 
-/* Encabezado de tabla */
+/* 🔹 THEAD FIJO Y LIMPIO */
 .table-container thead {
     position: sticky;
     top: 0;
-    background: #f4f4f4;
-    color: #333;
-    font-weight: 600;
-    text-transform: uppercase;
-    border-bottom: 2px solid #ddd;
+    background-color: #f8f9fa; /* Fondo sólido evita que se vean filas detrás */
+    z-index: 5; /* asegura que quede encima del tbody */
+    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.08); /* sombra suave para separarlo */
 }
 
+/* Encabezados de tabla */
 .table-container th {
-    padding: 14px;
+    padding: 14px 12px;
     text-align: left;
+    font-weight: 600;
+    color: #333;
+    border-bottom: 2px solid #e5e7eb;
 }
 
 /* Filas */
 .table-container td {
-    padding: 14px;
+    padding: 14px 12px;
     border-bottom: 1px solid #eee;
     color: #333;
-    font-size: 16px;
+    font-size: 15px;
 }
 
-/* Hover */
+/* Hover filas */
 .table-container tbody tr:hover {
-    background: #f9f9f9;
+    background: #f3f4f6;
     transition: background 0.2s;
 }
 

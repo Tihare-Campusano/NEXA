@@ -80,7 +80,7 @@ export default function ProductosTable({ productos: productosProp }: Props) {
                                     <td>
                                         <button
                                             className="btn-ver"
-                                            onClick={() => history.push(`/product/${prod.id}`)}
+                                            onClick={() => history.replace(`/product/${prod.id}`)}
                                         >
                                             Ver producto
                                         </button>

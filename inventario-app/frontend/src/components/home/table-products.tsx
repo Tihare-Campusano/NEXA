@@ -27,28 +27,31 @@ export default function ProductosTable({ productos: productosProp }: Props) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        // 🔹 Si recibimos productos desde props (ej: búsqueda), usamos esos
         if (productosProp) {
             setProductos(productosProp);
             setLoading(false);
             return;
         }
 
+        // 🔹 Si no hay props, cargamos todos los productos desde Supabase
         const fetchProductos = async () => {
             setLoading(true);
+
             const { data, error } = await supabase
                 .from("productos")
                 .select(`
-                        id,
-                        nombre,
-                        activo,
-                        created_at,
-                        stock (
-                            cantidad,
-                            estado,
-                            disponibilidad,
-                            ultima_actualizacion
-                            )
-                        `)
+                    id,
+                    nombre,
+                    activo,
+                    created_at,
+                    stock (
+                    cantidad,
+                    estado,
+                    disponibilidad,
+                    ultima_actualizacion
+                )
+            `)
                 .order("id", { ascending: false });
 
             if (error) {
@@ -65,13 +68,17 @@ export default function ProductosTable({ productos: productosProp }: Props) {
                 }));
                 setProductos(productosConStock);
             }
+
             setLoading(false);
         };
 
         fetchProductos();
     }, [productosProp]);
 
-    if (loading) return <p>Cargando productos...</p>;
+    // 🔹 Mostrar mensaje de carga solo al inicio
+    if (loading && productos.length === 0) {
+        return <p>Cargando productos...</p>;
+    }
 
     return (
         <div className="productos-card-outer">
@@ -83,7 +90,7 @@ export default function ProductosTable({ productos: productosProp }: Props) {
                 </div>
             </div>
 
-            {/* Tabla afuera de la card interna */}
+            {/* Tabla */}
             <div className="table-container">
                 <table>
                     <thead>
@@ -112,7 +119,10 @@ export default function ProductosTable({ productos: productosProp }: Props) {
                             ))
                         ) : (
                             <tr>
-                                <td colSpan={6} style={{ textAlign: "center", padding: "10px" }}>
+                                <td
+                                    colSpan={7}
+                                    style={{ textAlign: "center", padding: "10px" }}
+                                >
                                     No hay productos
                                 </td>
                             </tr>
