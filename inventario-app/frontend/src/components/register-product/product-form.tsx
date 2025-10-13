@@ -8,9 +8,9 @@ import {
     IonCard,
     IonCardContent,
 } from "@ionic/react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { useHistory } from "react-router-dom";
+import { useHistory, useLocation } from "react-router-dom";
 import "./product-form.css";
 
 const supabase = createClient(
@@ -20,6 +20,9 @@ const supabase = createClient(
 
 export default function FormularioRegistro() {
     const history = useHistory();
+    const location = useLocation();
+    const fromIA = (location.state as any)?.formData || null;
+
     const [form, setForm] = useState({
         codigo: "",
         nombre: "",
@@ -31,132 +34,124 @@ export default function FormularioRegistro() {
         stock: "",
         disponibilidad: "",
         estado: "",
+        imagen_url: "",
+        estadoIA: "",
     });
+
     const [loading, setLoading] = useState(false);
+    const [modoGuardar, setModoGuardar] = useState(false); // false = Siguiente, true = Guardar
+
+    // Si volvemos desde la IA, cargamos esos datos
+    useEffect(() => {
+        if (fromIA) {
+            setForm(prev => ({ ...prev, ...fromIA }));
+            setModoGuardar(true);
+        }
+    }, [fromIA]);
 
     const handleChange = (e: CustomEvent) => {
-        const { name, value } = e.detail;
-        setForm({ ...form, [name]: value });
+        const input = e.target as HTMLIonInputElement;
+        const name = input.name;
+        const value = e.detail.value ?? "";
+        setForm(prev => ({ ...prev, [name]: value }));
     };
 
     const handleCodigoChange = async (e: CustomEvent) => {
-        const codigo = e.detail.value;
-        setForm({ ...form, codigo });
+        const codigo = e.detail.value ?? "";
+        setForm(prev => ({ ...prev, codigo }));
 
-        if (!codigo) return;
+        if (!codigo || codigo.length < 4) return;
 
-        if (codigo.length >= 4) {
-            setLoading(true);
-            const { data: producto, error } = await supabase
-                .from("productos")
-                .select("*, stock(cantidad)")
-                .eq("codigo_barras", codigo)
-                .maybeSingle();
+        setLoading(true);
+        const { data: producto, error } = await supabase
+            .from("productos")
+            .select("*, stock(cantidad)")
+            .eq("codigo_barras", codigo)
+            .maybeSingle();
 
-            if (error) {
-                console.error(error);
-                setLoading(false);
-                return;
-            }
-
-            if (producto) {
-                // Si existe el producto, muestra datos para edición
-                const cantidadStock = producto.stock?.cantidad || 0;
-                let disponibilidad =
-                    cantidadStock <= 5 ? "Bajo stock" : cantidadStock <= 15 ? "Medio stock" : "Alto stock";
-
-                setForm({
-                    codigo: producto.codigo_barras,
-                    nombre: producto.nombre,
-                    marca: producto.marca,
-                    modelo: producto.modelo,
-                    categoria_id: producto.categoria_id || "",
-                    compatibilidad: producto.compatibilidad || "",
-                    observaciones: producto.observaciones || "",
-                    stock: cantidadStock.toString(),
-                    disponibilidad,
-                    estado: producto.estado || "-----",
-                });
-            } else {
-                // No existe: limpia campos no obligatorios para crear nuevo
-                setForm(prev => ({
-                    ...prev,
-                    nombre: "",
-                    marca: "",
-                    modelo: "",
-                    categoria_id: "",
-                    compatibilidad: "",
-                    observaciones: "",
-                    stock: "",
-                    disponibilidad: "",
-                    estado: "",
-                }));
-            }
-
+        if (error) {
+            console.error(error);
             setLoading(false);
-        }
-    };
-
-    const handleSubmit = async () => {
-        if (!form.codigo || !form.nombre || !form.marca || !form.modelo) {
-            alert("Por favor completa todos los campos obligatorios.");
             return;
         }
 
-        setLoading(true);
+        if (producto) {
+            const cantidadStock = producto.stock?.cantidad || 0;
+            const disponibilidad =
+                cantidadStock <= 5 ? "Bajo stock" : cantidadStock <= 15 ? "Medio stock" : "Alto stock";
 
-        // Verificar si ya existe un producto con el mismo código y nombre+modelo iguales
-        const { data: existente } = await supabase
-            .from("productos")
-            .select("id, nombre, modelo")
-            .eq("codigo_barras", form.codigo)
-            .maybeSingle();
-
-        if (existente) {
-            // Si mismo código y mismo nombre+modelo → actualizar
-            if (existente.nombre === form.nombre && existente.modelo === form.modelo) {
-                await supabase
-                    .from("productos")
-                    .update({
-                        marca: form.marca,
-                        categoria_id: form.categoria_id || null,
-                        compatibilidad: form.compatibilidad,
-                        observaciones: form.observaciones,
-                    })
-                    .eq("codigo_barras", form.codigo);
-            } else {
-                // Diferente nombre o modelo → crear nuevo producto
-                await supabase.from("productos").insert([
-                    {
-                        codigo_barras: form.codigo,
-                        nombre: form.nombre,
-                        marca: form.marca,
-                        modelo: form.modelo,
-                        categoria_id: form.categoria_id || null,
-                        compatibilidad: form.compatibilidad,
-                        observaciones: form.observaciones,
-                        activo: true,
-                    },
-                ]);
-            }
+            setForm({
+                codigo: producto.codigo_barras,
+                nombre: producto.nombre,
+                marca: producto.marca,
+                modelo: producto.modelo,
+                categoria_id: producto.categoria_id || "",
+                compatibilidad: producto.compatibilidad || "",
+                observaciones: producto.observaciones || "",
+                stock: cantidadStock.toString(),
+                disponibilidad,
+                estado: producto.estado || "",
+                imagen_url: producto.imagen_url || "",
+                estadoIA: producto.estadoIA || "",
+            });
         } else {
-            // Producto no existente → crear nuevo
-            await supabase.from("productos").insert([
-                {
-                    codigo_barras: form.codigo,
-                    nombre: form.nombre,
-                    marca: form.marca,
-                    modelo: form.modelo,
-                    categoria_id: form.categoria_id || null,
-                    compatibilidad: form.compatibilidad,
-                    observaciones: form.observaciones,
-                    activo: true,
-                },
-            ]);
+            // Limpia para nuevo registro
+            setForm(prev => ({
+                ...prev,
+                nombre: "",
+                marca: "",
+                modelo: "",
+                categoria_id: "",
+                compatibilidad: "",
+                observaciones: "",
+                stock: "",
+                disponibilidad: "",
+                estado: "",
+            }));
         }
 
         setLoading(false);
-        history.push("/registro/camera");
+    };
+
+    const handleNext = () => {
+        // Redirigir a la pantalla IA con los datos actuales
+        history.push({
+            pathname: "/registro/camera",
+            state: { formData: form },
+        });
+    };
+
+    const handleGuardar = async () => {
+        setLoading(true);
+
+        const { data: existente } = await supabase
+            .from("productos")
+            .select("id")
+            .eq("codigo_barras", form.codigo)
+            .maybeSingle();
+
+        const dataProducto = {
+            codigo_barras: form.codigo,
+            nombre: form.nombre,
+            marca: form.marca,
+            modelo: form.modelo,
+            categoria_id: form.categoria_id || null,
+            compatibilidad: form.compatibilidad,
+            observaciones: form.observaciones,
+            estado: form.estadoIA || form.estado,
+            imagen_url: form.imagen_url || null,
+            activo: true,
+        };
+
+        if (existente) {
+            await supabase.from("productos").update(dataProducto).eq("codigo_barras", form.codigo);
+        } else {
+            await supabase.from("productos").insert([dataProducto]);
+        }
+
+        setLoading(false);
+        alert("✅ Producto guardado correctamente.");
+        history.push("/inventario"); // o la ruta que tengas para volver
     };
 
     return (
@@ -169,6 +164,7 @@ export default function FormularioRegistro() {
                                 {field === "codigo" ? "Código" : field.charAt(0).toUpperCase() + field.slice(1)}
                             </label>
                             <IonInput
+                                type="text"
                                 name={field}
                                 value={form[field as keyof typeof form]}
                                 onIonChange={field === "codigo" ? handleCodigoChange : handleChange}
@@ -200,10 +196,10 @@ export default function FormularioRegistro() {
                 <IonButton
                     color="success"
                     expand="block"
-                    onClick={handleSubmit}
+                    onClick={modoGuardar ? handleGuardar : handleNext}
                     disabled={loading}
                 >
-                    {loading ? "Procesando..." : "Siguiente"}
+                    {loading ? "Procesando..." : modoGuardar ? "Guardar" : "Siguiente"}
                 </IonButton>
             </IonCardContent>
         </IonCard>
