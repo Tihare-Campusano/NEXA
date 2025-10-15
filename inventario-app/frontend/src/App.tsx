@@ -45,6 +45,7 @@ import EditorProducto from "./pages/product/editor-product";
 import Perfil from "./pages/perfil/perfil";
 import RegistroPistola from "./pages/register-product/scanner-gun";
 import RegistroCamera from "./pages/register-product/scanner-camera";
+import IAImagen from "./pages/register-product/ia-images/ia-images"; 
 
 setupIonicReact();
 
@@ -67,6 +68,7 @@ const App: React.FC = () => (
           <Route exact path="/perfil" component={Perfil} />
           <Route exact path="/registro/pistola" component={RegistroPistola} />
           <Route exact path="/registro/camera" component={RegistroCamera} />
+          <Route exact path="/registro/ia" component={IAImagen} />
         </IonRouterOutlet>
 
         {/* Rutas para los tabs inferiores */}
