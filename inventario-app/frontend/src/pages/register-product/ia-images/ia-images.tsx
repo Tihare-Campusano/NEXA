@@ -11,6 +11,7 @@ import { Camera, CameraResultType } from "@capacitor/camera";
 import { createClient } from "@supabase/supabase-js";
 import { useHistory, useLocation } from "react-router-dom";
 import * as tf from "@tensorflow/tfjs";
+import * as tflite from "@tensorflow/tfjs-tflite";
 
 const supabase = createClient(
     import.meta.env.VITE_SUPABASE_URL as string,
@@ -25,23 +26,23 @@ export default function IAImagen() {
     const [image, setImage] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [estadoIA, setEstadoIA] = useState<string | null>(null);
-    const [modelo, setModelo] = useState<tf.LayersModel | null>(null);
+    const [modeloLite, setModeloLite] = useState<tflite.TFLiteModel | null>(null);
 
-    // Cargar modelo al inicio
+    // Cargar modelo TFLite al inicio
     useEffect(() => {
-        const loadModel = async () => {
+        const loadModelLite = async () => {
             setLoading(true);
             try {
-                const m = await tf.loadLayersModel("/modelo_IA_web/model.json");
-                setModelo(m);
-                console.log("✅ Modelo IA cargado correctamente");
+                const m = await tflite.loadTFLiteModel("ml/modelo_final.lite");
+                setModeloLite(m);
+                console.log("✅ Modelo TFLite cargado correctamente");
             } catch (err) {
-                console.error("❌ Error cargando modelo IA:", err);
-                alert("Error al cargar el modelo de IA. Verifica la ruta o el formato.");
+                console.error("❌ Error cargando modelo TFLite:", err);
+                alert("Error al cargar el modelo TFLite.");
             }
             setLoading(false);
         };
-        loadModel();
+        loadModelLite();
     }, []);
 
     // Tomar foto desde la cámara
@@ -55,9 +56,9 @@ export default function IAImagen() {
         setEstadoIA(null);
     };
 
-    // Ejecutar predicción de IA
-    const predecirEstado = async () => {
-        if (!modelo || !image) {
+    // Ejecutar predicción de IA con TFLite
+    const predecirEstadoLite = async () => {
+        if (!modeloLite || !image) {
             alert("Primero toma una foto y asegúrate de que el modelo esté cargado.");
             return;
         }
@@ -73,22 +74,22 @@ export default function IAImagen() {
                     .fromPixels(img)
                     .resizeNearestNeighbor([224, 224])
                     .toFloat()
-                    .expandDims(0)
-                    .div(tf.scalar(255));
+                    .div(tf.scalar(255))
+                    .expandDims(0);
 
                 // Predicción
-                const pred = modelo.predict(tensor) as tf.Tensor;
-                const scores = (await pred.array()) as number[][];
+                const output = await modeloLite.predict(tensor) as tf.Tensor;
+                const scores = (await output.array()) as number[][];
                 const idx = scores[0].indexOf(Math.max(...scores[0]));
 
-                const etiquetas = ["Nuevo", "Usado", "Mal estado"]; // <-- Ajusta según tus clases
+                const etiquetas = ["Nuevo", "Usado", "Mal estado"];
                 const resultado = etiquetas[idx] || "Desconocido";
 
                 setEstadoIA(resultado);
                 alert(`Estado detectado: ${resultado}`);
             } catch (error) {
-                console.error("Error al predecir:", error);
-                alert("Ocurrió un error al analizar la imagen.");
+                console.error("Error al predecir TFLite:", error);
+                alert("Ocurrió un error al analizar la imagen con TFLite.");
             }
             setLoading(false);
         };
@@ -126,7 +127,7 @@ export default function IAImagen() {
 
         setLoading(false);
 
-        // ✅ Volver al formulario con los datos actualizados
+        // Volver al formulario con los datos actualizados
         history.push("/registro", { formData: updatedForm });
     };
 
@@ -147,7 +148,7 @@ export default function IAImagen() {
                     <IonButton
                         color="secondary"
                         expand="block"
-                        onClick={predecirEstado}
+                        onClick={predecirEstadoLite}
                         disabled={loading}
                     >
                         {loading ? <IonSpinner /> : "Analizar con IA"}
