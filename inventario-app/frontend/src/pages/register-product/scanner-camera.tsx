@@ -11,6 +11,9 @@ import {
 import HeaderApp from "../../components/header_app";
 import { FaClipboard } from "react-icons/fa";
 import { useHistory } from "react-router-dom";
+
+// Importaciones combinadas de ambas versiones
+import Botones from "../../components/register-product/botones";
 import { Capacitor } from "@capacitor/core";
 import { BarcodeScanner } from "@capacitor-mlkit/barcode-scanning";
 
@@ -69,20 +72,10 @@ export default function ScannerCamera() {
       />
 
       <IonContent className="ion-padding bg-white">
-        {/* 🔹 Botones superiores */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          <IonButton expand="block" className="flex-1 bg-gray-100 text-gray-800" onClick={() => history.push("/tabs/registro")}>
-            Ingreso manual
-          </IonButton>
-          <IonButton expand="block" className="flex-1 bg-gray-100 text-gray-800" onClick={() => history.push("/tabs/registro/pistola")}>
-            Escáner con pistola
-          </IonButton>
-          <IonButton expand="block" color="success" className="flex-1" onClick={() => history.push("/tabs/registro/camera")}>
-            Escáner con cámara
-          </IonButton>
-        </div>
+        {/* 🔹 Botones superiores (usando el componente refactorizado) */}
+        <Botones />
 
-        <h2 className="text-center text-xl font-extrabold mb-4">Escáner con cámara</h2>
+        <h2 className="text-center text-xl font-extrabold my-4">Escáner con cámara</h2>
 
         {/* 🔹 Botón para escanear */}
         <IonButton
@@ -94,7 +87,7 @@ export default function ScannerCamera() {
           Escanear código de barra
         </IonButton>
 
-        {/* 🔹 Formulario */}
+        {/* 🔹 Formulario completo */}
         <div className="grid grid-cols-2 gap-3 mb-6">
           <IonItem className="rounded-lg">
             <IonLabel position="floating">Código</IonLabel>

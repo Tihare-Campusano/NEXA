@@ -1,0 +1,15 @@
+.botones-container {
+    display: flex;
+    flex-wrap: wrap; /* permite que los botones se muevan a la siguiente fila en móviles pequeños */
+    padding: 0 1rem; /* margen lateral */
+    margin-bottom: 1rem;
+    justify-content: center; /* centra los botones horizontalmente */
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.botones-container ion-button {
+    flex: 1 1 200px; /* crece, se encoge, y base mínima 200px */
+    min-width: 150px; /* evita que se vean demasiado pequeños */
+    white-space: nowrap; /* el texto no se rompe en varias líneas */
+}
