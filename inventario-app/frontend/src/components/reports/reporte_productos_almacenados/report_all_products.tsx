@@ -1,18 +1,24 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
-  IonPage,
   IonHeader,
   IonToolbar,
   IonTitle,
   IonContent,
+  IonButtons,
+  IonButton,
+  IonText,
+  IonLoading,
 } from "@ionic/react";
-import "./report_all_products.css";
-import jsPDF from "jspdf";
-// @ts-ignore
-import autoTable from "jspdf-autotable";
-import * as XLSX from "xlsx";
 import { supabase } from "../../../supabaseClient";
 
+// --- Imports para generar archivos ---
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
+import { Filesystem, Directory } from "@capacitor/filesystem";
+import "./report_all_products.css"; // CSS para los botones
+
+// Interface para el tipo de producto
 interface Producto {
   codigo: string;
   nombre: string;
@@ -21,108 +27,149 @@ interface Producto {
   categoria: string;
 }
 
-const ReportAllProducts: React.FC = () => {
-  const [productos, setProductos] = useState<Producto[]>([]);
+// Props que el componente recibirá (una función para cerrarse)
+interface ReportAllProductsProps {
+  onDidDismiss: () => void;
+}
 
-  useEffect(() => {
-    const fetchProductos = async () => {
-      const { data, error } = await supabase
-        .from("productos")
-        .select(`
-          id,
-          sku,
-          nombre,
-          marca,
-          modelo,
-          estado,
-          stock:stock(stock_actual)
-        `);
+const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) => {
+  const [isLoading, setIsLoading] = useState(false);
 
-      if (error) {
-        console.error("Error al obtener productos:", error.message);
-      } else if (data) {
-        const mapped = data.map((p: any) => ({
-          codigo: p.sku,
-          nombre: p.nombre,
-          cantidad: p.stock?.stock_actual || 0,
-          estado: p.estado || "Desconocido",
-          categoria: p.marca || "General",
-        }));
-        setProductos(mapped);
-      }
-    };
+  // 1. Lógica para OBTENER los datos
+  const fetchProductos = async (): Promise<Producto[]> => {
+    // 👇 CORRECCIÓN 1: Se pide 'stock(cantidad)' en lugar de 'stock(stock_actual)'
+    const { data, error } = await supabase
+      .from("productos")
+      .select("sku, nombre, estado, marca, stock:stock(cantidad)"); // 👈 CORREGIDO
 
-    fetchProductos();
-  }, []);
+    if (error) {
+      console.error("Error al obtener productos:", error.message);
+      throw error;
+    }
 
-  const exportarPDF = () => {
-    const doc = new jsPDF();
-    doc.text("Reporte de Productos Almacenados", 14, 15);
-
-    autoTable(doc, {
-      startY: 20,
-      head: [["Código", "Nombre", "Cantidad", "Estado", "Categoría"]],
-      body: productos.map((p) => [
-        p.codigo,
-        p.nombre,
-        p.cantidad,
-        p.estado,
-        p.categoria,
-      ]),
-    });
-
-    doc.save("reporte_productos_almacenados.pdf");
+    if (data) {
+      return data.map((p: any) => ({
+        codigo: p.sku,
+        nombre: p.nombre,
+        // 👇 CORRECCIÓN 2: Se usa 'p.stock.cantidad'
+        cantidad: p.stock?.cantidad || 0, // 👈 CORREGIDO
+        estado: p.estado || "Desconocido",
+        categoria: p.marca || "General",
+      }));
+    }
+    return [];
   };
 
-  const exportarExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(productos);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Productos");
-    XLSX.writeFile(wb, "reporte_productos_almacenados.xlsx");
+  // 2. Lógica para GUARDAR en el dispositivo (Android/iOS)
+  const guardarEnDispositivo = async (fileName: string, base64Data: string) => {
+    try {
+      await Filesystem.writeFile({
+        path: fileName,
+        data: base64Data,
+        directory: Directory.Documents, // Carpeta 'Documents'
+      });
+      alert(`Archivo guardado en 'Documents' como: ${fileName}`);
+    } catch (e) {
+      console.error("Error al guardar archivo", e);
+      alert("Error al guardar archivo. ¿Otorgaste permisos a la app?");
+    }
   };
 
+  // 3. Lógica para EXPORTAR PDF
+  const exportarPDF = async () => {
+    setIsLoading(true);
+    try {
+      const productos = await fetchProductos();
+      const doc = new jsPDF();
+      doc.text("Reporte de Productos Almacenados", 14, 15);
+
+      autoTable(doc, {
+        startY: 20,
+        head: [["Código", "Nombre", "Cantidad", "Estado", "Categoría"]],
+        body: productos.map((p) => [
+          p.codigo,
+          p.nombre,
+          p.cantidad,
+          p.estado,
+          p.categoria,
+        ]),
+      });
+
+      // Genera como string base64 (no .save())
+      const base64Data = doc.output("datauristring").split(",")[1];
+      await guardarEnDispositivo("reporte_productos.pdf", base64Data);
+
+    } catch (error) {
+      console.error("Error PDF:", error);
+      alert("No se pudo generar el PDF.");
+    }
+    setIsLoading(false);
+    onDidDismiss(); // Cierra el modal
+  };
+
+  // 4. Lógica para EXPORTAR EXCEL
+  const exportarExcel = async () => {
+    setIsLoading(true);
+    try {
+      const productos = await fetchProductos();
+      const ws = XLSX.utils.json_to_sheet(productos);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Productos");
+
+      // Genera como string base64 (no .writeFile())
+      const base64Data = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
+      await guardarEnDispositivo("reporte_productos.xlsx", base64Data);
+
+    } catch (error) {
+      console.error("Error Excel:", error);
+      alert("No se pudo generar el Excel.");
+    }
+    setIsLoading(false);
+    onDidDismiss(); // Cierra el modal
+  };
+
+  // 5. RENDER: Esto es lo que se verá dentro del modal
   return (
-    <IonPage>
+    <>
+      {/* Encabezado del Modal */}
       <IonHeader>
         <IonToolbar>
-          <IonTitle>Reporte de Productos Almacenados</IonTitle>
+          <IonTitle>Todos los Productos</IonTitle>
+          <IonButtons slot="end">
+            <IonButton onClick={onDidDismiss}>Cancelar</IonButton>
+          </IonButtons>
         </IonToolbar>
       </IonHeader>
-      <IonContent fullscreen>
-        <div className="reporte-container">
-          <h1>📦 Reporte de Productos Almacenados</h1>
-          <table className="tabla-productos">
-            <thead>
-              <tr>
-                <th>Código</th>
-                <th>Nombre</th>
-                <th>Cantidad</th>
-                <th>Estado</th>
-                <th>Categoría</th>
-              </tr>
-            </thead>
-            <tbody>
-              {productos.map((p, i) => (
-                <tr key={i}>
-                  <td>{p.codigo}</td>
-                  <td>{p.nombre}</td>
-                  <td>{p.cantidad}</td>
-                  <td>{p.estado}</td>
-                  <td>{p.categoria}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
 
-          <div className="acciones">
-            <button onClick={exportarPDF}>Exportar PDF</button>
-            <button onClick={exportarExcel}>Exportar Excel</button>
-          </div>
+      {/* Contenido del Modal */}
+      <IonContent className="ion-padding">
+        <IonLoading isOpen={isLoading} message={"Generando reporte..."} />
+        <IonText>
+          <h3 style={{ textAlign: "center", fontWeight: "bold", marginTop: '1rem' }}>
+            ¿Deseas descargar en formato PDF o Excel?
+          </h3>
+        </IonText>
+        <div className="modal-buttons-container">
+          <IonButton
+            className="modal-button"
+            color="danger"
+            expand="block"
+            onClick={exportarPDF}
+          >
+            PDF
+          </IonButton>
+          <IonButton
+            className="modal-button"
+            color="success"
+            expand="block"
+            onClick={exportarExcel}
+          >
+            Excel
+          </IonButton>
         </div>
       </IonContent>
-    </IonPage>
+    </>
   );
 };
 
 export default ReportAllProducts;
-
