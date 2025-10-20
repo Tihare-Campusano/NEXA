@@ -3,7 +3,7 @@ import { FaFileAlt } from "react-icons/fa";
 import {
   IonPage,
   IonContent,
-  IonModal, // 👈 1. Importa IonModal
+  IonModal,
 } from "@ionic/react";
 
 // --- Gráficos (Dashboard) ---
@@ -14,22 +14,29 @@ import EstadoProductosChart from "../../components/reports/graficos/porcen_prod_
 import ReportesDropdown from "../../components/reports/ReportesDropdown";
 import HeaderApp from "../../components/header_app";
 
-// 👇 2. Importa tu componente de reporte REFACTORIZADO
+// 👇 1. Importa TODOS los componentes de reporte
 import ReportAllProducts from "../../components/reports/reporte_productos_almacenados/report_all_products";
-// ... (Aquí importarías los otros, ej: ReportBadState)
+import ReportBadState from "../../components/reports/reporte_productos_mal_estado/report_bad_state";
+import ReportNewProduct from "../../components/reports/reporte_productos_nuevos/report_new_product";
+import ReportUsedProduct from "../../components/reports/reporte_productos_usados/report_used_product";
+import ReportRegisterForMonth from "../../components/reports/reporte_registros_por_mes/report_register_for_month";
+import ReportRegisterForWeek from "../../components/reports/reporte_registros_por_semana/report_register_for_week";
+import ReportStockMonth from "../../components/reports/reporte_stock_mensual/report_stock_month"; // 👈 AÑADIDO
 
 // Opcional: un tipo para saber qué modal abrir
 type ReporteModalId =
   | "all_products"
   | "bad_state"
   | "new_product"
-  | "used_product"; //... etc
+  | "used_product"
+  | "register_month"
+  | "register_week"
+  | "stock_month"; // 👈 AÑADIDO
 
 export default function Reportes() {
-  // 👇 3. Estado para controlar qué modal está abierto
   const [modalAbierto, setModalAbierto] = useState<ReporteModalId | null>(null);
 
-  // 👇 4. Opciones del dropdown: ahora ABREN EL MODAL
+  // 👇 2. Opciones del dropdown actualizadas con todas las opciones
   const reportOptions = [
     {
       label: "Todos los Productos",
@@ -38,10 +45,27 @@ export default function Reportes() {
     {
       label: "Productos en Mal Estado",
       onClick: () => setModalAbierto("bad_state"),
-      // (Esta opción aún no hará nada hasta que crees ReportBadState)
     },
-    // ... (añade las otras opciones aquí)
-    // { label: "Productos Nuevos", onClick: () => setModalAbierto("new_product") },
+    {
+      label: "Productos Nuevos",
+      onClick: () => setModalAbierto("new_product"),
+    },
+    {
+      label: "Productos Usados",
+      onClick: () => setModalAbierto("used_product"),
+    },
+    {
+      label: "Registros por Mes",
+      onClick: () => setModalAbierto("register_month"),
+    },
+    {
+      label: "Registros por Semana",
+      onClick: () => setModalAbierto("register_week"),
+    },
+    {
+      label: "Stock Mensual",
+      onClick: () => setModalAbierto("stock_month"), // 👈 AÑADIDO
+    },
   ];
 
   return (
@@ -67,26 +91,42 @@ export default function Reportes() {
         <br />
         <EstadoProductosChart />
 
-        {/* 👇 5. MODAL: Se muestra cuando 'modalAbierto' no es null */}
+        {/* 👇 3. MODAL (con la clase CSS para el estilo) */}
         <IonModal
           isOpen={modalAbierto !== null}
           onDidDismiss={() => setModalAbierto(null)}
           // Clase para que el modal sea pequeño
           className="report-download-modal"
         >
-          {/* 👇 6. Contenido dinámico del Modal 
-            Aquí es donde llamas a tu componente limpio.
-          */}
+          {/* 👇 4. Contenido dinámico del Modal */}
           
           {modalAbierto === "all_products" && (
             <ReportAllProducts onDidDismiss={() => setModalAbierto(null)} />
           )}
 
-          {/* // Ejemplo de cómo añadirías el siguiente reporte:
           {modalAbierto === "bad_state" && (
             <ReportBadState onDidDismiss={() => setModalAbierto(null)} />
-          )} 
-          */}
+          )}
+
+          {modalAbierto === "new_product" && (
+            <ReportNewProduct onDidDismiss={() => setModalAbierto(null)} />
+          )}
+
+          {modalAbierto === "used_product" && (
+            <ReportUsedProduct onDidDismiss={() => setModalAbierto(null)} />
+          )}
+          
+          {modalAbierto === "register_month" && (
+            <ReportRegisterForMonth onDidDismiss={() => setModalAbierto(null)} />
+          )}
+
+          {modalAbierto === "register_week" && (
+            <ReportRegisterForWeek onDidDismiss={() => setModalAbierto(null)} />
+          )}
+
+          {modalAbierto === "stock_month" && (
+            <ReportStockMonth onDidDismiss={() => setModalAbierto(null)} /> // 👈 AÑADIDO
+          )}
 
         </IonModal>
       </IonContent>

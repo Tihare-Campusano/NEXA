@@ -41,13 +41,13 @@ import ScannerCamera from "./pages/register-product/scanner-camera";
 import IAImagen from "./pages/register-product/ia-images/ia-images";
 
 /* Componentes de reportes */
-import ReportAllProducts from "./components/reports/reporte_productos_almacenados/report_all_products";
-import ReportBadState from "./components/reports/reporte_productos_mal_estado/report_bad_state";
-import ReportUsedProduct from "./components/reports/reporte_productos_usados/report_used_product";
-import ReportNewProduct from "./components/reports/reporte_productos_nuevos/report_new_product";
-import ReportStockMonth from "./components/reports/reporte_stock_mensual/report_stock_month";
-import ReportRegisterForMonth from "./components/reports/reporte_registros_por_mes/report_register_for_month";
-import ReportRegisterForWeek from "./components/reports/reporte_registros_por_semana/report_register_for_week";
+// import ReportAllProducts from "./components/reports/reporte_productos_almacenados/report_all_products";
+// import ReportBadState from "./components/reports/reporte_productos_mal_estado/report_bad_state";
+// import ReportUsedProduct from "./components/reports/reporte_productos_usados/report_used_product";
+// import ReportNewProduct from "./components/reports/reporte_productos_nuevos/report_new_product";
+// import ReportStockMonth from "./components/reports/reporte_stock_mensual/report_stock_month";
+// import ReportRegisterForMonth from "./components/reports/reporte_registros_por_mes/report_register_for_month";
+// import ReportRegisterForWeek from "./components/reports/reporte_registros_por_semana/report_register_for_week";
 
 setupIonicReact();
 
@@ -73,13 +73,13 @@ const App: React.FC = () => {
             <Route exact path="/tabs/registro/ia" component={IAImagen} />
             
             {/* ========== Rutas fuera del TabBar (reportes individuales) ========== */}
-            <Route exact path="/reportes/productos-almacenados" component={ReportAllProducts} />
+            {/* <Route exact path="/reportes/productos-almacenados" component={ReportAllProducts} />
             <Route exact path="/reportes/productos-mal-estado" component={ReportBadState} />
             <Route exact path="/reportes/productos-usados" component={ReportUsedProduct} />
             <Route exact path="/reportes/productos-nuevos" component={ReportNewProduct} />
             <Route exact path="/reportes/stock-mensual" component={ReportStockMonth} />
             <Route exact path="/reportes/registros-mes" component={ReportRegisterForMonth} />
-            <Route exact path="/reportes/registros-semana" component={ReportRegisterForWeek} />
+            <Route exact path="/reportes/registros-semana" component={ReportRegisterForWeek} /> */}
 
             {/* Editor de producto (sin tabs) */}
             <Route exact path="/product/:id" component={EditorProducto} />
