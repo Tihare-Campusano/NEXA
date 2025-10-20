@@ -1,6 +1,6 @@
 // src/pages/Perfil/Perfil.tsx
 import { FaUserCircle } from "react-icons/fa";
-import "./Perfil.css";
+import "./perfil.css";
 import { IonPage, IonContent } from "@ionic/react";
 import HeaderApp from "../../components/header_app";
 

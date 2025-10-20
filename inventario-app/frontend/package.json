@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "test.e2e": "cypress run",
     "test.unit": "vitest",
-    "lint": "eslint"
+    "lint": "eslint",
+    "start": "ionic serve",
+    "test": "react-scripts test"
   },
   "dependencies": {
     "@capacitor-mlkit/barcode-scanning": "^7.3.0",
