@@ -7,6 +7,8 @@ import {
     IonText,
 } from "@ionic/react";
 import { useState, useEffect } from "react";
+// ✅ CORRECCIÓN 1: Importamos Capacitor para detectar la plataforma
+import { Capacitor } from "@capacitor/core"; 
 import { Camera, CameraResultType } from "@capacitor/camera";
 import { createClient } from "@supabase/supabase-js";
 import { useHistory, useLocation } from "react-router-dom";
@@ -33,7 +35,8 @@ export default function IAImagen() {
         const loadModelLite = async () => {
             setLoading(true);
             try {
-                const m = await tflite.loadTFLiteModel("ml/modelo_final.lite");
+                // Asegúrate que tu modelo está en la carpeta `public/ml/`
+                const m = await tflite.loadTFLiteModel("/ml/modelo_final.lite");
                 setModeloLite(m);
                 console.log("✅ Modelo TFLite cargado correctamente");
             } catch (err) {
@@ -45,18 +48,37 @@ export default function IAImagen() {
         loadModelLite();
     }, []);
 
-    // Tomar foto desde la cámara
+    // ✅ CORRECCIÓN 2: Función `tomarFoto` mejorada para ser multiplataforma
     const tomarFoto = async () => {
-        const foto = await Camera.getPhoto({
-            resultType: CameraResultType.DataUrl,
-            quality: 90,
-            allowEditing: false,
-        });
-        setImage(foto.dataUrl || null);
-        setEstadoIA(null);
+        try {
+            // Detectamos si estamos en un dispositivo nativo (Android/iOS)
+            const isNative = Capacitor.isNativePlatform();
+
+            const foto = await Camera.getPhoto({
+                quality: 90,
+                allowEditing: false,
+                // Pedimos URI en nativo para ahorrar memoria, y DataUrl en web
+                resultType: isNative ? CameraResultType.Uri : CameraResultType.DataUrl,
+            });
+
+            // Usamos `webPath`, Capacitor se encarga de que funcione en ambas plataformas
+            if (foto.webPath) {
+                setImage(foto.webPath);
+            } else {
+                // Como fallback para la web si webPath no estuviera
+                setImage(foto.dataUrl || null);
+            }
+            
+            setEstadoIA(null); // Resetea el análisis previo
+
+        } catch (error) {
+            console.log("El usuario canceló la toma de la foto.");
+        }
     };
 
-    // Ejecutar predicción de IA con TFLite
+    // El resto de tus funciones (predecir y guardar) funcionan sin cambios
+    // gracias a la magia de `webPath` de Capacitor.
+    
     const predecirEstadoLite = async () => {
         if (!modeloLite || !image) {
             alert("Primero toma una foto y asegúrate de que el modelo esté cargado.");
@@ -69,16 +91,14 @@ export default function IAImagen() {
 
         img.onload = async () => {
             try {
-                // Preprocesamiento de la imagen
                 const tensor = tf.browser
                     .fromPixels(img)
                     .resizeNearestNeighbor([224, 224])
                     .toFloat()
                     .div(tf.scalar(255))
                     .expandDims(0);
-
-                // Predicción
-                const output = await modeloLite.predict(tensor) as tf.Tensor;
+                
+                const output = (await modeloLite.predict(tensor)) as tf.Tensor;
                 const scores = (await output.array()) as number[][];
                 const idx = scores[0].indexOf(Math.max(...scores[0]));
 
@@ -95,7 +115,6 @@ export default function IAImagen() {
         };
     };
 
-    // Guardar imagen y volver al formulario con los datos
     const guardarImagen = async () => {
         if (!image || !estadoIA) {
             alert("Toma una foto y ejecuta la IA antes de guardar.");
@@ -103,11 +122,15 @@ export default function IAImagen() {
         }
 
         setLoading(true);
+        
+        // `fetch(image)` funciona con `webPath` en nativo y con `dataUrl` en web.
+        const response = await fetch(image);
+        const blob = await response.blob();
 
         const fileName = `productos/${formData.codigo}_${Date.now()}.png`;
         const { error } = await supabase.storage
             .from("imagenes-productos")
-            .upload(fileName, await fetch(image).then(r => r.blob()));
+            .upload(fileName, blob);
 
         if (error) {
             console.error(error);
@@ -117,7 +140,7 @@ export default function IAImagen() {
         }
 
         const { data } = supabase.storage.from("imagenes-productos").getPublicUrl(fileName);
-        const publicUrl = data?.publicUrl || "";
+        const publicUrl = data.publicUrl || "";
 
         const updatedForm = {
             ...formData,
@@ -126,8 +149,6 @@ export default function IAImagen() {
         };
 
         setLoading(false);
-
-        // Volver al formulario con los datos actualizados
         history.push("/registro", { formData: updatedForm });
     };
 
@@ -149,7 +170,7 @@ export default function IAImagen() {
                         color="secondary"
                         expand="block"
                         onClick={predecirEstadoLite}
-                        disabled={loading}
+                        disabled={loading || !modeloLite}
                     >
                         {loading ? <IonSpinner /> : "Analizar con IA"}
                     </IonButton>
