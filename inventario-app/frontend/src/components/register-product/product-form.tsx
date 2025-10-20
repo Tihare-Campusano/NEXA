@@ -107,20 +107,22 @@ export default function FormularioRegistro() {
                 estadoIA: "",
             });
         } else {
-            setForm(prev => ({
-                codigo: prev.codigo,
+            // ✅ MEJORA: Si el producto no existe, limpiamos el formulario
+            // pero mantenemos el código y establecemos un stock inicial.
+            setForm({
+                codigo: codigo,
                 nombre: "",
                 marca: "",
                 modelo: "",
                 categoria_id: "",
                 compatibilidad: "",
                 observaciones: "",
-                stock: "",
-                disponibilidad: "",
+                stock: "0",
+                disponibilidad: "Sin stock",
                 estado: "",
                 imagen_url: "",
                 estadoIA: "",
-            }));
+            });
         }
 
         setLoading(false);
@@ -128,10 +130,15 @@ export default function FormularioRegistro() {
 
     // --- NAVEGACIÓN A LA PÁGINA DE IA ---
     const handleNext = () => {
+        // ✅ CORRECCIÓN: Se añade una validación para asegurar que el código exista.
+        if (!form.codigo.trim()) {
+            alert("Por favor, ingresa un código para el producto antes de continuar.");
+            return; // Detiene la navegación si no hay código.
+        }
+
         history.push({
-            // 👇 ¡ESTE ES EL ÚNICO CAMBIO! 👇
-            pathname: "/registro/ia", // Apuntamos a la ruta de la IA
-            state: { formData: form },   // Enviamos los datos del formulario
+            pathname: "/tabs/registro/ia",
+            state: { formData: form },
         });
     };
 
@@ -170,7 +177,7 @@ export default function FormularioRegistro() {
             alert(`❌ Error al guardar el producto: ${error.message}`);
         } else {
             alert("✅ Producto guardado correctamente.");
-            history.push("/inventario");
+            history.push("/inventario"); // Considera si esta ruta es correcta o debería ser /tabs/productos
         }
     };
 
