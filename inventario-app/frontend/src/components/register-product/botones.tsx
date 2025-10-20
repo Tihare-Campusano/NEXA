@@ -10,21 +10,21 @@ const Botones: React.FC = () => {
             <IonButton
                 color="primary"
                 expand="block"
-                onClick={() => history.push("/registro")}
+                onClick={() => history.push("/tabs/registro")}
             >
                 Registro manual
             </IonButton>
             <IonButton
                 color="secondary"
                 expand="block"
-                onClick={() => history.push("/registro/pistola")}
+                onClick={() => history.push("/tabs/registro/pistola")}
             >
                 Registro con pistola
             </IonButton>
             <IonButton
                 color="tertiary"
                 expand="block"
-                onClick={() => history.push("/registro/camera")}
+                onClick={() => history.push("/tabs/registro/camera")}
             >
                 Registro con cámara
             </IonButton>
