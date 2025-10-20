@@ -143,7 +143,7 @@ export default function FormularioRegistro() {
             .select("id")
             .eq("codigo_barras", form.codigo)
             .maybeSingle();
-        
+
         const dataProducto = {
             codigo_barras: form.codigo,
             nombre: form.nombre,
@@ -163,17 +163,17 @@ export default function FormularioRegistro() {
         } else {
             ({ error } = await supabase.from("productos").insert([dataProducto]));
         }
-        
+
         setLoading(false);
 
         if (error) {
             alert(`❌ Error al guardar el producto: ${error.message}`);
         } else {
             alert("✅ Producto guardado correctamente.");
-            history.push("/inventario"); 
+            history.push("/inventario");
         }
     };
-    
+
     // --- Renderizado del componente ---
     return (
         <IonCard className="form-card">
@@ -193,22 +193,22 @@ export default function FormularioRegistro() {
                             />
                         </div>
                     ))}
-                    
+
                     <IonItem className="form-field">
-                      <IonLabel position="stacked" className="form-label">Categoría</IonLabel>
-                      <IonSelect
-                        name="categoria_id"
-                        value={form.categoria_id}
-                        placeholder="Selecciona una categoría"
-                        onIonChange={handleChange}
-                        interface="popover"
-                      >
-                        {categoriasFijas.map((cat) => (
-                          <IonSelectOption key={cat.id} value={cat.id.toString()}>
-                            {cat.nombre}
-                          </IonSelectOption>
-                        ))}
-                      </IonSelect>
+                        <IonLabel position="stacked" className="form-label">Categoría</IonLabel>
+                        <IonSelect
+                            name="categoria_id"
+                            value={form.categoria_id}
+                            placeholder="Selecciona una categoría"
+                            onIonChange={handleChange}
+                            interface="popover"
+                        >
+                            {categoriasFijas.map((cat) => (
+                                <IonSelectOption key={cat.id} value={cat.id.toString()}>
+                                    {cat.nombre}
+                                </IonSelectOption>
+                            ))}
+                        </IonSelect>
                     </IonItem>
 
                     {["stock", "disponibilidad", "estado"].map((field) => (

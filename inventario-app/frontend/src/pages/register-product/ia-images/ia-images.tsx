@@ -60,7 +60,7 @@ export default function IAImagen() {
                 console.log("✅ Backend de TensorFlow listo.");
 
                 // Cargamos el archivo del modelo desde la carpeta 'public/ml'.
-                const m = await tflite.loadTFLiteModel("/ml/modelo_final.lite");
+                const m = await tflite.loadTFLiteModel("../ml/modelo_final.tflite");
                 
                 // Guardamos el modelo cargado en nuestro estado para poder usarlo después.
                 setModeloLite(m);
