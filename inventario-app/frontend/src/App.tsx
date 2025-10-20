@@ -13,6 +13,7 @@ import {
 import { IonReactRouter } from "@ionic/react-router";
 import { home, barChart, create, list, person } from "ionicons/icons";
 
+
 /* Páginas principales */
 import Home from "./pages/home/home";
 import Reportes from "./pages/reports/reports";
@@ -20,6 +21,11 @@ import Registro from "./pages/register-product/register-manual";
 import Productos from "./pages/product/mostrar-products";
 import EditorProducto from "./pages/product/editor-product";
 import Perfil from "./pages/perfil/perfil";
+/* Páginas de registro */
+import RegisterManual from "./pages/register-product/register-manual";
+import ScannerGun from "./pages/register-product/scanner-gun";
+import ScannerCamera from "./pages/register-product/scanner-camera";
+
 
 /* Componentes de reportes */
 import ReportAllProducts from "./components/reports/reporte_productos_almacenados/report_all_products";
@@ -73,6 +79,18 @@ const App: React.FC = () => {
 
             {/* Editor de producto (sin tabs) */}
             <Route exact path="/product/:id" component={EditorProducto} />
+            {/* Rutas con Tabs */}
+            <Route exact path="/tabs/home" component={Home} />
+            <Route exact path="/tabs/reportes" component={Reportes} />
+
+            {/* Registro (3 variantes) */}
+            <Route exact path="/tabs/registro" component={RegisterManual} />
+            <Route exact path="/tabs/registro/pistola" component={ScannerGun} />
+            <Route exact path="/tabs/registro/camera" component={ScannerCamera} />
+
+            <Route exact path="/tabs/productos" component={Productos} />
+            <Route exact path="/tabs/perfil" component={Perfil} />
+
           </IonRouterOutlet>
 
           {/* ========== TAB BAR INFERIOR ========== */}
