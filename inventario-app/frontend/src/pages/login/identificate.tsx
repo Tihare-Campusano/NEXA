@@ -6,65 +6,51 @@ import {
     IonButton,
     IonItem,
     IonLabel,
-    IonHeader,
-    IonToolbar,
-    IonTitle,
     IonLoading,
     useIonToast,
+    IonIcon, // Importamos IonIcon si el logo es un icono o se usará como placeholder
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
-import { supabase } from '../../supabaseClient'; // Se mantiene la ruta del 2do archivo
+import { supabase } from '../../supabaseClient';
 import { User } from '@supabase/supabase-js';
+// Importa un icono para usar como placeholder de logo (ej: lock-closed)
+import { lockClosed } from 'ionicons/icons';
+import './Identificate.css'; // **Importamos un CSS dedicado**
 
-// Estilos en línea simples para centrar (del 2do archivo)
-const containerStyles = {
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    height: '100%',
-    padding: '1rem',
-    maxWidth: '500px',
-    margin: '0 auto',
-};
+// --- COMPONENTE Identificate ---
 
 const Identificate: React.FC = () => {
-    // --- Estados combinados de ambos archivos ---
     const [nombre, setNombre] = useState('');
-    const [apellido, setApellido] = useState(''); // <-- Añadido del 1er archivo
-    const [user, setUser] = useState<User | null>(null); // Renombrado (era currentUser)
-    const [loading, setLoading] = useState(true); // Renombrado (era isLoading) y default true
+    const [apellido, setApellido] = useState('');
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
     const [presentToast] = useIonToast();
     const history = useHistory();
 
-    // --- useEffect combinado (lógica del 1er archivo) ---
-    // Al cargar, verifica usuario Y precarga datos si existen
+    // Lógica de autenticación y precarga de datos (sin cambios)
     useEffect(() => {
         const fetchUser = async () => {
             setLoading(true);
             const { data: { user }, error } = await supabase.auth.getUser();
 
-            if (error) {
-                console.error('Error al obtener usuario:', error.message);
-                presentToast({ 
-                    message: 'Error: No se pudo verificar tu sesión.', 
-                    color: 'danger',
-                    duration: 3000
-                });
+            if (error || !user) {
+                console.error('Error al obtener usuario o no autenticado:', error?.message);
+                presentToast({ message: 'Error: No se pudo verificar tu sesión.', color: 'danger', duration: 3000 });
                 history.replace('/login');
-            } else if (user) {
+            } else {
                 setUser(user);
-                
+
                 // Opcional: pre-rellenar si ya tiene datos
                 const { data: profile } = await supabase
                     .from('usuarios')
-                    .select('nombre')
+                    .select('nombre, apellido') // Incluimos apellido para pre-rellenar si existe
                     .eq('auth_uid', user.id)
-                    .single();
-                    
-                if (profile?.nombre) setNombre(profile.nombre);
+                    .maybeSingle();
 
-            } else {
-                history.replace('/login');
+                if (profile?.nombre) setNombre(profile.nombre);
+                // Asumimos que también hay un campo apellido en el perfil
+                // if (profile?.apellido) setApellido(profile.apellido); 
+
             }
             setLoading(false);
         };
@@ -72,12 +58,9 @@ const Identificate: React.FC = () => {
         fetchUser();
     }, [history, presentToast]);
 
-    /**
-     * VALIDACIÓN Y GUARDADO (Lógica del 1er archivo)
-     */
+    // Función para guardar (sin cambios)
     const handleSubmit = async () => {
-        // Validación simple para ambos campos
-        if (!user || !nombre || !apellido) {
+        if (!user || !nombre.trim() || !apellido.trim()) {
             presentToast({
                 message: 'Por favor completa tu nombre y apellido.',
                 duration: 3000,
@@ -88,14 +71,13 @@ const Identificate: React.FC = () => {
 
         setLoading(true);
 
-        // Actualiza ambos campos en la tabla 'usuarios'
         const { error } = await supabase
             .from('usuarios')
-            .update({ 
+            .update({
                 nombre: nombre.trim(),
-                apellido: apellido.trim() // <-- Añadido
+                apellido: apellido.trim()
             })
-            .eq('auth_uid', user.id); // Vincula al 'auth_uid'
+            .eq('auth_uid', user.id);
 
         setLoading(false);
 
@@ -107,37 +89,40 @@ const Identificate: React.FC = () => {
             });
         } else {
             presentToast({
-                message: '¡Perfil completado!',
+                message: '¡Perfil completado! Bienvenido(a).',
                 duration: 2000,
                 color: 'success',
             });
-            // Éxito: Ahora sí, al inicio de la app
             history.replace('/tabs/home');
         }
     };
 
-    // --- UI Combinada (Estilos del 2do, Inputs del 1ro) ---
+    // --- UI Modificada ---
     return (
         <IonPage>
-            <IonHeader>
-                <IonToolbar>
-                    <IonTitle>Identifícate</IonTitle>
-                </IonToolbar>
-            </IonHeader>
-            <IonContent>
-                {/* Mensaje de carga del 1er archivo */}
+            {/* Eliminamos el IonHeader para un look de pantalla completa de login/auth */}
+            <IonContent fullscreen className="ion-padding auth-page">
                 <IonLoading isOpen={loading} message={'Cargando...'} />
-                
-                <div style={containerStyles as React.CSSProperties}>
-                    <h2 style={{ textAlign: 'center' }}>Casi listo...</h2>
-                    <p style={{ textAlign: 'center' }}>
+
+                <div className="auth-container">
+                    {/* Sección del Logo/Marca */}
+                    <div className="logo-section">
+                        {/* Reemplaza este IonIcon con tu logo (Image, SVG, o componente de logo) */}
+                        <IonIcon icon={lockClosed} color="primary" className="logo-icon" />
+                        <h1 className="app-title">Mi App Inventario</h1> {/* Título principal */}
+                        <h2 className="tagline">Completa tu perfil</h2> {/* Título de la sección */}
+                    </div>
+
+                    <p className="ion-text-center ion-margin-bottom">
                         Necesitamos saber quién eres para continuar.
                     </p>
 
-                    {/* Input de Nombre */}
-                    <IonItem>
+                    {/* Formulario */}
+                    // PRIMER CAMPO CORREGIDO
+                    <IonItem className="ion-margin-bottom">
                         <IonLabel position="floating">Nombre</IonLabel>
                         <IonInput
+                            fill="outline" // <-- MOVIDO AQUÍ
                             type="text"
                             value={nombre}
                             onIonInput={(e) => setNombre(e.detail.value!)}
@@ -145,10 +130,11 @@ const Identificate: React.FC = () => {
                         />
                     </IonItem>
 
-                    {/* Input de Apellido (Añadido) */}
-                    <IonItem>
+// SEGUNDO CAMPO CORREGIDO
+                    <IonItem className="ion-margin-bottom">
                         <IonLabel position="floating">Apellido</IonLabel>
                         <IonInput
+                            fill="outline" // <-- MOVIDO AQUÍ
                             type="text"
                             value={apellido}
                             onIonInput={(e) => setApellido(e.detail.value!)}
@@ -159,7 +145,7 @@ const Identificate: React.FC = () => {
                     <IonButton
                         expand="block"
                         className="ion-margin-top"
-                        onClick={handleSubmit} // Llama a la nueva función
+                        onClick={handleSubmit}
                         disabled={loading}
                     >
                         Guardar y Continuar

@@ -1,0 +1,48 @@
+/* Centra el contenido vertical y horizontalmente */
+.auth-page {
+    --background: var(--ion-background-color, #ffffff); /* Asegura fondo blanco/claro si no hay imagen de fondo */
+    display: flex;
+    justify-content: center; /* Centrado horizontal */
+    align-items: center; /* Centrado vertical */
+}
+
+/* Contenedor principal para limitar el ancho en pantallas grandes (como el estilo in-line original) */
+.auth-container {
+    width: 100%;
+    max-width: 400px; /* Ancho típico de un formulario de login */
+    padding: 20px;
+}
+
+/* Estilo del Logo/Marca (similar al de un login) */
+.logo-section {
+    text-align: center;
+    margin-bottom: 2rem; /* Espacio debajo del logo/título */
+}
+
+.logo-icon {
+    font-size: 4rem; /* Icono grande como placeholder de logo */
+    margin-bottom: 0.5rem;
+}
+
+/* Título principal de la aplicación */
+.app-title {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: var(--ion-color-primary, #3880ff); /* Color principal de la aplicación */
+    margin-top: 0;
+    margin-bottom: 5px;
+}
+
+/* Subtítulo (el "Identifícate" o "Casi Listo") */
+.tagline {
+    font-size: 1.5rem;
+    font-weight: normal;
+    color: var(--ion-color-step-600, #666); /* Color secundario para el tagline */
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+/* Estilo para los IonItem/IonInput */
+ion-item.ion-margin-bottom {
+    --inner-padding-end: 0;
+}
