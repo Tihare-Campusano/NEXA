@@ -10,6 +10,7 @@ import { useHistory } from 'react-router-dom';
 import { logoGoogle } from 'ionicons/icons';
 import { supabase } from '../../supabaseClient';
 import LoginForm from '../../components/login/login-form';
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 
 // Importa el archivo CSS
 import './login.css';
@@ -45,23 +46,34 @@ const Login: React.FC = () => {
     // funcion login con google
     const handleGoogleLogin = async () => {
         setIsLoading(true);
-        const { error } = await supabase.auth.signInWithOAuth({
-            provider: 'google',
-            options: {
-                redirectTo: 'com.tu.paquete://login-callback',
-            },
-        });
+        try {
+            // 1️⃣ Llama al plugin nativo
+            const googleUser = await GoogleAuth.signIn();
 
-        if (error) {
+            if (!googleUser || !googleUser.authentication?.idToken) {
+                throw new Error('No se pudo obtener el token de Google.');
+            }
+
+            // 2️⃣ Pasa el idToken a Supabase
+            const { data, error } = await supabase.auth.signInWithIdToken({
+                provider: 'google',
+                token: googleUser.authentication.idToken,
+            });
+
+            if (error) throw error;
+
+            // onAuthStateChange en App.tsx hará la creación de perfil y redirección
+
+        } catch (error: any) {
             presentToast({
                 message: 'Error al iniciar con Google: ' + error.message,
                 duration: 3000,
                 color: 'danger',
             });
+        } finally {
             setIsLoading(false);
         }
     };
-
     // Esta función no cambia, es llamada por el listener en App.tsx
     // o por el login con email.
     const checkProfileAndRedirect = async (userId: string) => {
