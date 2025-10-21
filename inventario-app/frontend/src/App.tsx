@@ -20,6 +20,8 @@ import Registro from "./pages/register-product/register-manual";
 import Productos from "./pages/product/mostrar-products";
 import EditorProducto from "./pages/product/editor-product";
 import Perfil from "./pages/perfil/perfil";
+import RegistroPistola from "./pages/register-product/registro_pistola";
+
 
 /* Componentes de reportes */
 import ReportAllProducts from "./components/reports/reporte_productos_almacenados/report_all_products";
@@ -73,6 +75,8 @@ const App: React.FC = () => {
 
             {/* Editor de producto (sin tabs) */}
             <Route exact path="/product/:id" component={EditorProducto} />
+            <Route exact path="/registro/pistola" component={RegistroPistola} />
+
           </IonRouterOutlet>
 
           {/* ========== TAB BAR INFERIOR ========== */}
