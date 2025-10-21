@@ -102,13 +102,13 @@ const Login: React.FC = () => {
     const checkProfileAndRedirect = async (userId: string) => {
         const { data, error } = await supabase
             .from('usuarios')
-            .select('nombre, apellido') // ✅ Asegúrate que estas columnas existen en tu DB.
+            .select('nombre') 
             .eq('auth_uid', userId)
             .maybeSingle(); // 🛠️ Usar maybeSingle() para prevenir error 406.
 
         // NOTA: No es necesario usar console.warn si el error es solo "no rows found".
 
-        if (data?.nombre && data?.apellido) {
+        if (data?.nombre) {
             history.replace('/tabs/home');
         } else {
             history.replace('/identificate');

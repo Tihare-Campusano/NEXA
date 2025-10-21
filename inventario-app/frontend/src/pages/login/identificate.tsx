@@ -57,12 +57,11 @@ const Identificate: React.FC = () => {
                 // Opcional: pre-rellenar si ya tiene datos
                 const { data: profile } = await supabase
                     .from('usuarios')
-                    .select('nombre, apellido')
+                    .select('nombre')
                     .eq('auth_uid', user.id)
                     .single();
                     
                 if (profile?.nombre) setNombre(profile.nombre);
-                if (profile?.apellido) setApellido(profile.apellido);
 
             } else {
                 history.replace('/login');
