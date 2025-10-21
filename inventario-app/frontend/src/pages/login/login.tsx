@@ -42,15 +42,13 @@ const Login: React.FC = () => {
         setIsLoading(false);
     };
 
-    // 👇 ESTA ES LA FUNCIÓN CORREGIDA
+    // funcion login con google
     const handleGoogleLogin = async () => {
         setIsLoading(true);
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                // Esta línea le dice a Supabase a dónde volver después de que
-                // Google te regrese a la app. Es la solución al bucle.
-                redirectTo: window.location.origin,
+                redirectTo: 'com.tu.paquete://login-callback',
             },
         });
 
