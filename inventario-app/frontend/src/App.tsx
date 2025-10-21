@@ -16,22 +16,30 @@ import { supabase } from "./supabaseClient";
 
 /* CSS de Ionic */
 import "@ionic/react/css/core.css";
-// ... (tus otros imports de CSS)
+import "@ionic/react/css/normalize.css";
+import "@ionic/react/css/structure.css";
+import "@ionic/react/css/typography.css";
+import "@ionic/react/css/padding.css";
+import "@ionic/react/css/float-elements.css";
+import "@ionic/react/css/text-alignment.css";
+import "@ionic/react/css/text-transformation.css";
+import "@ionic/react/css/flex-utils.css";
+import "@ionic/react/css/display.css";
 import "@ionic/react/css/palettes/dark.system.css";
 import "./theme/variables.css";
 
-/* Tus páginas de AUTH */
+/* Páginas de Autenticación */
 import Login from "./pages/login/login";
 import Identificate from "./pages/login/identificate";
 
-/* Páginas principales */
+/* Páginas Principales */
 import Home from "./pages/home/home";
 import Reportes from "./pages/reports/reports";
 import Productos from "./pages/product/mostrar-products";
 import EditorProducto from "./pages/product/editor-product";
 import Perfil from "./pages/perfil/perfil";
 
-/* Páginas de registro */
+/* Páginas de Registro */
 import RegisterManual from "./pages/register-product/register-manual";
 import ScannerGun from "./pages/register-product/scanner-gun";
 import ScannerCamera from "./pages/register-product/scanner-camera";
@@ -41,67 +49,73 @@ setupIonicReact();
 
 const App: React.FC = () => {
   const history = useHistory();
-  // En tu archivo App.tsx
 
-  // 👇 PEGA ESTE BLOQUE COMPLETO (REEMPLAZANDO EL TUYO)
+  // Listener de Autenticación (CORREGIDO)
   useEffect(() => {
+    console.log("🟢 App.tsx: Configurando el listener de autenticación...");
+
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log(`🟡 App.tsx: Evento de autenticación detectado: ${event}`);
 
         if (event === "SIGNED_IN") {
           if (session?.user) {
+            console.log(`🟢 App.tsx: Usuario INICIÓ SESIÓN: ${session.user.email}`);
 
-            // 1. Intenta obtener el perfil (de forma segura, sin fallar si está vacío)
-            const { data: profileData } = await supabase
+            const { data: profileData, error: selectError } = await supabase
               .from("usuarios")
               .select("nombre")
               .eq("auth_uid", session.user.id)
-              .maybeSingle(); // 👈 Usamos maybeSingle() para evitar el error
+              .maybeSingle();
 
-            // 2. Si NO hay perfil (!profileData), es un usuario nuevo.
+            if (selectError) {
+              console.error("🔴 App.tsx: Error al SELECCIONAR el perfil:", selectError.message);
+              return;
+            }
+
             if (!profileData) {
-              // 👇 ESTA ES LA LÓGICA QUE TE FALTA:
+              console.log("🟡 App.tsx: No se encontró perfil. Intentando crear uno nuevo...");
+
+              // 👇 LA CORRECCIÓN CLAVE: AÑADIMOS VALORES POR DEFECTO
               const { error: insertError } = await supabase
                 .from("usuarios")
                 .insert({
                   auth_uid: session.user.id,
                   email: session.user.email,
-                  // 'nombre' se deja nulo, para eso lo mandamos a /identificate
+                  rol_usuario: 'usuario', // Asigna un rol por defecto
+                  activo: true          // Asigna un estado por defecto
                 });
 
               if (insertError) {
-                console.error("Error al crear el perfil:", insertError.message);
-                history.replace("/login"); // Si falla, que intente de nuevo
+                console.error("🔴🔴🔴 App.tsx: ¡ERROR AL CREAR EL PERFIL!", insertError.message);
+                history.replace("/login");
               } else {
-                // Perfil creado. Ahora SÍ lo mandamos a poner su nombre.
+                console.log("🟢 App.tsx: Perfil creado con éxito. Redirigiendo a /identificate...");
                 history.replace("/identificate");
               }
-
             } else {
-              // 3. Si SÍ hay perfil, comprobamos si tiene nombre.
+              console.log("🟢 App.tsx: Perfil encontrado.");
               if (profileData.nombre) {
-                // Si tiene nombre, va a la app
+                console.log("🟢 App.tsx: El usuario tiene nombre. Redirigiendo a /tabs/home...");
                 history.replace("/tabs/home");
               } else {
-                // Si tiene perfil pero no nombre, va a identificarse
+                console.log("🟡 App.tsx: El usuario no tiene nombre. Redirigiendo a /identificate...");
                 history.replace("/identificate");
               }
             }
           }
-        }
-        else if (event === "SIGNED_OUT") {
+        } else if (event === "SIGNED_OUT") {
+          console.log("🟢 App.tsx: Usuario CERRÓ SESIÓN. Redirigiendo a /login...");
           history.replace("/login");
         }
       }
     );
 
-    // Función de limpieza
     return () => {
+      console.log("🔵 App.tsx: Limpiando el listener de autenticación.");
       authListener?.subscription?.unsubscribe();
     };
   }, [history]);
-
-  // ... (el resto de tu componente App.tsx)
 
   return (
     <IonApp>
@@ -111,8 +125,7 @@ const App: React.FC = () => {
           <Route exact path="/" render={() => <Redirect to="/login" />} />
           <Route exact path="/login" component={Login} />
           <Route exact path="/identificate" component={Identificate} />
-
-          {/* Rutas Protegidas (Tabs) */}
+          {/* Rutas Protegidas que cargan el layout con Tabs */}
           <Route path="/tabs" render={() => <TabsLayout />} />
         </IonRouterOutlet>
       </IonReactRouter>
@@ -120,27 +133,26 @@ const App: React.FC = () => {
   );
 };
 
-/* Componente del Layout de Tabs (sin cambios) */
+/* Componente para el Layout de las Rutas con Tabs */
 const TabsLayout: React.FC = () => {
   return (
     <IonTabs>
       <IonRouterOutlet>
         <Route exact path="/tabs" render={() => <Redirect to="/tabs/home" />} />
+        {/* Rutas con Tabs */}
         <Route exact path="/tabs/home" component={Home} />
         <Route exact path="/tabs/reportes" component={Reportes} />
         <Route exact path="/tabs/productos" component={Productos} />
         <Route exact path="/tabs/perfil" component={Perfil} />
+        {/* Rutas de Registro */}
         <Route exact path="/tabs/registro" component={RegisterManual} />
         <Route exact path="/tabs/registro/pistola" component={ScannerGun} />
         <Route exact path="/tabs/registro/camera" component={ScannerCamera} />
         <Route exact path="/tabs/registro/ia" component={IAImagen} />
-
-        {/* 👇 Esta es la única definición de /product/:id, lo cual es correcto */}
+        {/* Ruta interna sin Tabs */}
         <Route exact path="/product/:id" component={EditorProducto} />
       </IonRouterOutlet>
-
       <IonTabBar slot="bottom">
-        {/* ... (tus botones de tabs) ... */}
         <IonTabButton tab="home" href="/tabs/home">
           <IonIcon icon={home} />
           <IonLabel>Inicio</IonLabel>

@@ -2,18 +2,16 @@ import React, { useState } from 'react';
 import {
     IonPage,
     IonContent,
-    IonText,
     IonButton,
     IonIcon,
     useIonToast,
-    // 👇 Quitamos Header, Toolbar y Title
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { logoGoogle } from 'ionicons/icons';
 import { supabase } from '../../supabaseClient';
 import LoginForm from '../../components/login/login-form';
 
-// 👇 1. Importa el NUEVO archivo CSS
+// Importa el archivo CSS
 import './login.css';
 
 const Login: React.FC = () => {
@@ -44,12 +42,30 @@ const Login: React.FC = () => {
         setIsLoading(false);
     };
 
+    // 👇 ESTA ES LA FUNCIÓN CORREGIDA
     const handleGoogleLogin = async () => {
-        await supabase.auth.signInWithOAuth({
+        setIsLoading(true);
+        const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
+            options: {
+                // Esta línea le dice a Supabase a dónde volver después de que
+                // Google te regrese a la app. Es la solución al bucle.
+                redirectTo: window.location.origin,
+            },
         });
+
+        if (error) {
+            presentToast({
+                message: 'Error al iniciar con Google: ' + error.message,
+                duration: 3000,
+                color: 'danger',
+            });
+            setIsLoading(false);
+        }
     };
 
+    // Esta función no cambia, es llamada por el listener en App.tsx
+    // o por el login con email.
     const checkProfileAndRedirect = async (userId: string) => {
         const { data, error } = await supabase
             .from('usuarios')
@@ -68,27 +84,19 @@ const Login: React.FC = () => {
         }
     };
 
-
-    // 👇 2. El RENDER cambia
     return (
         <IonPage>
-            {/* Usamos 'className' para aplicar la fuente y el padding */}
             <IonContent className="login-page-content">
-
                 <div className="login-container">
-
-                    {/* 👇 3. AQUÍ VA EL LOGO */}
                     <img
-                        src="/public/logo.png" // 👈 ¡REEMPLAZA ESTO CON LA RUTA A TU LOGO!
+                        src="/logo.png" // Ruta corregida sin /public
                         alt="Logo de la App"
                         className="login-logo"
                     />
 
-                    {/* 👇 4. TÍTULOS */}
                     <h1 className="login-title">Bienvenido</h1>
                     <p className="login-subtitle">Inicia sesión para continuar</p>
 
-                    {/* 👇 5. Formulario (sigue igual) */}
                     <LoginForm
                         email={email}
                         setEmail={setEmail}
@@ -98,22 +106,19 @@ const Login: React.FC = () => {
                         isLoading={isLoading}
                     />
 
-                    {/* 👇 6. Separador "o" */}
                     <div className="separator">o</div>
 
-                    {/* 👇 7. Botón de Google */}
                     <IonButton
                         expand="block"
                         fill="outline"
                         onClick={handleGoogleLogin}
                         disabled={isLoading}
-                        className="google-button" // 👈 Clase CSS
+                        className="google-button"
                     >
                         <IonIcon icon={logoGoogle} slot="start" />
                         Continuar con Google
                     </IonButton>
                 </div>
-
             </IonContent>
         </IonPage>
     );
