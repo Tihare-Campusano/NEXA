@@ -13,7 +13,6 @@ import { FaClipboard } from "react-icons/fa";
 import { useHistory } from "react-router-dom";
 
 // Importaciones combinadas de ambas versiones
-import Botones from "../../components/register-product/botones";
 import { Capacitor } from "@capacitor/core";
 import { BarcodeScanner } from "@capacitor-mlkit/barcode-scanning";
 
@@ -73,7 +72,7 @@ export default function ScannerCamera() {
 
       <IonContent className="ion-padding bg-white">
         {/* 🔹 Botones superiores (usando el componente refactorizado) */}
-        <Botones />
+        
 
         <h2 className="text-center text-xl font-extrabold my-4">Escáner con cámara</h2>
 
