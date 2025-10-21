@@ -13,10 +13,9 @@ import {
 import { IonReactRouter } from "@ionic/react-router";
 import { home, barChart, create, list, person } from "ionicons/icons";
 import { supabase } from "./supabaseClient";
-import { PostgrestError } from '@supabase/supabase-js'; // 👈 Importación requerida para el fix de TypeScript
+import { PostgrestError } from '@supabase/supabase-js';
 
 /* CSS de Ionic */
-// ... (Tus importaciones de CSS) ...
 import "@ionic/react/css/core.css";
 import "@ionic/react/css/normalize.css";
 import "@ionic/react/css/structure.css";
@@ -65,22 +64,20 @@ const App: React.FC = () => {
                     // 1. REVISAR PERFIL EXISTENTE
                     const { data: profileData, error: selectError } = await supabase
                         .from("usuarios")
-                        .select("nombre, apellido")
+                        .select("nombre") // ✅ CORREGIDO: SOLO SELECCIONA 'nombre'
                         .eq("auth_uid", session.user.id)
                         .maybeSingle(); 
 
-                    // 🛠️ FIX DE TYPESCRIPT: Aseguramos el tipo del error
+                    // FIX DE TYPESCRIPT
                     const errorMsg = (selectError as PostgrestError)?.message || ""; 
 
-                    // Manejo del error de consulta (que detiene la ejecución)
+                    // Manejo del error de consulta
                     if (selectError && !errorMsg.includes('rows found')) {
                         console.error("🔴 Error al consultar perfil:", errorMsg);
-                        // Si hay un error real de DB/RLS, salimos.
                         return; 
                     }
 
                     // 2. CREAR PERFIL SI NO EXISTE
-                    // Verificamos si no hay data O si el error fue "no rows found"
                     if (!profileData || errorMsg.includes('rows found')) {
                         console.log("🟡 Perfil no encontrado. Creando uno nuevo...");
 
@@ -98,17 +95,17 @@ const App: React.FC = () => {
                             history.replace("/login");
                         } else {
                             console.log("🟢 Perfil creado. Redirigiendo a /identificate...");
-                            history.replace("/identificate"); // ⬅️ REDIRECCIÓN A COMPLETAR DATOS
+                            history.replace("/identificate"); // ⬅️ REDIRECCIÓN EXITOSA
                         }
                     
                     // 3. REDIRIGIR BASADO EN EL ESTADO DEL PERFIL
                     } else {
-                        // Revisa si faltan datos
-                        if (profileData.nombre && profileData.apellido) {
+                        // Revisa si falta el nombre
+                        if (profileData.nombre) {
                             console.log("🟢 Perfil completo. Redirigiendo a /tabs/home...");
-                            history.replace("/tabs/home");
+                            history.replace("/tabs/home"); // ⬅️ REDIRECCIÓN EXITOSA
                         } else {
-                            console.log("🟡 Faltan datos en perfil. Redirigiendo a /identificate...");
+                            console.log("🟡 Falta el nombre en perfil. Redirigiendo a /identificate...");
                             history.replace("/identificate"); // ⬅️ REDIRECCIÓN A COMPLETAR DATOS
                         }
                     }
@@ -124,7 +121,7 @@ const App: React.FC = () => {
             console.log("🔵 Limpiando listener de autenticación.");
             authListener?.subscription?.unsubscribe();
         };
-    }, [history]);
+    }, []); // ⬅️ CORRECCIÓN CLAVE: Dependencia vacía para evitar el bucle.
 
     return (
         <IonApp>

@@ -10,7 +10,7 @@ import { useHistory } from 'react-router-dom';
 import { logoGoogle } from 'ionicons/icons';
 import { supabase } from '../../supabaseClient';
 import LoginForm from '../../components/login/login-form';
-import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth'; // Importación ya presente
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 
 // Importa el archivo CSS
 import './login.css';
@@ -22,7 +22,7 @@ const Login: React.FC = () => {
     const [presentToast] = useIonToast();
     const history = useHistory();
 
-    // 🛠️ FUNCIÓN CON MANEJO DE ERRORES MEJORADO
+    // FUNCIÓN CON MANEJO DE ERRORES MEJORADO
     const handleEmailLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
@@ -35,7 +35,6 @@ const Login: React.FC = () => {
         if (error) {
             let errorMessage = 'Error de credenciales. Inténtalo de nuevo.';
             
-            // Lógica basada en mensajes comunes de Supabase (puede variar ligeramente)
             if (error.message.includes('Invalid login credentials')) {
                 errorMessage = 'Correo o contraseña inválidos.';
             } else if (error.message.includes('Email not confirmed')) {
@@ -51,17 +50,8 @@ const Login: React.FC = () => {
             });
             
         } else if (data.user) {
-            // ✅ CORRECCIÓN: Tras login exitoso, NO hacemos redirección manual.
-            // Dejamos que el listener en App.tsx tome el control.
-            // Sin embargo, para flujos síncronos (email/pass) es común forzar un re-check de la sesión 
-            // navegando a una ruta neutral (como la misma /login) o directamente a la protegida
-            // para que el listener se active inmediatamente si no lo ha hecho.
-            
-            // Para garantizar la redirección inmediata tras el login manual:
-            await checkProfileAndRedirect(data.user.id);
-
-            // Opcionalmente, puedes eliminar la llamada a checkProfileAndRedirect 
-            // y depender solo de App.tsx (usando history.replace('/') para forzar el chequeo).
+            // Login exitoso: Forzamos navegación a la raíz. App.tsx toma el control.
+            history.replace('/'); 
         }
         setIsLoading(false);
     };
@@ -70,7 +60,6 @@ const Login: React.FC = () => {
     const handleGoogleLogin = async () => {
         setIsLoading(true);
         try {
-            // ... (Tu lógica de Google Auth con Capacitor)
             const googleUser = await GoogleAuth.signIn();
 
             if (!googleUser || !googleUser.authentication?.idToken) {
@@ -84,9 +73,6 @@ const Login: React.FC = () => {
 
             if (error) throw error;
             
-            // Si tiene éxito, no hacemos nada. El listener de App.tsx se encargará.
-            // Para apps móviles, esto es lo mejor.
-
         } catch (error: any) {
             presentToast({
                 message: 'Error al iniciar con Google: ' + error.message,
@@ -98,15 +84,15 @@ const Login: React.FC = () => {
         }
     };
     
-    // Esta función maneja la redirección del login manual.
+    // Esta función ha sido eliminada y su lógica centralizada en App.tsx
+    // (pero la dejamos si quieres conservarla para propósitos internos, 
+    // corrigiendo la consulta por las dudas)
     const checkProfileAndRedirect = async (userId: string) => {
-        const { data, error } = await supabase
+        const { data } = await supabase
             .from('usuarios')
-            .select('nombre') 
+            .select('nombre') // 🛠️ CORREGIDO: SOLO 'nombre'
             .eq('auth_uid', userId)
-            .maybeSingle(); // 🛠️ Usar maybeSingle() para prevenir error 406.
-
-        // NOTA: No es necesario usar console.warn si el error es solo "no rows found".
+            .maybeSingle(); 
 
         if (data?.nombre) {
             history.replace('/tabs/home');
@@ -117,10 +103,8 @@ const Login: React.FC = () => {
 
     return (
         <IonPage>
-            {/* ... Contenido del Login ... */}
             <IonContent className="login-page-content">
                 <div className="login-container">
-                    {/* ... logo y títulos ... */}
                     <img
                         src="/logo.png" 
                         alt="Logo de la App"
