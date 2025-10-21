@@ -13,10 +13,10 @@ import {
     useIonToast,
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
-import { supabase } from '../../supabaseClient';
+import { supabase } from '../../supabaseClient'; // Se mantiene la ruta del 2do archivo
 import { User } from '@supabase/supabase-js';
 
-// Estilos en línea simples para centrar
+// Estilos en línea simples para centrar (del 2do archivo)
 const containerStyles = {
     display: 'flex',
     flexDirection: 'column',
@@ -28,83 +28,96 @@ const containerStyles = {
 };
 
 const Identificate: React.FC = () => {
+    // --- Estados combinados de ambos archivos ---
     const [nombre, setNombre] = useState('');
-    const [currentUser, setCurrentUser] = useState<User | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
+    const [apellido, setApellido] = useState(''); // <-- Añadido del 1er archivo
+    const [user, setUser] = useState<User | null>(null); // Renombrado (era currentUser)
+    const [loading, setLoading] = useState(true); // Renombrado (era isLoading) y default true
     const [presentToast] = useIonToast();
     const history = useHistory();
 
-    // Al cargar, verifica que el usuario esté logueado
+    // --- useEffect combinado (lógica del 1er archivo) ---
+    // Al cargar, verifica usuario Y precarga datos si existen
     useEffect(() => {
         const fetchUser = async () => {
-            // 👇 LÍNEA CORREGIDA (sin el guion bajo)
-            const { data } = await supabase.auth.getUser();
+            setLoading(true);
+            const { data: { user }, error } = await supabase.auth.getUser();
 
-            if (data.user) {
-                setCurrentUser(data.user);
+            if (error) {
+                console.error('Error al obtener usuario:', error.message);
+                presentToast({ 
+                    message: 'Error: No se pudo verificar tu sesión.', 
+                    color: 'danger',
+                    duration: 3000
+                });
+                history.replace('/login');
+            } else if (user) {
+                setUser(user);
+                
+                // Opcional: pre-rellenar si ya tiene datos
+                const { data: profile } = await supabase
+                    .from('usuarios')
+                    .select('nombre, apellido')
+                    .eq('auth_uid', user.id)
+                    .single();
+                    
+                if (profile?.nombre) setNombre(profile.nombre);
+                if (profile?.apellido) setApellido(profile.apellido);
+
             } else {
-                // Si no hay usuario, no debería estar aquí. Lo regresamos al login.
                 history.replace('/login');
             }
+            setLoading(false);
         };
+
         fetchUser();
-    }, [history]);
+    }, [history, presentToast]);
 
     /**
-     * VALIDACIÓN Y GUARDADO DEL NOMBRE
+     * VALIDACIÓN Y GUARDADO (Lógica del 1er archivo)
      */
-    const handleSaveName = async () => {
-        setIsLoading(true);
-
-        // Validación de "nombre y apellido" (evita gibberish)
-        // Regex: Busca al menos dos palabras, separadas por un espacio.
-        const nameRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s'-]{2,}(\s[a-zA-ZáéíóúÁÉÍÓÚñÑ\s'-]{2,})+$/;
-
-        if (!nameRegex.test(nombre.trim())) {
+    const handleSubmit = async () => {
+        // Validación simple para ambos campos
+        if (!user || !nombre || !apellido) {
             presentToast({
-                message: 'Por favor, ingresa un nombre y apellido válidos (ej: Juan Pérez).',
+                message: 'Por favor completa tu nombre y apellido.',
                 duration: 3000,
-                color: 'danger',
+                color: 'warning',
             });
-            setIsLoading(false);
             return;
         }
 
-        if (!currentUser) {
-            // Doble chequeo, por si acaso
-            presentToast({
-                message: 'Error: No se encontró el usuario.',
-                duration: 3000,
-                color: 'danger',
-            });
-            setIsLoading(false);
-            return;
-        }
+        setLoading(true);
 
-        // Actualiza el nombre en la tabla 'usuarios'
+        // Actualiza ambos campos en la tabla 'usuarios'
         const { error } = await supabase
             .from('usuarios')
-            .update({ nombre: nombre.trim() })
-            .eq('auth_uid', currentUser.id); // Vincula al 'auth_uid'
+            .update({ 
+                nombre: nombre.trim(),
+                apellido: apellido.trim() // <-- Añadido
+            })
+            .eq('auth_uid', user.id); // Vincula al 'auth_uid'
+
+        setLoading(false);
 
         if (error) {
             presentToast({
-                message: 'Error al guardar el nombre: ' + error.message,
+                message: 'Error al guardar: ' + error.message,
                 duration: 3000,
                 color: 'danger',
             });
         } else {
             presentToast({
-                message: `¡Bienvenido, ${nombre.trim()}!`,
+                message: '¡Perfil completado!',
                 duration: 2000,
                 color: 'success',
             });
             // Éxito: Ahora sí, al inicio de la app
             history.replace('/tabs/home');
         }
-        setIsLoading(false);
     };
 
+    // --- UI Combinada (Estilos del 2do, Inputs del 1ro) ---
     return (
         <IonPage>
             <IonHeader>
@@ -113,15 +126,18 @@ const Identificate: React.FC = () => {
                 </IonToolbar>
             </IonHeader>
             <IonContent>
-                <IonLoading isOpen={isLoading} message={'Guardando...'} />
+                {/* Mensaje de carga del 1er archivo */}
+                <IonLoading isOpen={loading} message={'Cargando...'} />
+                
                 <div style={containerStyles as React.CSSProperties}>
                     <h2 style={{ textAlign: 'center' }}>Casi listo...</h2>
                     <p style={{ textAlign: 'center' }}>
-                        Necesitamos saber tu nombre para continuar.
+                        Necesitamos saber quién eres para continuar.
                     </p>
 
+                    {/* Input de Nombre */}
                     <IonItem>
-                        <IonLabel position="floating">Nombre y Apellido</IonLabel>
+                        <IonLabel position="floating">Nombre</IonLabel>
                         <IonInput
                             type="text"
                             value={nombre}
@@ -130,13 +146,24 @@ const Identificate: React.FC = () => {
                         />
                     </IonItem>
 
+                    {/* Input de Apellido (Añadido) */}
+                    <IonItem>
+                        <IonLabel position="floating">Apellido</IonLabel>
+                        <IonInput
+                            type="text"
+                            value={apellido}
+                            onIonInput={(e) => setApellido(e.detail.value!)}
+                            required
+                        />
+                    </IonItem>
+
                     <IonButton
                         expand="block"
                         className="ion-margin-top"
-                        onClick={handleSaveName}
-                        disabled={isLoading}
+                        onClick={handleSubmit} // Llama a la nueva función
+                        disabled={loading}
                     >
-                        Continuar
+                        Guardar y Continuar
                     </IonButton>
                 </div>
             </IonContent>

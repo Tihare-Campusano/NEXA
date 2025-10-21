@@ -50,69 +50,65 @@ setupIonicReact();
 const App: React.FC = () => {
   const history = useHistory();
 
-  // Listener de Autenticación (CORREGIDO)
   useEffect(() => {
-    console.log("🟢 App.tsx: Configurando el listener de autenticación...");
+    console.log("🟢 App.tsx: Configurando listener de autenticación...");
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log(`🟡 App.tsx: Evento de autenticación detectado: ${event}`);
+        console.log(`🟡 Evento de autenticación: ${event}`);
 
-        if (event === "SIGNED_IN") {
-          if (session?.user) {
-            console.log(`🟢 App.tsx: Usuario INICIÓ SESIÓN: ${session.user.email}`);
+        if (event === "SIGNED_IN" && session?.user) {
+          console.log(`🟢 Usuario INICIÓ SESIÓN: ${session.user.email}`);
 
-            const { data: profileData, error: selectError } = await supabase
+          // Revisa si existe perfil
+          const { data: profileData, error: selectError } = await supabase
+            .from("usuarios")
+            .select("nombre, apellido")
+            .eq("auth_uid", session.user.id)
+            .maybeSingle();
+
+          if (selectError) {
+            console.error("🔴 Error al consultar perfil:", selectError.message);
+            return;
+          }
+
+          if (!profileData) {
+            console.log("🟡 Perfil no encontrado. Creando uno nuevo...");
+
+            const { error: insertError } = await supabase
               .from("usuarios")
-              .select("nombre")
-              .eq("auth_uid", session.user.id)
-              .maybeSingle();
+              .insert({
+                auth_uid: session.user.id,
+                email: session.user.email,
+                rol: "usuario",
+                activo: true,
+              });
 
-            if (selectError) {
-              console.error("🔴 App.tsx: Error al SELECCIONAR el perfil:", selectError.message);
-              return;
-            }
-
-            if (!profileData) {
-              console.log("🟡 App.tsx: No se encontró perfil. Intentando crear uno nuevo...");
-
-              // 👇 LA CORRECCIÓN CLAVE: AÑADIMOS VALORES POR DEFECTO
-              const { error: insertError } = await supabase
-                .from("usuarios")
-                .insert({
-                  auth_uid: session.user.id,
-                  email: session.user.email,
-                  rol_usuario: 'usuario', // Asigna un rol por defecto
-                  activo: true          // Asigna un estado por defecto
-                });
-
-              if (insertError) {
-                console.error("🔴🔴🔴 App.tsx: ¡ERROR AL CREAR EL PERFIL!", insertError.message);
-                history.replace("/login");
-              } else {
-                console.log("🟢 App.tsx: Perfil creado con éxito. Redirigiendo a /identificate...");
-                history.replace("/identificate");
-              }
+            if (insertError) {
+              console.error("🔴 Error al crear perfil:", insertError.message);
+              history.replace("/login");
             } else {
-              console.log("🟢 App.tsx: Perfil encontrado.");
-              if (profileData.nombre) {
-                console.log("🟢 App.tsx: El usuario tiene nombre. Redirigiendo a /tabs/home...");
-                history.replace("/tabs/home");
-              } else {
-                console.log("🟡 App.tsx: El usuario no tiene nombre. Redirigiendo a /identificate...");
-                history.replace("/identificate");
-              }
+              console.log("🟢 Perfil creado. Redirigiendo a /identificate...");
+              history.replace("/identificate");
+            }
+          } else {
+            if (profileData.nombre && profileData.apellido) {
+              console.log("🟢 Perfil completo. Redirigiendo a /tabs/home...");
+              history.replace("/tabs/home");
+            } else {
+              console.log("🟡 Faltan datos en perfil. Redirigiendo a /identificate...");
+              history.replace("/identificate");
             }
           }
         } else if (event === "SIGNED_OUT") {
-          console.log("🟢 App.tsx: Usuario CERRÓ SESIÓN. Redirigiendo a /login...");
+          console.log("🟢 Usuario CERRÓ SESIÓN. Redirigiendo a /login...");
           history.replace("/login");
         }
       }
     );
 
     return () => {
-      console.log("🔵 App.tsx: Limpiando el listener de autenticación.");
+      console.log("🔵 Limpiando listener de autenticación.");
       authListener?.subscription?.unsubscribe();
     };
   }, [history]);
@@ -125,7 +121,7 @@ const App: React.FC = () => {
           <Route exact path="/" render={() => <Redirect to="/login" />} />
           <Route exact path="/login" component={Login} />
           <Route exact path="/identificate" component={Identificate} />
-          {/* Rutas Protegidas que cargan el layout con Tabs */}
+          {/* Rutas Protegidas */}
           <Route path="/tabs" render={() => <TabsLayout />} />
         </IonRouterOutlet>
       </IonReactRouter>
@@ -133,49 +129,44 @@ const App: React.FC = () => {
   );
 };
 
-/* Componente para el Layout de las Rutas con Tabs */
-const TabsLayout: React.FC = () => {
-  return (
-    <IonTabs>
-      <IonRouterOutlet>
-        <Route exact path="/tabs" render={() => <Redirect to="/tabs/home" />} />
-        {/* Rutas con Tabs */}
-        <Route exact path="/tabs/home" component={Home} />
-        <Route exact path="/tabs/reportes" component={Reportes} />
-        <Route exact path="/tabs/productos" component={Productos} />
-        <Route exact path="/tabs/perfil" component={Perfil} />
-        {/* Rutas de Registro */}
-        <Route exact path="/tabs/registro" component={RegisterManual} />
-        <Route exact path="/tabs/registro/pistola" component={ScannerGun} />
-        <Route exact path="/tabs/registro/camera" component={ScannerCamera} />
-        <Route exact path="/tabs/registro/ia" component={IAImagen} />
-        {/* Ruta interna sin Tabs */}
-        <Route exact path="/product/:id" component={EditorProducto} />
-      </IonRouterOutlet>
-      <IonTabBar slot="bottom">
-        <IonTabButton tab="home" href="/tabs/home">
-          <IonIcon icon={home} />
-          <IonLabel>Inicio</IonLabel>
-        </IonTabButton>
-        <IonTabButton tab="reportes" href="/tabs/reportes">
-          <IonIcon icon={barChart} />
-          <IonLabel>Reportes</IonLabel>
-        </IonTabButton>
-        <IonTabButton tab="registro" href="/tabs/registro">
-          <IonIcon icon={create} />
-          <IonLabel>Registrar</IonLabel>
-        </IonTabButton>
-        <IonTabButton tab="productos" href="/tabs/productos">
-          <IonIcon icon={list} />
-          <IonLabel>Productos</IonLabel>
-        </IonTabButton>
-        <IonTabButton tab="perfil" href="/tabs/perfil">
-          <IonIcon icon={person} />
-          <IonLabel>Perfil</IonLabel>
-        </IonTabButton>
-      </IonTabBar>
-    </IonTabs>
-  );
-};
+/* Layout con Tabs */
+const TabsLayout: React.FC = () => (
+  <IonTabs>
+    <IonRouterOutlet>
+      <Route exact path="/tabs" render={() => <Redirect to="/tabs/home" />} />
+      <Route exact path="/tabs/home" component={Home} />
+      <Route exact path="/tabs/reportes" component={Reportes} />
+      <Route exact path="/tabs/productos" component={Productos} />
+      <Route exact path="/tabs/perfil" component={Perfil} />
+      <Route exact path="/tabs/registro" component={RegisterManual} />
+      <Route exact path="/tabs/registro/pistola" component={ScannerGun} />
+      <Route exact path="/tabs/registro/camera" component={ScannerCamera} />
+      <Route exact path="/tabs/registro/ia" component={IAImagen} />
+      <Route exact path="/product/:id" component={EditorProducto} />
+    </IonRouterOutlet>
+    <IonTabBar slot="bottom">
+      <IonTabButton tab="home" href="/tabs/home">
+        <IonIcon icon={home} />
+        <IonLabel>Inicio</IonLabel>
+      </IonTabButton>
+      <IonTabButton tab="reportes" href="/tabs/reportes">
+        <IonIcon icon={barChart} />
+        <IonLabel>Reportes</IonLabel>
+      </IonTabButton>
+      <IonTabButton tab="registro" href="/tabs/registro">
+        <IonIcon icon={create} />
+        <IonLabel>Registrar</IonLabel>
+      </IonTabButton>
+      <IonTabButton tab="productos" href="/tabs/productos">
+        <IonIcon icon={list} />
+        <IonLabel>Productos</IonLabel>
+      </IonTabButton>
+      <IonTabButton tab="perfil" href="/tabs/perfil">
+        <IonIcon icon={person} />
+        <IonLabel>Perfil</IonLabel>
+      </IonTabButton>
+    </IonTabBar>
+  </IonTabs>
+);
 
 export default App;
