@@ -27,11 +27,9 @@
     "@tensorflow/tfjs-tflite": "^0.0.1-alpha.10",
     "@types/react-router": "^5.1.20",
     "@types/react-router-dom": "^5.3.3",
-    "apexcharts": "^5.3.5",
     "axios": "^1.11.0",
     "ionicons": "^7.4.0",
     "react": "19.0.0",
-    "react-apexcharts": "^1.8.0",
     "react-dom": "19.0.0",
     "react-router": "^5.3.4",
     "react-router-dom": "^5.3.4"

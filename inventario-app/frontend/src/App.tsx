@@ -13,26 +13,7 @@ import {
 import { IonReactRouter } from "@ionic/react-router";
 import { home, barChart, create, list, person } from "ionicons/icons";
 
-/* Páginas principales */
-import Home from "./pages/home/home";
-import Reportes from "./pages/reports/reports";
-import Registro from "./pages/register-product/register-manual";
-import Productos from "./pages/product/mostrar-products";
-import EditorProducto from "./pages/product/editor-product";
-import Perfil from "./pages/perfil/perfil";
-import RegistroPistola from "./pages/register-product/registro_pistola";
-
-
-/* Componentes de reportes */
-import ReportAllProducts from "./components/reports/reporte_productos_almacenados/report_all_products";
-import ReportBadState from "./components/reports/reporte_productos_mal_estado/report_bad_state";
-import ReportUsedProduct from "./components/reports/reporte_productos_usados/report_used_product";
-import ReportNewProduct from "./components/reports/reporte_productos_nuevos/report_new_product";
-import ReportStockMonth from "./components/reports/reporte_stock_mensual/report_stock_month";
-import ReportRegisterForMonth from "./components/reports/reporte_registros_por_mes/report_register_for_month";
-import ReportRegisterForWeek from "./components/reports/reporte_registros_por_semana/report_register_for_week";
-
-/* Ionic setup */
+/* CSS de Ionic */
 import "@ionic/react/css/core.css";
 import "@ionic/react/css/normalize.css";
 import "@ionic/react/css/structure.css";
@@ -45,6 +26,28 @@ import "@ionic/react/css/flex-utils.css";
 import "@ionic/react/css/display.css";
 import "@ionic/react/css/palettes/dark.system.css";
 import "./theme/variables.css";
+
+/* Páginas principales */
+import Home from "./pages/home/home";
+import Reportes from "./pages/reports/reports";
+import Productos from "./pages/product/mostrar-products";
+import EditorProducto from "./pages/product/editor-product";
+import Perfil from "./pages/perfil/perfil";
+
+/* Páginas de registro */
+import RegisterManual from "./pages/register-product/register-manual";
+import ScannerGun from "./pages/register-product/scanner-gun";
+import ScannerCamera from "./pages/register-product/scanner-camera";
+import IAImagen from "./pages/register-product/ia-images/ia-images";
+
+/* Componentes de reportes */
+import ReportAllProducts from "./components/reports/reporte_productos_almacenados/report_all_products";
+import ReportBadState from "./components/reports/reporte_productos_mal_estado/report_bad_state";
+import ReportUsedProduct from "./components/reports/reporte_productos_usados/report_used_product";
+import ReportNewProduct from "./components/reports/reporte_productos_nuevos/report_new_product";
+import ReportStockMonth from "./components/reports/reporte_stock_mensual/report_stock_month";
+import ReportRegisterForMonth from "./components/reports/reporte_registros_por_mes/report_register_for_month";
+import ReportRegisterForWeek from "./components/reports/reporte_registros_por_semana/report_register_for_week";
 
 setupIonicReact();
 
@@ -60,10 +63,15 @@ const App: React.FC = () => {
             {/* ========== Rutas con Tabs (vista principal) ========== */}
             <Route exact path="/tabs/home" component={Home} />
             <Route exact path="/tabs/reportes" component={Reportes} />
-            <Route exact path="/tabs/registro" component={Registro} />
             <Route exact path="/tabs/productos" component={Productos} />
             <Route exact path="/tabs/perfil" component={Perfil} />
-
+            
+            {/* ========== Rutas de Registro (variantes) ========== */}
+            <Route exact path="/tabs/registro" component={RegisterManual} />
+            <Route exact path="/tabs/registro/pistola" component={ScannerGun} />
+            <Route exact path="/tabs/registro/camera" component={ScannerCamera} />
+            <Route exact path="/tabs/registro/ia" component={IAImagen} />
+            
             {/* ========== Rutas fuera del TabBar (reportes individuales) ========== */}
             <Route exact path="/reportes/productos-almacenados" component={ReportAllProducts} />
             <Route exact path="/reportes/productos-mal-estado" component={ReportBadState} />
@@ -75,8 +83,7 @@ const App: React.FC = () => {
 
             {/* Editor de producto (sin tabs) */}
             <Route exact path="/product/:id" component={EditorProducto} />
-            <Route exact path="/registro/pistola" component={RegistroPistola} />
-
+            
           </IonRouterOutlet>
 
           {/* ========== TAB BAR INFERIOR ========== */}
@@ -113,11 +120,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-
-
-
-
-
-
-
-
