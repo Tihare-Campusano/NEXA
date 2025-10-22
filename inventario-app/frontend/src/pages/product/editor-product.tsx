@@ -228,7 +228,7 @@ export default function EditorProducto() {
 
                             <button
                                 className="btn-volver"
-                                onClick={() => history.replace("/product")}
+                                onClick={() => history.replace("/tabs/productos")}
                             >
                                 ⬅ Volver
                             </button>

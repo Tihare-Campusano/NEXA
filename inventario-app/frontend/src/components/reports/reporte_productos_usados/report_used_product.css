@@ -1,32 +1,16 @@
-.reporte-container {
-  padding: 20px;
+/*
+  CSS para el contenido INTERNO del modal
+  (report_used_product.css)
+*/
+
+.modal-buttons-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem; /* Espacio entre botones */
+  padding: 0 1rem 1rem 1rem;
+  margin-top: 1rem; 
 }
 
-.tabla-productos {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 20px;
-}
-
-.tabla-productos th,
-.tabla-productos td {
-  border: 1px solid #ccc;
-  padding: 8px;
-  text-align: left;
-}
-
-.resumen {
-  margin-top: 20px;
-  font-size: 14px;
-  color: #333;
-}
-
-.acciones {
-  margin-top: 20px;
-}
-
-button {
-  margin-right: 10px;
-  padding: 8px 12px;
-  cursor: pointer;
+.modal-button {
+  font-weight: bold;
 }

@@ -1,18 +1,24 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
-  IonPage,
   IonHeader,
   IonToolbar,
   IonTitle,
   IonContent,
+  IonButtons,
+  IonButton,
+  IonText,
+  IonLoading,
 } from "@ionic/react";
-import "./report_register_for_week.css";
-import jsPDF from "jspdf";
-// @ts-ignore
-import autoTable from "jspdf-autotable";
-import * as XLSX from "xlsx";
 import { supabase } from "../../../supabaseClient";
 
+// --- Imports para generar archivos ---
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
+import { Filesystem, Directory } from "@capacitor/filesystem";
+import "./report_register_for_week.css"; // 👈 CSS para los botones
+
+// Interface para el tipo de producto
 interface Producto {
   codigo: string;
   nombre: string;
@@ -21,122 +27,184 @@ interface Producto {
   fecha: string;
 }
 
-const ReportRegisterForWeek: React.FC = () => {
-  const [productos, setProductos] = useState<Producto[]>([]);
-  const [semana, setSemana] = useState<string>("");
+// Props que el componente recibirá
+interface ReportRegisterForWeekProps {
+  onDidDismiss: () => void;
+}
 
-  useEffect(() => {
-    const fetchProductos = async () => {
-      const hoy = new Date();
-      const inicioSemana = new Date(hoy);
-      inicioSemana.setDate(hoy.getDate() - hoy.getDay());
-      const finSemana = new Date(inicioSemana);
-      finSemana.setDate(inicioSemana.getDate() + 6);
+const ReportRegisterForWeek: React.FC<ReportRegisterForWeekProps> = ({
+  onDidDismiss,
+}) => {
+  const [isLoading, setIsLoading] = useState(false);
 
-      const inicioISO = inicioSemana.toISOString().split("T")[0];
-      const finISO = finSemana.toISOString().split("T")[0];
+  // 1. Lógica para OBTENER los datos (se llama al hacer clic)
+  const getReportData = async () => {
+    // Calcular la semana actual (Domingo - Sábado)
+    const hoy = new Date();
+    const inicioSemana = new Date(hoy);
+    inicioSemana.setDate(hoy.getDate() - hoy.getDay());
+    inicioSemana.setHours(0, 0, 0, 0); // Inicio del domingo
 
-      setSemana(
-        `Semana del ${inicioSemana.toLocaleDateString("es-ES")} al ${finSemana.toLocaleDateString("es-ES")}`
+    const finSemana = new Date(inicioSemana);
+    finSemana.setDate(inicioSemana.getDate() + 6);
+    finSemana.setHours(23, 59, 59, 999); // Fin del sábado
+
+    const inicioISO = inicioSemana.toISOString();
+    const finISO = finSemana.toISOString();
+
+    const semana = `Semana del ${inicioSemana.toLocaleDateString(
+      "es-ES"
+    )} al ${finSemana.toLocaleDateString("es-ES")}`;
+
+    // Buscar datos
+    const { data, error } = await supabase
+      .from("productos")
+      .select("id, sku, nombre, marca, modelo, created_at")
+      .gte("created_at", inicioISO)
+      .lte("created_at", finISO);
+
+    if (error) {
+      console.error("❌ Error al obtener productos:", error.message);
+      throw error;
+    }
+
+    // Mapear datos
+    const productos = data.map((p: any) => ({
+      codigo: p.sku,
+      nombre: p.nombre,
+      marca: p.marca || "N/A",
+      modelo: p.modelo || "N/A",
+      fecha: new Date(p.created_at).toLocaleDateString("es-ES"),
+    }));
+
+    return { productos, semana };
+  };
+
+  // 2. Lógica para GUARDAR en el dispositivo (Android/iOS)
+  const guardarEnDispositivo = async (fileName: string, base64Data: string) => {
+    try {
+      await Filesystem.writeFile({
+        path: fileName,
+        data: base64Data,
+        directory: Directory.Documents,
+      });
+      alert(`Archivo guardado en 'Documents' como: ${fileName}`);
+    } catch (e) {
+      console.error("Error al guardar archivo", e);
+      alert("Error al guardar archivo. ¿Otorgaste permisos a la app?");
+    }
+  };
+
+  // 3. Lógica para EXPORTAR PDF
+  const exportarPDF = async () => {
+    setIsLoading(true);
+    try {
+      const { productos, semana } = await getReportData();
+      const doc = new jsPDF();
+      doc.text(`📅 Reporte de registros (${semana})`, 14, 15);
+
+      autoTable(doc, {
+        startY: 20,
+        head: [["Código", "Nombre", "Marca", "Modelo", "Fecha"]],
+        body: productos.map((p) => [
+          p.codigo,
+          p.nombre,
+          p.marca,
+          p.modelo,
+          p.fecha,
+        ]),
+      });
+
+      const finalY = (doc as any).lastAutoTable?.finalY || 30;
+      doc.text(
+        `Este reporte muestra los productos registrados durante la semana indicada.`,
+        14,
+        finalY + 10
       );
 
-      const { data, error } = await supabase
-        .from("productos")
-        .select("id, sku, nombre, marca, modelo, created_at")
-        .gte("created_at", inicioISO)
-        .lte("created_at", finISO);
+      const base64Data = doc.output("datauristring").split(",")[1];
+      await guardarEnDispositivo(
+        `reporte_registros_semana.pdf`,
+        base64Data
+      );
 
-      if (error) {
-        console.error("❌ Error al obtener productos:", error.message);
-      } else if (data) {
-        const mapped = data.map((p: any) => ({
-          codigo: p.sku,
-          nombre: p.nombre,
-          marca: p.marca || "N/A",
-          modelo: p.modelo || "N/A",
-          fecha: new Date(p.created_at).toLocaleDateString("es-ES"),
-        }));
-        setProductos(mapped);
-      }
-    };
-
-    fetchProductos();
-  }, []);
-
-  const exportarPDF = () => {
-    const doc = new jsPDF();
-    doc.text(`📅 Reporte de registros semanales (${semana})`, 14, 15);
-    autoTable(doc, {
-      startY: 20,
-      head: [["Código", "Nombre", "Marca", "Modelo", "Fecha"]],
-      body: productos.map((p) => [p.codigo, p.nombre, p.marca, p.modelo, p.fecha]),
-    });
-    const finalY = (doc as any).lastAutoTable?.finalY || 30;
-    doc.text(
-      `Este reporte muestra los productos registrados durante la semana indicada.\nEl histórico permitirá revisar semanas anteriores.`,
-      14,
-      finalY + 10
-    );
-    doc.save(`reporte_registros_semana_${semana}.pdf`);
+    } catch (error) {
+      console.error("Error PDF:", error);
+      alert("No se pudo generar el PDF.");
+    }
+    setIsLoading(false);
+    onDidDismiss(); // Cierra el modal
   };
 
-  const exportarExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(productos);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, `Semana`);
-    XLSX.writeFile(wb, `reporte_registros_semana_${semana}.xlsx`);
+  // 4. Lógica para EXPORTAR EXCEL
+  const exportarExcel = async () => {
+    setIsLoading(true);
+    try {
+      const { productos } = await getReportData();
+      const ws = XLSX.utils.json_to_sheet(productos);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, `Semana`);
+
+      const base64Data = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
+      await guardarEnDispositivo(
+        `reporte_registros_semana.xlsx`,
+        base64Data
+      );
+
+    } catch (error) {
+      console.error("Error Excel:", error);
+      alert("No se pudo generar el Excel.");
+    }
+    setIsLoading(false);
+    onDidDismiss(); // Cierra el modal
   };
 
+  // 5. RENDER: El contenido del modal
   return (
-    <IonPage>
+    <>
       <IonHeader>
-        <IonToolbar color="primary">
-          <IonTitle>📅 Registros por semana</IonTitle>
+        <IonToolbar>
+          <IonTitle>Registros por Semana</IonTitle>
+          <IonButtons slot="end">
+            <IonButton onClick={onDidDismiss}>Cancelar</IonButton>
+          </IonButtons>
         </IonToolbar>
       </IonHeader>
 
       <IonContent className="ion-padding">
-        <h2>{semana}</h2>
-
-        <table className="tabla-productos">
-          <thead>
-            <tr>
-              <th>Código</th>
-              <th>Nombre</th>
-              <th>Marca</th>
-              <th>Modelo</th>
-              <th>Fecha</th>
-            </tr>
-          </thead>
-          <tbody>
-            {productos.map((p, i) => (
-              <tr key={i}>
-                <td>{p.codigo}</td>
-                <td>{p.nombre}</td>
-                <td>{p.marca}</td>
-                <td>{p.modelo}</td>
-                <td>{p.fecha}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <div className="resumen">
-          <p>
-            Este reporte lista los productos registrados en la semana seleccionada.
-            Cada semana nueva se agrega al histórico para que siempre tengas acceso
-            a los registros anteriores.
-          </p>
-        </div>
-
-        <div className="acciones">
-          <button onClick={exportarPDF}>Exportar PDF</button>
-          <button onClick={exportarExcel}>Exportar Excel</button>
+        <IonLoading isOpen={isLoading} message={"Generando reporte..."} />
+        <IonText>
+          <h3
+            style={{
+              textAlign: "center",
+              fontWeight: "bold",
+              marginTop: "1rem",
+            }}
+          >
+            ¿Deseas descargar en formato PDF o Excel?
+          </h3>
+        </IonText>
+        <div className="modal-buttons-container">
+          <IonButton
+            className="modal-button"
+            color="danger"
+            expand="block"
+            onClick={exportarPDF}
+          >
+            PDF
+          </IonButton>
+          <IonButton
+            className="modal-button"
+            color="success"
+            expand="block"
+            onClick={exportarExcel}
+          >
+            Excel
+          </IonButton>
         </div>
       </IonContent>
-    </IonPage>
+    </>
   );
 };
 
 export default ReportRegisterForWeek;
-

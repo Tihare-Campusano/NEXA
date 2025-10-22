@@ -204,7 +204,7 @@ export default function IAImagen() {
             };
             
             // Navegamos de vuelta a la página de registro, pasándole el objeto con todos los datos actualizados.
-            history.push("/registro", { formData: updatedForm });
+            history.push("/tabs/registro/ia", { formData: updatedForm });
 
         } catch (error: any) {
             alert(`Error al subir imagen: ${error.message}`);

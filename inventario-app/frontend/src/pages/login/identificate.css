@@ -1,0 +1,102 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+/* --- Variables de Color (para fácil manejo) --- */
+:root {
+    --color-fondo: #211c14;
+    --color-secundario-oscuro: #312b23;
+    --color-texto-claro: #ffffff;
+    --color-texto-gris: #a0a0a0;
+    --color-verde-principal: #33a852;
+    --color-verde-hover: #45c065;
+    --color-borde-campo: #4e4e4e;
+    --color-borde-google-hover: #606060;
+}
+
+/* --- Estilos del Contenedor Principal (Fondo Oscuro) --- */
+.login-page-container {
+    /* Usar variables de Ionic si el componente está dentro de un IonPage */
+    --background: var(--color-fondo); 
+    background-color: var(--color-fondo); /* Fallback para entorno web */
+    
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+/* --- Estilos de la Tarjeta Contenedora --- */
+.login-card {
+    width: 100%;
+    max-width: 380px;
+    background-color: transparent;
+    box-shadow: none;
+    color: var(--color-texto-claro);
+    text-align: center;
+}
+
+/* --- Logo NEXA (Ajustado para <img>) --- */
+.nexa-logo-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+/* --- Títulos y Subtítulos --- */
+.welcome-title {
+    font-size: 32px;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.subtitle {
+    font-size: 16px;
+    color: var(--color-texto-gris);
+    margin-bottom: 30px;
+}
+
+/* --- Campos de Entrada (Input) --- */
+.input-group {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.login-input-item {
+    --background: #000;
+    /* 👈 1. Fondo negro */
+    --color: #fff;
+    /* 👈 2. Texto que escribes, en blanco */
+    --placeholder-color: #fff;
+    /* 👈 3. Texto del placeholder, en blanco */
+    --border-radius: 10px;
+    --padding-start: 1rem;
+    --padding-end: 1rem;
+    --border-width: 0px;
+    --highlight-height: 0;
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Estilo del placeholder */
+.login-input::placeholder {
+    color: var(--color-texto-gris);
+}
+
+/* Icono dentro del campo (posicionado) */
+.input-icon {
+    position: absolute;
+    top: 50%;
+    left: 15px;
+    transform: translateY(-50%);
+    color: var(--color-texto-gris);
+    font-size: 18px;
+    z-index: 10;
+}
+
+/* --- Botón Primario (Continuar) --- */
+.btn-primary {
+    --border-radius: 10px;
+    --box-shadow: 0 6px 20px rgba(var(--ion-color-primary-rgb), 0.4);
+    font-weight: 600;
+    height: 48px;
+    margin-top: 1rem;
+}
