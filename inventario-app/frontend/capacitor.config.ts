@@ -10,7 +10,7 @@ const config: CapacitorConfig = {
       scopes: ['profile', 'email'],
       // 👇 USA EL ID DE CLIENTE TIPO "APLICACIÓN WEB"
       // El mismo que pusiste en Supabase (el que SÍ tiene secreto)
-      serverClientId: '617353460185-5g4d3o9eqb1t2vsnphnq0tnquu5jutp3.apps.googleusercontent.com',
+      serverClientId: '617353460185-p7hqfhkdvlmotngb5ep2dvb1in5evbvc.apps.googleusercontent.com',
       forceCodeForRefreshToken: true,
     },
   },

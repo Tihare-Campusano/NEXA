@@ -16,6 +16,7 @@ import { supabase } from "./supabaseClient";
 import { PostgrestError } from '@supabase/supabase-js';
 
 /* CSS de Ionic */
+// ... (omito imports CSS para brevedad)
 import "@ionic/react/css/core.css";
 import "@ionic/react/css/normalize.css";
 import "@ionic/react/css/structure.css";
@@ -49,7 +50,7 @@ import IAImagen from "./pages/register-product/ia-images/ia-images";
 setupIonicReact();
 
 const App: React.FC = () => {
-    const history = useHistory();
+    const history = useHistory(); 
 
     useEffect(() => {
         console.log("🟢 App.tsx: Configurando listener de autenticación...");
@@ -64,21 +65,22 @@ const App: React.FC = () => {
                     // 1. REVISAR PERFIL EXISTENTE
                     const { data: profileData, error: selectError } = await supabase
                         .from("usuarios")
-                        .select("nombre") // ✅ CORREGIDO: SOLO SELECCIONA 'nombre'
+                        .select("nombre") 
                         .eq("auth_uid", session.user.id)
                         .maybeSingle(); 
 
                     // FIX DE TYPESCRIPT
                     const errorMsg = (selectError as PostgrestError)?.message || ""; 
 
-                    // Manejo del error de consulta
+                    // Manejo del error de consulta (si el error no es simplemente 'no rows found')
                     if (selectError && !errorMsg.includes('rows found')) {
                         console.error("🔴 Error al consultar perfil:", errorMsg);
                         return; 
                     }
 
                     // 2. CREAR PERFIL SI NO EXISTE
-                    if (!profileData || errorMsg.includes('rows found')) {
+                    // Usamos `!profileData` ya que `maybeSingle()` devuelve `null` si no encuentra.
+                    if (!profileData) { 
                         console.log("🟡 Perfil no encontrado. Creando uno nuevo...");
 
                         const { error: insertError } = await supabase
@@ -88,25 +90,28 @@ const App: React.FC = () => {
                                 email: session.user.email,
                                 rol: "usuario",
                                 activo: true,
+                                // Nombre: Supabase Auth usa `user_metadata` si viene de Google
+                                nombre: session.user.user_metadata.full_name || null 
                             });
 
                         if (insertError) {
                             console.error("🔴 Error al crear perfil:", insertError.message);
-                            history.replace("/login");
+                            // history.replace("/login"); // En caso de error crítico, forzamos logout/redir.
                         } else {
+                            // Si el perfil se acaba de crear, redirigimos a Identificate para completar datos
                             console.log("🟢 Perfil creado. Redirigiendo a /identificate...");
-                            history.replace("/identificate"); // ⬅️ REDIRECCIÓN EXITOSA
+                            history.replace("/identificate"); 
                         }
                     
                     // 3. REDIRIGIR BASADO EN EL ESTADO DEL PERFIL
                     } else {
-                        // Revisa si falta el nombre
-                        if (profileData.nombre) {
+                        // Revisa si falta el nombre o si es null/cadena vacía
+                        if (profileData.nombre && profileData.nombre.trim() !== "") {
                             console.log("🟢 Perfil completo. Redirigiendo a /tabs/home...");
-                            history.replace("/tabs/home"); // ⬅️ REDIRECCIÓN EXITOSA
+                            history.replace("/tabs/home"); 
                         } else {
                             console.log("🟡 Falta el nombre en perfil. Redirigiendo a /identificate...");
-                            history.replace("/identificate"); // ⬅️ REDIRECCIÓN A COMPLETAR DATOS
+                            history.replace("/identificate"); 
                         }
                     }
                 } else if (event === "SIGNED_OUT") {
@@ -121,7 +126,7 @@ const App: React.FC = () => {
             console.log("🔵 Limpiando listener de autenticación.");
             authListener?.subscription?.unsubscribe();
         };
-    }, []); // ⬅️ CORRECCIÓN CLAVE: Dependencia vacía para evitar el bucle.
+    }, []); 
 
     return (
         <IonApp>

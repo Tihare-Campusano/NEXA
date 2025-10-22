@@ -10,6 +10,7 @@ import { useHistory } from 'react-router-dom';
 import { logoGoogle } from 'ionicons/icons';
 import { supabase } from '../../supabaseClient';
 import LoginForm from '../../components/login/login-form';
+// 🛠️ NECESARIO: Importar solo GoogleAuth
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 
 // Importa el archivo CSS
@@ -50,22 +51,26 @@ const Login: React.FC = () => {
             });
             
         } else if (data.user) {
-            // Login exitoso: Forzamos navegación a la raíz. App.tsx toma el control.
+            // ✅ CAMBIO CLAVE: Login exitoso: Forzamos navegación a la raíz. 
+            // App.tsx tomará el control, creará/validará el perfil y redirigirá.
             history.replace('/'); 
         }
         setIsLoading(false);
     };
 
-    // funcion login con google
+    // FUNCIÓN LOGIN CON GOOGLE (Capacitor/Native App Flow)
     const handleGoogleLogin = async () => {
         setIsLoading(true);
         try {
+            // 1. Obtener ID Token nativo de Google (usando Capacitor)
             const googleUser = await GoogleAuth.signIn();
 
             if (!googleUser || !googleUser.authentication?.idToken) {
-                throw new Error('No se pudo obtener el token de Google.');
+                // Manejar cancelación o error
+                throw new Error('Autenticación de Google cancelada o fallida.');
             }
 
+            // 2. Usar el ID Token para iniciar sesión en Supabase
             const { error } = await supabase.auth.signInWithIdToken({
                 provider: 'google',
                 token: googleUser.authentication.idToken,
@@ -73,10 +78,19 @@ const Login: React.FC = () => {
 
             if (error) throw error;
             
+            // ✅ Éxito: El listener en App.tsx se encargará de la redirección.
+            history.replace('/'); 
+            
         } catch (error: any) {
+             // Es común que el usuario cancele el diálogo, no es un error crítico
+            if (error.message.includes('No se pudo obtener el token de Google') || error.message.includes('Autenticación de Google cancelada')) {
+                console.log("Login con Google cancelado.");
+                return;
+            }
+
             presentToast({
                 message: 'Error al iniciar con Google: ' + error.message,
-                duration: 3000,
+                duration: 4000,
                 color: 'danger',
             });
         } finally {
@@ -84,22 +98,21 @@ const Login: React.FC = () => {
         }
     };
     
-    // Esta función ha sido eliminada y su lógica centralizada en App.tsx
-    // (pero la dejamos si quieres conservarla para propósitos internos, 
-    // corrigiendo la consulta por las dudas)
-    const checkProfileAndRedirect = async (userId: string) => {
-        const { data } = await supabase
-            .from('usuarios')
-            .select('nombre') // 🛠️ CORREGIDO: SOLO 'nombre'
-            .eq('auth_uid', userId)
-            .maybeSingle(); 
+    // 🛠️ Función ya no necesaria aquí: La lógica de redirección fue movida a App.tsx
+    // La dejamos comentada/corregida como referencia
+    // const checkProfileAndRedirect = async (userId: string) => {
+    //     const { data } = await supabase
+    //         .from('usuarios')
+    //         .select('nombre') 
+    //         .eq('auth_uid', userId)
+    //         .maybeSingle(); 
 
-        if (data?.nombre) {
-            history.replace('/tabs/home');
-        } else {
-            history.replace('/identificate');
-        }
-    };
+    //     if (data?.nombre) {
+    //         history.replace('/tabs/home');
+    //     } else {
+    //         history.replace('/identificate');
+    //     }
+    // };
 
     return (
         <IonPage>
