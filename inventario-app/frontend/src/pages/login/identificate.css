@@ -1,48 +1,102 @@
-/* Centra el contenido vertical y horizontalmente */
-.auth-page {
-    --background: var(--ion-background-color, #ffffff); /* Asegura fondo blanco/claro si no hay imagen de fondo */
-    display: flex;
-    justify-content: center; /* Centrado horizontal */
-    align-items: center; /* Centrado vertical */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+/* --- Variables de Color (para fácil manejo) --- */
+:root {
+    --color-fondo: #211c14;
+    --color-secundario-oscuro: #312b23;
+    --color-texto-claro: #ffffff;
+    --color-texto-gris: #a0a0a0;
+    --color-verde-principal: #33a852;
+    --color-verde-hover: #45c065;
+    --color-borde-campo: #4e4e4e;
+    --color-borde-google-hover: #606060;
 }
 
-/* Contenedor principal para limitar el ancho en pantallas grandes (como el estilo in-line original) */
-.auth-container {
-    width: 100%;
-    max-width: 400px; /* Ancho típico de un formulario de login */
+/* --- Estilos del Contenedor Principal (Fondo Oscuro) --- */
+.login-page-container {
+    /* Usar variables de Ionic si el componente está dentro de un IonPage */
+    --background: var(--color-fondo); 
+    background-color: var(--color-fondo); /* Fallback para entorno web */
+    
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
     padding: 20px;
 }
 
-/* Estilo del Logo/Marca (similar al de un login) */
-.logo-section {
+/* --- Estilos de la Tarjeta Contenedora --- */
+.login-card {
+    width: 100%;
+    max-width: 380px;
+    background-color: transparent;
+    box-shadow: none;
+    color: var(--color-texto-claro);
     text-align: center;
-    margin-bottom: 2rem; /* Espacio debajo del logo/título */
 }
 
-.logo-icon {
-    font-size: 4rem; /* Icono grande como placeholder de logo */
-    margin-bottom: 0.5rem;
+/* --- Logo NEXA (Ajustado para <img>) --- */
+.nexa-logo-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
-
-/* Título principal de la aplicación */
-.app-title {
-    font-size: 2.5rem;
+/* --- Títulos y Subtítulos --- */
+.welcome-title {
+    font-size: 32px;
     font-weight: bold;
-    color: var(--ion-color-primary, #3880ff); /* Color principal de la aplicación */
-    margin-top: 0;
-    margin-bottom: 5px;
+    margin-bottom: 10px;
 }
 
-/* Subtítulo (el "Identifícate" o "Casi Listo") */
-.tagline {
-    font-size: 1.5rem;
-    font-weight: normal;
-    color: var(--ion-color-step-600, #666); /* Color secundario para el tagline */
-    margin-top: 0;
-    margin-bottom: 0;
+.subtitle {
+    font-size: 16px;
+    color: var(--color-texto-gris);
+    margin-bottom: 30px;
 }
 
-/* Estilo para los IonItem/IonInput */
-ion-item.ion-margin-bottom {
-    --inner-padding-end: 0;
+/* --- Campos de Entrada (Input) --- */
+.input-group {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.login-input-item {
+    --background: #000;
+    /* 👈 1. Fondo negro */
+    --color: #fff;
+    /* 👈 2. Texto que escribes, en blanco */
+    --placeholder-color: #fff;
+    /* 👈 3. Texto del placeholder, en blanco */
+    --border-radius: 10px;
+    --padding-start: 1rem;
+    --padding-end: 1rem;
+    --border-width: 0px;
+    --highlight-height: 0;
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Estilo del placeholder */
+.login-input::placeholder {
+    color: var(--color-texto-gris);
+}
+
+/* Icono dentro del campo (posicionado) */
+.input-icon {
+    position: absolute;
+    top: 50%;
+    left: 15px;
+    transform: translateY(-50%);
+    color: var(--color-texto-gris);
+    font-size: 18px;
+    z-index: 10;
+}
+
+/* --- Botón Primario (Continuar) --- */
+.btn-primary {
+    --border-radius: 10px;
+    --box-shadow: 0 6px 20px rgba(var(--ion-color-primary-rgb), 0.4);
+    font-weight: 600;
+    height: 48px;
+    margin-top: 1rem;
 }
