@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { useHistory } from "react-router-dom";
+// 🚨 Importar withRouter y RouteComponentProps
+import { withRouter, RouteComponentProps } from "react-router-dom"; 
 import "./table-editor.css";
 
 // Configura tu cliente de Supabase
@@ -19,10 +20,15 @@ type Props = {
     productos?: Producto[];
 };
 
-export default function ProductosTable({ productos: productosProp }: Props) {
+// 🚨 Definir el nuevo tipo de props que incluye las de RouteComponentProps
+type ProductosTableProps = Props & RouteComponentProps;
+
+
+// 🚨 Eliminar useHistory y recibir 'history' directamente en las props
+function ProductosTable({ productos: productosProp, history }: ProductosTableProps) {
     const [productos, setProductos] = useState<Producto[]>([]);
     const [loading, setLoading] = useState(true);
-    const history = useHistory();
+    // const history = useHistory(); // ❌ ELIMINADO: Ya no es necesario aquí.
 
     useEffect(() => {
         if (productosProp) {
@@ -80,7 +86,8 @@ export default function ProductosTable({ productos: productosProp }: Props) {
                                     <td>
                                         <button
                                             className="btn-ver"
-                                            onClick={() => history.replace(`/product/${prod.id}`)}
+                                            // ✅ Uso de history.push() inyectado para la ruta correcta
+                                            onClick={() => history.push(`/product/${prod.id}`)}
                                         >
                                             Ver producto
                                         </button>
@@ -100,3 +107,6 @@ export default function ProductosTable({ productos: productosProp }: Props) {
         </div>
     );
 }
+
+// 🚨 Exportar el componente envuelto en withRouter
+export default withRouter(ProductosTable);

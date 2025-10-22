@@ -9,20 +9,59 @@ import {
     IonLoading,
     useIonToast,
     IonIcon,
-    IonNote, // Añadido para mostrar el email si es necesario
+    IonNote,
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { User } from '@supabase/supabase-js';
-import { lockClosed } from 'ionicons/icons';
-// ⚠️ Asegúrate de tener un archivo 'Identificate.css' para los estilos.
+import { lockClosed, personCircle } from 'ionicons/icons'; // 👈 Importado personCircle para el input
 import './Identificate.css'; 
+
+// --- FUNCIÓN DE VALIDACIÓN DE NOMBRE COMPLETO ---
+const validateFullName = (name: string): string | null => {
+    const trimmedName = name.trim();
+    
+    if (!trimmedName) {
+        return 'El nombre no puede estar vacío.';
+    }
+
+    // 1. Solo letras (incluyendo ñ y acentos) y espacios
+    if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(trimmedName)) {
+        return 'El nombre completo solo puede contener letras y espacios.';
+    }
+
+    const words = trimmedName.split(/\s+/).filter(w => w.length > 0);
+
+    // 2. Debe haber al menos dos palabras (Nombre y Apellido)
+    if (words.length < 2) {
+        return 'Debes ingresar al menos un nombre y un apellido.';
+    }
+
+    // 3. Heurística para evitar texto aleatorio (e.g., klsdaksakl)
+    // Se verifica la longitud y que la palabra no sea solo una letra repetida (ej. "a a")
+    for (const word of words) {
+        if (word.length < 2) {
+             return 'Cada palabra debe tener al menos dos letras.';
+        }
+        
+        // (La verificación de mayúsculas es muy difícil de hacer sin Falsos Positivos, 
+        // pero la validación de que solo sean letras y espacios ya ayuda a evitar "sksksks123")
+        
+        // Se podría agregar una verificación de la proporción de vocales/consonantes para detectar texto aleatorio,
+        // pero por simplicidad, nos basamos en la regex de solo letras y la cuenta de palabras.
+    }
+    
+    return null; // Validación exitosa
+};
+
 
 // --- COMPONENTE Identificate ---
 
 const Identificate: React.FC = () => {
-    const [nombre, setNombre] = useState('');
-    const [apellido, setApellido] = useState('');
+    // ❌ Eliminado: nombre y apellido separados
+    // ✅ Nuevo estado para el nombre completo
+    const [fullName, setFullName] = useState(''); 
+    
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [presentToast] = useIonToast();
@@ -37,15 +76,16 @@ const Identificate: React.FC = () => {
             if (error || !user) {
                 console.error('Error al obtener usuario o no autenticado:', error?.message);
                 presentToast({ message: 'Error: No se pudo verificar tu sesión.', color: 'danger', duration: 3000 });
-                // Redirige al login si no hay sesión
                 history.replace('/login');
             } else {
                 setUser(user);
 
-                // Obtener datos del perfil existente para precargar/verificar
+                // Obtener datos del perfil existente
+                // Nota: Ahora solo se usa el campo 'nombre' para precargar el nombre completo
                 const { data: profile, error: profileError } = await supabase
                     .from('usuarios')
-                    .select('nombre, apellido')
+                    // Solo seleccionamos 'nombre', pues ahí guardaremos el nombre completo
+                    .select('nombre') 
                     .eq('auth_uid', user.id)
                     .maybeSingle();
                 
@@ -53,17 +93,18 @@ const Identificate: React.FC = () => {
                     console.error('Error al cargar perfil:', profileError.message);
                 }
 
-                // 💡 Pre-rellenar si ya existen datos o si vino de Google/OAuth
+                let initialName = '';
+                
+                // 💡 Pre-rellenar si ya existe el nombre completo en DB
                 if (profile?.nombre) {
-                    setNombre(profile.nombre);
-                } else if (user.user_metadata.full_name) {
-                    // Intenta precargar de los metadatos de OAuth si está disponible
-                    setNombre(user.user_metadata.full_name);
+                    initialName = profile.nombre;
+                } 
+                // 💡 O si vino de Google/OAuth (user_metadata.full_name)
+                else if (user.user_metadata.full_name) {
+                    initialName = user.user_metadata.full_name;
                 }
                 
-                if (profile?.apellido) {
-                    setApellido(profile.apellido);
-                }
+                setFullName(initialName);
             }
             setLoading(false);
         };
@@ -73,11 +114,18 @@ const Identificate: React.FC = () => {
 
     // Función para guardar y actualizar el perfil 
     const handleSubmit = async () => {
-        // Validación de campos
-        if (!user || !nombre.trim() || !apellido.trim()) {
+        // Ejecutar la validación del nombre completo
+        const validationError = validateFullName(fullName);
+
+        if (!user) {
+             // Esto no debería pasar si el useEffect funciona, pero es buena práctica.
+             return;
+        }
+
+        if (validationError) {
             presentToast({
-                message: 'Por favor, completa tu nombre y apellido.',
-                duration: 3000,
+                message: validationError,
+                duration: 4000,
                 color: 'warning',
             });
             return;
@@ -85,15 +133,14 @@ const Identificate: React.FC = () => {
 
         setLoading(true);
 
-        // 🎯 Lógica de ACTUALIZACIÓN de la tabla 'usuarios'
+        // 🎯 Lógica de ACTUALIZACIÓN: Solo se actualiza el campo 'nombre' con el nombre completo
         const { error } = await supabase
             .from('usuarios')
             .update({
-                nombre: nombre.trim(),
-                apellido: apellido.trim()
-                // Puedes agregar más campos aquí
+                nombre: fullName.trim(), // Guardar el nombre completo en el campo 'nombre'
+                // ❌ Eliminado: apellido: apellido.trim()
             })
-            .eq('auth_uid', user.id); // 🔑 CLAVE: Filtra por el ID de autenticación
+            .eq('auth_uid', user.id); 
 
         setLoading(false);
 
@@ -114,7 +161,6 @@ const Identificate: React.FC = () => {
         }
     };
 
-    // Si está cargando o no hay usuario autenticado (se redirige en el useEffect)
     if (loading) {
         return (
             <IonPage>
@@ -123,56 +169,50 @@ const Identificate: React.FC = () => {
         );
     }
 
-    // --- UI Modificada ---
     return (
         <IonPage>
             <IonContent fullscreen className="ion-padding auth-page">
-                <div className="auth-container">
+                <div className="auth-container card-container">
                     {/* Sección del Logo/Marca */}
-                    <div className="logo-section">
+                    <div className="logo-section ion-text-center">
                         <IonIcon icon={lockClosed} color="primary" className="logo-icon" />
                         <h1 className="app-title">NEXA App</h1> 
                         <h2 className="tagline">Completa tu perfil</h2> 
                     </div>
 
-                    <p className="ion-text-center ion-margin-bottom">
+                    <p className="ion-text-center ion-margin-bottom description">
                         ¡Bienvenido(a)! Solo te falta un paso para comenzar.
                     </p>
                     
-                    {/* Email del usuario (opcional, útil para debugging/UX) */}
+                    {/* Email del usuario (con estilo sutil) */}
                     {user?.email && (
-                        <IonNote className="ion-text-center ion-margin-bottom" style={{ display: 'block' }}>
+                        <IonNote className="ion-text-center ion-margin-bottom email-note" style={{ display: 'block' }}>
                             Email: {user.email}
                         </IonNote>
                     )}
 
                     {/* Formulario */}
                     <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
-                        <IonItem className="ion-margin-bottom">
-                            <IonLabel position="floating">Nombre</IonLabel>
+                        {/* Input Único para Nombre Completo */}
+                        <IonItem className="ion-margin-bottom input-item"> 
+                            <IonIcon icon={personCircle} slot="start" color="medium" /> {/* Icono de perfil */}
+                            <IonLabel position="floating">Nombre y Apellido</IonLabel>
                             <IonInput
                                 type="text"
-                                value={nombre}
-                                onIonInput={(e) => setNombre(e.detail.value!)}
+                                value={fullName}
+                                placeholder="Ej: Juan Pérez" // Placeholder
+                                onIonInput={(e) => setFullName(e.detail.value!)}
                                 required
                             />
                         </IonItem>
 
-                        <IonItem className="ion-margin-bottom">
-                            <IonLabel position="floating">Apellido</IonLabel>
-                            <IonInput
-                                type="text"
-                                value={apellido}
-                                onIonInput={(e) => setApellido(e.detail.value!)}
-                                required
-                            />
-                        </IonItem>
+                        {/* Input de Apellido ELIMINADO */}
 
                         <IonButton
                             expand="block"
-                            className="ion-margin-top"
-                            type="submit" // Usar type="submit" para que el formulario funcione al presionar Enter
-                            disabled={loading || !nombre.trim() || !apellido.trim()}
+                            className="ion-margin-top save-button"
+                            type="submit" 
+                            disabled={loading || validateFullName(fullName) !== null} // Se deshabilita si la validación falla
                         >
                             Guardar y Continuar
                         </IonButton>

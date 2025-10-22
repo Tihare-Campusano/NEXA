@@ -12,11 +12,11 @@ import {
 } from "@ionic/react";
 import { IonReactRouter } from "@ionic/react-router";
 import { home, barChart, create, list, person } from "ionicons/icons";
-import { supabase } from "./supabaseClient";
-import { PostgrestError } from '@supabase/supabase-js';
+// import { supabase } from "./supabaseClient"; // Se comenta, ya no se usa
+// import { PostgrestError } from '@supabase/supabase-js'; // Se comenta, ya no se usa
 
 /* CSS de Ionic */
-// ... (omito imports CSS para brevedad)
+// ... (imports CSS de Ionic)
 import "@ionic/react/css/core.css";
 import "@ionic/react/css/normalize.css";
 import "@ionic/react/css/structure.css";
@@ -50,93 +50,29 @@ import IAImagen from "./pages/register-product/ia-images/ia-images";
 setupIonicReact();
 
 const App: React.FC = () => {
-    const history = useHistory(); 
+    // const history = useHistory(); // Se comenta, ya no se usa
 
+    // ❌ LÓGICA DE AUTENTICACIÓN Y REDIRECCIÓN ELIMINADA ❌
+    // El listener de onAuthStateChange ya no existe aquí.
+    // Esto significa que la app no protegerá las rutas ni creará perfiles de forma automática.
+    /*
     useEffect(() => {
-        console.log("🟢 App.tsx: Configurando listener de autenticación...");
-
-        const { data: authListener } = supabase.auth.onAuthStateChange(
-            async (event, session) => {
-                console.log(`🟡 Evento de autenticación: ${event}`);
-
-                if (event === "SIGNED_IN" && session?.user) {
-                    console.log(`🟢 Usuario INICIÓ SESIÓN: ${session.user.email}`);
-
-                    // 1. REVISAR PERFIL EXISTENTE
-                    const { data: profileData, error: selectError } = await supabase
-                        .from("usuarios")
-                        .select("nombre") 
-                        .eq("auth_uid", session.user.id)
-                        .maybeSingle(); 
-
-                    // FIX DE TYPESCRIPT
-                    const errorMsg = (selectError as PostgrestError)?.message || ""; 
-
-                    // Manejo del error de consulta (si el error no es simplemente 'no rows found')
-                    if (selectError && !errorMsg.includes('rows found')) {
-                        console.error("🔴 Error al consultar perfil:", errorMsg);
-                        return; 
-                    }
-
-                    // 2. CREAR PERFIL SI NO EXISTE
-                    // Usamos `!profileData` ya que `maybeSingle()` devuelve `null` si no encuentra.
-                    if (!profileData) { 
-                        console.log("🟡 Perfil no encontrado. Creando uno nuevo...");
-
-                        const { error: insertError } = await supabase
-                            .from("usuarios")
-                            .insert({
-                                auth_uid: session.user.id,
-                                email: session.user.email,
-                                rol: "usuario",
-                                activo: true,
-                                // Nombre: Supabase Auth usa `user_metadata` si viene de Google
-                                nombre: session.user.user_metadata.full_name || null 
-                            });
-
-                        if (insertError) {
-                            console.error("🔴 Error al crear perfil:", insertError.message);
-                            // history.replace("/login"); // En caso de error crítico, forzamos logout/redir.
-                        } else {
-                            // Si el perfil se acaba de crear, redirigimos a Identificate para completar datos
-                            console.log("🟢 Perfil creado. Redirigiendo a /identificate...");
-                            history.replace("/identificate"); 
-                        }
-                    
-                    // 3. REDIRIGIR BASADO EN EL ESTADO DEL PERFIL
-                    } else {
-                        // Revisa si falta el nombre o si es null/cadena vacía
-                        if (profileData.nombre && profileData.nombre.trim() !== "") {
-                            console.log("🟢 Perfil completo. Redirigiendo a /tabs/home...");
-                            history.replace("/tabs/home"); 
-                        } else {
-                            console.log("🟡 Falta el nombre en perfil. Redirigiendo a /identificate...");
-                            history.replace("/identificate"); 
-                        }
-                    }
-                } else if (event === "SIGNED_OUT") {
-                    console.log("🟢 Usuario CERRÓ SESIÓN. Redirigiendo a /login...");
-                    history.replace("/login");
-                }
-            }
-        );
-
-        // Limpieza del listener al desmontar el componente
+        console.log("🟢 App.tsx: Listener de autenticación eliminado.");
         return () => {
-            console.log("🔵 Limpiando listener de autenticación.");
-            authListener?.subscription?.unsubscribe();
+            // No hay nada que limpiar.
         };
     }, []); 
+    */
 
     return (
         <IonApp>
             <IonReactRouter>
                 <IonRouterOutlet>
-                    {/* Rutas Públicas */}
+                    {/* Rutas Públicas (ahora todas son accesibles directamente) */}
                     <Route exact path="/" render={() => <Redirect to="/login" />} />
                     <Route exact path="/login" component={Login} />
                     <Route exact path="/identificate" component={Identificate} />
-                    {/* Rutas Protegidas que cargan el layout con Tabs */}
+                    {/* Rutas con Tabs (ahora desprotegidas) */}
                     <Route path="/tabs" render={() => <TabsLayout />} />
                 </IonRouterOutlet>
             </IonReactRouter>
