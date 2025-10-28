@@ -10,7 +10,7 @@ const supabase = createClient(
     import.meta.env.VITE_SUPABASE_ANON_KEY as string
 );
 
-export type Producto = {
+type Producto = {
     id: number;
     codigo_barras: string | null;
     nombre: string;
@@ -41,13 +41,19 @@ function ProductosTable({ productos: productosProp, history }: ProductosTablePro
             setLoading(true);
             const { data, error } = await supabase
                 .from("productos")
-                .select("id, codigo_barras, nombre")
+                // Traemos ambas por compatibilidad y normalizamos abajo
+                .select("id, codigo_barras, sku, nombre")
                 .order("id", { ascending: false });
 
             if (error) {
                 console.error("Error al cargar productos:", error.message);
             } else {
-                setProductos(data || []);
+                const normalizados: Producto[] = (data || []).map((p: any) => ({
+                    id: p.id,
+                    nombre: p.nombre,
+                    codigo_barras: p.codigo_barras ?? p.sku ?? null,
+                }));
+                setProductos(normalizados);
             }
             setLoading(false);
         };
@@ -87,7 +93,7 @@ function ProductosTable({ productos: productosProp, history }: ProductosTablePro
                                         <button
                                             className="btn-ver"
                                             // ✅ Uso de history.push() inyectado para la ruta correcta
-                                            onClick={() => history.push(`/product/${prod.id}`)}
+                                            onClick={() => history.push(`/tabs/product/${prod.id}`)}
                                         >
                                             Ver producto
                                         </button>
@@ -108,5 +114,6 @@ function ProductosTable({ productos: productosProp, history }: ProductosTablePro
     );
 }
 
-// 🚨 Exportar el componente envuelto en withRouter
-export default withRouter(ProductosTable);
+// 🚨 Exportar el componente envuelto en withRouter con nombre
+const ProductosTableWithRouter = withRouter(ProductosTable);
+export default ProductosTableWithRouter;

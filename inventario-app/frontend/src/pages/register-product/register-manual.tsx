@@ -1,16 +1,13 @@
 import {
   IonPage,
   IonContent,
-  IonButton,
 } from "@ionic/react";
 import { FaClipboard } from "react-icons/fa";
 import HeaderApp from "../../components/header_app";
 import FormularioRegistro from "../../components/register-product/product-form";
-import { useHistory } from "react-router-dom";
 import Botones from "../../components/register-product/botones";
 
 export default function Registro() {
-  const history = useHistory();
 
   return (
     <IonPage>

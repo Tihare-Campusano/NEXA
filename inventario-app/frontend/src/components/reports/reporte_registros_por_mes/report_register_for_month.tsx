@@ -18,13 +18,7 @@ import * as XLSX from "xlsx";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import "./report_register_for_month.css"; // 👈 CSS para los botones
 
-// Interface para el tipo de producto
-interface Producto {
-  codigo: string;
-  nombre: string;
-  marca: string;
-  fecha: string;
-}
+// Tipos derivados de datos del backend (inferidos en tiempo de ejecución)
 
 // Props que el componente recibirá
 interface ReportRegisterForMonthProps {

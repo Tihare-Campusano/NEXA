@@ -10,7 +10,6 @@ import {
 } from "@ionic/react";
 import HeaderApp from "../../components/header_app";
 import { FaClipboard } from "react-icons/fa";
-import { useHistory } from "react-router-dom";
 
 // Importaciones combinadas de ambas versiones
 import Botones from "../../components/register-product/botones";
@@ -18,7 +17,6 @@ import { Capacitor } from "@capacitor/core";
 import { BarcodeScanner } from "@capacitor-mlkit/barcode-scanning";
 
 export default function ScannerCamera() {
-  const history = useHistory();
   const [form, setForm] = useState({
     codigo: "",
     nombre: "",

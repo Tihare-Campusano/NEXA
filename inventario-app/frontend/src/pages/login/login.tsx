@@ -15,21 +15,21 @@ import './login.css';
 const Login: React.FC = () => {
     const [email, setEmail] = useState('');
     const [pass, setPass] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading] = useState(false);
     const history = useHistory();
 
     // Login con email (Ahora redirige inmediatamente a /identificate)
     const handleEmailLogin = (e: React.FormEvent) => {
         e.preventDefault();
         // Redirige al presionar Iniciar Sesión (simula un login exitoso)
-        history.push('/identificate');
+        history.push('/tabs/home');
         // NOTA: Se ha eliminado la simulación de carga (setIsLoading) y la espera.
     };
 
     // Login con google (Ahora redirige inmediatamente a /identificate)
     const handleGoogleLogin = () => {
         // Redirige al presionar Continuar con Google
-        history.push('/identificate');
+        history.push('/tabs/home');
         // NOTA: Se ha eliminado la simulación de carga (setIsLoading) y la espera.
     };
     

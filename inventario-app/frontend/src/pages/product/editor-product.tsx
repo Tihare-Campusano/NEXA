@@ -41,13 +41,7 @@ export default function EditorProducto() {
     const [changed, setChanged] = useState<boolean>(false);
     const mountedRef = useRef(true);
 
-    const editableFields: (keyof Producto)[] = [
-        "nombre",
-        "marca",
-        "modelo",
-        "compatibilidad",
-        "observaciones",
-    ];
+    // editableFields eliminado: no se utiliza en la UI actual
 
     useEffect(() => {
         mountedRef.current = true;
@@ -71,7 +65,7 @@ export default function EditorProducto() {
             const { data, error } = await supabase
                 .from("productos")
                 .select("*, categoria:categorias(nombre)")
-                .eq("id", id)
+                .eq("id", Number(id))
                 .single();
 
             if (!mountedRef.current || ignore) return;
