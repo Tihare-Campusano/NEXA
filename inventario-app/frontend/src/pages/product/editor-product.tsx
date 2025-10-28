@@ -3,7 +3,8 @@ import { useParams, useHistory } from "react-router-dom";
 import { createClient } from "@supabase/supabase-js";
 import { FaBoxOpen, FaEdit } from "react-icons/fa";
 import "./editor-product.css";
-import { IonPage, IonContent } from "@ionic/react";
+import { IonPage, IonContent, IonIcon } from "@ionic/react";
+import { arrowBackOutline, copyOutline, closeOutline } from "ionicons/icons";
 import HeaderApp from "../../components/header_app";
 
 // Configuración de Supabase
@@ -40,14 +41,11 @@ export default function EditorProducto() {
     const [editData, setEditData] = useState<Partial<Producto>>({});
     const [changed, setChanged] = useState<boolean>(false);
     const mountedRef = useRef(true);
+    const [showRemoveModal, setShowRemoveModal] = useState(false);
+    const [removeQty, setRemoveQty] = useState<string>("");
+    const [copied, setCopied] = useState(false);
 
-    const editableFields: (keyof Producto)[] = [
-        "nombre",
-        "marca",
-        "modelo",
-        "compatibilidad",
-        "observaciones",
-    ];
+    // editableFields eliminado: no se utiliza en la UI actual
 
     useEffect(() => {
         mountedRef.current = true;
@@ -71,7 +69,7 @@ export default function EditorProducto() {
             const { data, error } = await supabase
                 .from("productos")
                 .select("*, categoria:categorias(nombre)")
-                .eq("id", id)
+                .eq("id", Number(id))
                 .single();
 
             if (!mountedRef.current || ignore) return;
@@ -80,7 +78,10 @@ export default function EditorProducto() {
                 console.error("Error al obtener producto:", error.message);
                 setProducto(null);
             } else {
-                setProducto(data as Producto);
+                // Normalizamos el código de barras al cargar
+                const d = data as Producto;
+                const codigo_barras = (d as any).codigo_barras ?? (d as any).sku ?? null;
+                setProducto({ ...(d as any), codigo_barras } as Producto);
             }
             setLoading(false);
         };
@@ -121,6 +122,49 @@ export default function EditorProducto() {
         alert("Cambios guardados ✅");
     };
 
+    const handleRemoveStock = async () => {
+        if (!producto) return;
+        const qty = Math.max(0, Math.floor(Number(removeQty || 0)));
+        if (qty <= 0) {
+            alert("Ingresa una cantidad válida");
+            return;
+        }
+        // Obtener stock actual
+        const { data: stockData, error: stockErr } = await supabase
+            .from("stock")
+            .select("cantidad")
+            .eq("producto_id", producto.id)
+            .single();
+        if (stockErr) {
+            alert("No se pudo obtener el stock actual");
+            return;
+        }
+
+        const actual = Number(stockData?.cantidad ?? 0);
+        if (actual <= 0) {
+            alert("Ya no hay más stock disponible");
+            return;
+        }
+        if (qty > actual) {
+            alert("No es posible eliminar esa cantidad; supera el stock disponible");
+            return;
+        }
+
+        const nuevo = Math.max(0, actual - qty);
+        const { error: updErr } = await supabase
+            .from("stock")
+            .update({ cantidad: nuevo })
+            .eq("producto_id", producto.id);
+        if (updErr) {
+            alert("Error al actualizar el stock");
+            return;
+        }
+
+        setShowRemoveModal(false);
+        setRemoveQty("");
+        alert("Stock actualizado ✅");
+    };
+
     // Loader
     if (loading) {
         return (
@@ -159,9 +203,52 @@ export default function EditorProducto() {
             <IonContent fullscreen className="ion-padding">
                 <div className="editor-container">
                     <div className="editor-producto-card">
+                        {/* Flecha volver en la parte superior de la card */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 8 }}>
+                            <IonIcon
+                                icon={arrowBackOutline}
+                                onClick={() => history.goBack()}
+                                title="Volver"
+                                style={{ cursor: 'pointer', fontSize: 22, color: '#333333' }}
+                            />
+                        </div>
                         <div className="editor-body">
                             <p><strong>ID:</strong> {String(producto.id)}</p>
-                            <p><strong>Código de Barras:</strong> {producto.codigo_barras ?? "N/A"}</p>
+                            <div style={{ marginBottom: 8 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                    <strong>Código de Barras</strong>
+                                    <span style={{
+                                        fontFamily: 'monospace',
+                                        background: '#f3f4f6',
+                                        padding: '2px 6px',
+                                        borderRadius: 6,
+                                        color: '#111827'
+                                    }}>
+                                        {String(editData.codigo_barras ?? producto.codigo_barras ?? producto.sku ?? 'N/A')}
+                                    </span>
+                                    {(producto.codigo_barras || producto.sku) && (
+                                        <IonIcon
+                                            icon={copyOutline}
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(String(editData.codigo_barras ?? producto.codigo_barras ?? producto.sku));
+                                                setCopied(true);
+                                                setTimeout(() => setCopied(false), 2000);
+                                            }}
+                                            title="Copiar"
+                                            style={{ cursor: 'pointer', fontSize: 18, color: '#555', padding: 4 }}
+                                        />
+                                    )}
+                                    {copied && (
+                                        <span style={{ fontSize: 12, color: '#10b981' }}>¡Copiado!</span>
+                                    )}
+                                </div>
+                                <input
+                                    value={String(editData.codigo_barras ?? producto.codigo_barras ?? "")}
+                                    onChange={(e) => handleEdit("codigo_barras", e.target.value)}
+                                    placeholder="Ingresar código"
+                                    style={{ maxWidth: 320, marginTop: 6 }}
+                                />
+                            </div>
                             <p>
                                 <strong>Nombre:</strong>
                                 <input
@@ -216,7 +303,14 @@ export default function EditorProducto() {
                             <p><strong>Última actualización:</strong> {formatFecha(producto.updated_at)}</p>
                         </div>
 
-                        <div className="editor-actions">
+                        <div className="editor-actions" style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                            <button
+                                className="btn-volver"
+                                onClick={() => setShowRemoveModal(true)}
+                                title="Eliminar / retirar stock"
+                            >
+                                🗑 Eliminar producto
+                            </button>
                             <button
                                 className="btn-guardar"
                                 onClick={handleSave}
@@ -225,17 +319,81 @@ export default function EditorProducto() {
                             >
                                 💾 Guardar cambios
                             </button>
-
-                            <button
-                                className="btn-volver"
-                                onClick={() => history.replace("/tabs/productos")}
-                            >
-                                ⬅ Volver
-                            </button>
                         </div>
                     </div>
                 </div>
             </IonContent>
+            {/* Modal para retirar stock */}
+            {showRemoveModal && (
+                <div
+                    className="modal-overlay"
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(0,0,0,0.6)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000,
+                    }}
+                >
+                    <div
+                        className="modal-card"
+                        style={{
+                            width: '90%',
+                            maxWidth: 420,
+                            background: '#000000',
+                            color: '#ffffff',
+                            borderRadius: 12,
+                            padding: 16,
+                            boxShadow: '0 12px 30px rgba(0,0,0,0.25)',
+                            position: 'relative',
+                        }}
+                    >
+                        <button
+                            onClick={() => { setShowRemoveModal(false); setRemoveQty(""); }}
+                            title="Cerrar"
+                            style={{
+                                position: 'absolute',
+                                top: 10,
+                                left: 10,
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: 4,
+                            }}
+                        >
+                            <IonIcon icon={closeOutline} style={{ fontSize: 22, color: '#ffffff' }} />
+                        </button>
+                        <div style={{ textAlign: 'center', marginTop: 8 }}>
+                            <h3 style={{ margin: '8px 0 12px 0', fontSize: 18, color: '#ffffff' }}>¿Cuántos productos deseas eliminar?</h3>
+                            <input
+                                type="number"
+                                min={0}
+                                value={removeQty}
+                                onChange={(e) => setRemoveQty(e.target.value)}
+                                placeholder="0"
+                                style={{
+                                    width: '100%',
+                                    padding: 10,
+                                    borderRadius: 8,
+                                    border: '1px solid #333333',
+                                    outline: 'none',
+                                    background: '#111111',
+                                    color: '#ffffff',
+                                }}
+                            />
+                            <button
+                                className="btn-guardar"
+                                onClick={handleRemoveStock}
+                                style={{ marginTop: 14, width: '100%' }}
+                            >
+                                Guardar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </IonPage>
     );
 }

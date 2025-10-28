@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 // 🚨 Importar withRouter y RouteComponentProps
 import { withRouter, RouteComponentProps } from "react-router-dom"; 
+import { IonIcon } from "@ionic/react";
+import { copyOutline } from "ionicons/icons";
 import "./table-editor.css";
 
 // Configura tu cliente de Supabase
@@ -28,6 +30,10 @@ type ProductosTableProps = Props & RouteComponentProps;
 function ProductosTable({ productos: productosProp, history }: ProductosTableProps) {
     const [productos, setProductos] = useState<Producto[]>([]);
     const [loading, setLoading] = useState(true);
+    const [page, setPage] = useState(1);
+    const [pageSize] = useState(10);
+    const [total, setTotal] = useState(0);
+    const [copiedId, setCopiedId] = useState<number | null>(null);
     // const history = useHistory(); // ❌ ELIMINADO: Ya no es necesario aquí.
 
     useEffect(() => {
@@ -39,21 +45,37 @@ function ProductosTable({ productos: productosProp, history }: ProductosTablePro
 
         const fetchProductos = async () => {
             setLoading(true);
+            // Obtener total
+            const { count: totalCount } = await supabase
+                .from("productos")
+                .select("id", { count: 'exact', head: true });
+            if (typeof totalCount === 'number') setTotal(totalCount);
+
+            const from = (page - 1) * pageSize;
+            const to = from + pageSize - 1;
+
             const { data, error } = await supabase
                 .from("productos")
-                .select("id, codigo_barras, nombre")
-                .order("id", { ascending: false });
+                // Traemos ambas por compatibilidad y normalizamos abajo
+                .select("id, codigo_barras, sku, nombre")
+                .order("id", { ascending: false })
+                .range(from, to);
 
             if (error) {
                 console.error("Error al cargar productos:", error.message);
             } else {
-                setProductos(data || []);
+                const normalizados: Producto[] = (data || []).map((p: any) => ({
+                    id: p.id,
+                    nombre: p.nombre,
+                    codigo_barras: p.codigo_barras ?? p.sku ?? null,
+                }));
+                setProductos(normalizados);
             }
             setLoading(false);
         };
 
         fetchProductos();
-    }, [productosProp]);
+    }, [productosProp, page, pageSize]);
 
     if (loading) return <p>Cargando productos...</p>;
 
@@ -81,13 +103,32 @@ function ProductosTable({ productos: productosProp, history }: ProductosTablePro
                         {productos.length > 0 ? (
                             productos.map((prod) => (
                                 <tr key={prod.id}>
-                                    <td>{prod.codigo_barras || "N/A"}</td>
+                                    <td>
+                                        {prod.codigo_barras || "N/A"}
+                                        {prod.codigo_barras && (
+                                            <>
+                                                <IonIcon
+                                                    icon={copyOutline}
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(prod.codigo_barras as string);
+                                                        setCopiedId(prod.id);
+                                                        setTimeout(() => setCopiedId((prev) => (prev === prod.id ? null : prev)), 2000);
+                                                    }}
+                                                    title="Copiar código"
+                                                    style={{ marginLeft: 8, cursor: 'pointer', fontSize: 18, color: '#555' }}
+                                                />
+                                                {copiedId === prod.id && (
+                                                    <span style={{ marginLeft: 6, fontSize: 12, color: '#10b981' }}>¡Copiado!</span>
+                                                )}
+                                            </>
+                                        )}
+                                    </td>
                                     <td>{prod.nombre}</td>
                                     <td>
                                         <button
                                             className="btn-ver"
                                             // ✅ Uso de history.push() inyectado para la ruta correcta
-                                            onClick={() => history.push(`/product/${prod.id}`)}
+                                            onClick={() => history.push(`/tabs/product/${prod.id}`)}
                                         >
                                             Ver producto
                                         </button>
@@ -103,10 +144,33 @@ function ProductosTable({ productos: productosProp, history }: ProductosTablePro
                         )}
                     </tbody>
                 </table>
+                {/* Paginación simple */}
+                {total > pageSize && (
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 12 }}>
+                        <button
+                            className="btn-ver"
+                            onClick={() => setPage((p) => Math.max(1, p - 1))}
+                            disabled={page === 1}
+                        >
+                            Anterior
+                        </button>
+                        <span>
+                            Página {page} de {Math.max(1, Math.ceil(total / pageSize))}
+                        </span>
+                        <button
+                            className="btn-ver"
+                            onClick={() => setPage((p) => (p < Math.ceil(total / pageSize) ? p + 1 : p))}
+                            disabled={page >= Math.ceil(total / pageSize)}
+                        >
+                            Siguiente
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );
 }
 
-// 🚨 Exportar el componente envuelto en withRouter
-export default withRouter(ProductosTable);
+// 🚨 Exportar el componente envuelto en withRouter con nombre
+const ProductosTableWithRouter = withRouter(ProductosTable);
+export default ProductosTableWithRouter;

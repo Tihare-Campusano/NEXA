@@ -5,7 +5,6 @@ import {
     IonContent,
     IonButton,
     IonImg,
-    IonSpinner,
     IonText,
     IonLoading,
 } from "@ionic/react";
@@ -93,7 +92,7 @@ export default function IAImagen() {
             setImage(foto.webPath || foto.dataUrl || null);
             // Limpiamos cualquier predicción anterior, ya que la foto es nueva.
             setEstadoIA(null);
-        } catch (error) {
+        } catch {
             // Si el usuario cancela la cámara, se produce un error que capturamos aquí para evitar que la app se rompa.
             console.log("El usuario canceló la toma de la foto.");
         }
