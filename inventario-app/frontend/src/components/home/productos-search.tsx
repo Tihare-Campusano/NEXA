@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 import "./productos-search.css";
 
@@ -16,20 +16,7 @@ export default function ProductosSearch({ onResults }: Props) {
     const [loading, setLoading] = useState(false);
 
     // 👉 Búsqueda automática con debounce
-    useEffect(() => {
-        const timeout = setTimeout(() => {
-            if (query.trim().length === 0) {
-                fetchAllProductos(); // 🔹 en vez de limpiar, recargo todos
-            } else {
-                handleSearch();
-            }
-        }, 400);
-
-        return () => clearTimeout(timeout);
-    }, [query]);
-
-    // 🔹 Buscar productos por similitud
-    const handleSearch = async () => {
+    const handleSearch = useCallback(async () => {
         setLoading(true);
 
         const { data, error } = await supabase
@@ -54,7 +41,8 @@ export default function ProductosSearch({ onResults }: Props) {
                 nombre: p.nombre,
                 marca: p.marca,
                 modelo: p.modelo,
-                sku: p.sku,
+                // Normalizamos: prioriza 'codigo_barras' y cae a 'sku' si no existe
+                codigo_barras: p.codigo_barras ?? p.sku ?? null,
                 activo: p.activo,
                 stock: p.stock?.cantidad ?? 0,
                 estado: p.stock?.estado ?? "N/A",
@@ -63,10 +51,9 @@ export default function ProductosSearch({ onResults }: Props) {
             onResults(productosConStock);
         }
         setLoading(false);
-    };
+    }, [onResults, query]);
 
-    // 🔹 Traer todos los productos (cuando se borra la búsqueda)
-    const fetchAllProductos = async () => {
+    const fetchAllProductos = useCallback(async () => {
         setLoading(true);
         const { data, error } = await supabase
             .from("productos")
@@ -90,7 +77,8 @@ export default function ProductosSearch({ onResults }: Props) {
                 nombre: p.nombre,
                 marca: p.marca,
                 modelo: p.modelo,
-                sku: p.sku,
+                // Normalizamos: prioriza 'codigo_barras' y cae a 'sku' si no existe
+                codigo_barras: p.codigo_barras ?? p.sku ?? null,
                 activo: p.activo,
                 stock: p.stock?.cantidad ?? 0,
                 estado: p.stock?.estado ?? "N/A",
@@ -99,7 +87,19 @@ export default function ProductosSearch({ onResults }: Props) {
             onResults(productosConStock);
         }
         setLoading(false);
-    };
+    }, [onResults]);
+
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            if (query.trim().length === 0) {
+                fetchAllProductos(); // 🔹 en vez de limpiar, recargo todos
+            } else {
+                handleSearch();
+            }
+        }, 400);
+
+        return () => clearTimeout(timeout);
+    }, [query, fetchAllProductos, handleSearch]);
 
     return (
         <div className="search-box">

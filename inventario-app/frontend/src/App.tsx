@@ -1,5 +1,5 @@
-import React, { useEffect } from "react";
-import { Redirect, Route, useHistory } from "react-router-dom";
+import React from "react";
+import { Redirect, Route } from "react-router-dom";
 import {
     IonApp,
     IonIcon,
@@ -32,7 +32,6 @@ import "./theme/variables.css";
 
 /* Páginas de Autenticación */
 import Login from "./pages/login/login";
-import Identificate from "./pages/login/identificate";
 
 /* Páginas Principales */
 import Home from "./pages/home/home";
@@ -71,7 +70,7 @@ const App: React.FC = () => {
                     {/* Rutas Públicas (ahora todas son accesibles directamente) */}
                     <Route exact path="/" render={() => <Redirect to="/login" />} />
                     <Route exact path="/login" component={Login} />
-                    <Route exact path="/identificate" component={Identificate} />
+                    {/* Ruta eliminada: /identificate */}
                     {/* Rutas con Tabs (ahora desprotegidas) */}
                     <Route path="/tabs" render={() => <TabsLayout />} />
                 </IonRouterOutlet>
@@ -95,8 +94,8 @@ const TabsLayout: React.FC = () => (
             <Route exact path="/tabs/registro/pistola" component={ScannerGun} />
             <Route exact path="/tabs/registro/camera" component={ScannerCamera} />
             <Route exact path="/tabs/registro/ia" component={IAImagen} />
-            {/* Ruta interna sin Tabs */}
-            <Route exact path="/product/:id" component={EditorProducto} />
+            {/* Ruta interna con Tabs para detalle de producto */}
+            <Route exact path="/tabs/product/:id" component={EditorProducto} />
         </IonRouterOutlet>
         <IonTabBar slot="bottom">
             <IonTabButton tab="home" href="/tabs/home">
