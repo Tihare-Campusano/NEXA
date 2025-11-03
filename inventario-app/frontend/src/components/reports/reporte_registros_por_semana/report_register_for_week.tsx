@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   IonHeader,
   IonToolbar,
@@ -7,7 +7,6 @@ import {
   IonButtons,
   IonButton,
   IonText,
-  IonLoading,
 } from "@ionic/react";
 import { supabase } from "../../../supabaseClient";
 
@@ -16,6 +15,8 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Capacitor } from "@capacitor/core";
+import { FileOpener } from "@capacitor-community/file-opener";
+import { Toast } from "@capacitor/toast";
 import "./report_register_for_week.css";
 
 interface ReportRegisterForWeekProps {
@@ -25,9 +26,13 @@ interface ReportRegisterForWeekProps {
 const ReportRegisterForWeek: React.FC<ReportRegisterForWeekProps> = ({
   onDidDismiss,
 }) => {
-  const [isLoading, setIsLoading] = useState(false);
 
-  // 🔹 Función para solicitar permisos de almacenamiento en Android
+  // 🔹 Mostrar toast
+  const mostrarNotificacion = async (mensaje: string) => {
+    await Toast.show({ text: mensaje, duration: "long" });
+  };
+
+  // 🔹 Solicitar permiso de almacenamiento
   const solicitarPermisoDescarga = async (): Promise<boolean> => {
     if (Capacitor.getPlatform() === "android") {
       try {
@@ -35,7 +40,7 @@ const ReportRegisterForWeek: React.FC<ReportRegisterForWeekProps> = ({
         if (check.publicStorage !== "granted") {
           const request = await Filesystem.requestPermissions();
           if (request.publicStorage !== "granted") {
-            alert(
+            mostrarNotificacion(
               "Por favor, concede permiso de almacenamiento para descargar archivos."
             );
             return false;
@@ -43,7 +48,7 @@ const ReportRegisterForWeek: React.FC<ReportRegisterForWeekProps> = ({
         }
       } catch (err) {
         console.error("Error al verificar permisos de almacenamiento:", err);
-        alert("No se pudo obtener el permiso de almacenamiento.");
+        mostrarNotificacion("No se pudo obtener el permiso de almacenamiento.");
         return false;
       }
     }
@@ -61,9 +66,6 @@ const ReportRegisterForWeek: React.FC<ReportRegisterForWeekProps> = ({
     finSemana.setDate(inicioSemana.getDate() + 6);
     finSemana.setHours(23, 59, 59, 999);
 
-    const inicioISO = inicioSemana.toISOString();
-    const finISO = finSemana.toISOString();
-
     const semana = `Semana del ${inicioSemana.toLocaleDateString(
       "es-ES"
     )} al ${finSemana.toLocaleDateString("es-ES")}`;
@@ -71,8 +73,8 @@ const ReportRegisterForWeek: React.FC<ReportRegisterForWeekProps> = ({
     const { data, error } = await supabase
       .from("productos")
       .select("id, sku, nombre, marca, modelo, created_at")
-      .gte("created_at", inicioISO)
-      .lte("created_at", finISO);
+      .gte("created_at", inicioSemana.toISOString())
+      .lte("created_at", finSemana.toISOString());
 
     if (error) {
       console.error("❌ Error al obtener productos:", error.message);
@@ -90,19 +92,38 @@ const ReportRegisterForWeek: React.FC<ReportRegisterForWeekProps> = ({
     return { productos, semana };
   };
 
-  // 🔹 Guardar archivo en Descargas
-  const guardarEnDispositivo = async (fileName: string, base64Data: string) => {
+  // 🔹 Guardar archivo y abrirlo
+  const guardarEnDispositivo = async (
+    fileName: string,
+    base64Data: string,
+    mimeType: string
+  ) => {
     try {
-      await Filesystem.writeFile({
+      const savedFile = await Filesystem.writeFile({
         path: fileName,
         data: base64Data,
-        directory: Directory.External, // Carpeta pública
-        encoding: undefined,
+        directory: Directory.Documents,
+        recursive: true,
       });
-      alert(`Archivo guardado en Descargas como: ${fileName}`);
+
+      const fileUri = savedFile.uri;
+
+      try {
+        await FileOpener.open({
+          filePath: fileUri,
+          contentType: mimeType,
+        });
+      } catch (e) {
+        console.error("Error al abrir archivo automáticamente:", e);
+        mostrarNotificacion(
+          "Archivo guardado. Búscalo en la carpeta Documentos de tu dispositivo."
+        );
+      }
     } catch (e) {
       console.error("Error al guardar archivo", e);
-      alert("Error al guardar archivo. ¿Otorgaste permisos a la app?");
+      mostrarNotificacion(
+        "Error al guardar archivo. ¿Otorgaste permisos a la app?"
+      );
     }
   };
 
@@ -111,7 +132,8 @@ const ReportRegisterForWeek: React.FC<ReportRegisterForWeekProps> = ({
     const permitido = await solicitarPermisoDescarga();
     if (!permitido) return;
 
-    setIsLoading(true);
+    mostrarNotificacion("Generando PDF, la descarga se iniciará en breve...");
+
     try {
       const { productos, semana } = await getReportData();
       const doc = new jsPDF();
@@ -140,14 +162,17 @@ const ReportRegisterForWeek: React.FC<ReportRegisterForWeekProps> = ({
       const timestamp = new Date().getTime();
       await guardarEnDispositivo(
         `reporte_registros_semana_${timestamp}.pdf`,
-        base64Data
+        base64Data,
+        "application/pdf"
+      );
+
+      mostrarNotificacion(
+        "PDF descargado correctamente. Revisa el panel de notificaciones o la carpeta Documentos."
       );
     } catch (error) {
       console.error("Error PDF:", error);
-      alert("No se pudo generar el PDF.");
+      mostrarNotificacion("No se pudo generar el PDF.");
     }
-    setIsLoading(false);
-    onDidDismiss();
   };
 
   // 🔹 Exportar Excel
@@ -155,7 +180,8 @@ const ReportRegisterForWeek: React.FC<ReportRegisterForWeekProps> = ({
     const permitido = await solicitarPermisoDescarga();
     if (!permitido) return;
 
-    setIsLoading(true);
+    mostrarNotificacion("Generando Excel, la descarga se iniciará en breve...");
+
     try {
       const { productos, semana } = await getReportData();
       const ws = XLSX.utils.json_to_sheet(productos);
@@ -166,14 +192,17 @@ const ReportRegisterForWeek: React.FC<ReportRegisterForWeekProps> = ({
       const timestamp = new Date().getTime();
       await guardarEnDispositivo(
         `reporte_registros_semana_${timestamp}.xlsx`,
-        base64Data
+        base64Data,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+
+      mostrarNotificacion(
+        "Excel descargado correctamente. Revisa el panel de notificaciones o la carpeta Documentos."
       );
     } catch (error) {
       console.error("Error Excel:", error);
-      alert("No se pudo generar el Excel.");
+      mostrarNotificacion("No se pudo generar el Excel.");
     }
-    setIsLoading(false);
-    onDidDismiss();
   };
 
   return (
@@ -188,7 +217,6 @@ const ReportRegisterForWeek: React.FC<ReportRegisterForWeekProps> = ({
       </IonHeader>
 
       <IonContent className="ion-padding">
-        <IonLoading isOpen={isLoading} message={"Generando reporte..."} />
         <IonText>
           <h3
             style={{
@@ -200,14 +228,15 @@ const ReportRegisterForWeek: React.FC<ReportRegisterForWeekProps> = ({
             ¿Deseas descargar en formato PDF o Excel?
           </h3>
         </IonText>
-        <div className="modal-buttons-container">
+        <div className="modal-buttons-container" style={{ padding: "20px" }}>
           <IonButton
             className="modal-button"
             color="danger"
             expand="block"
             onClick={exportarPDF}
+            style={{ marginBottom: "10px" }}
           >
-            PDF
+            Descargar PDF
           </IonButton>
           <IonButton
             className="modal-button"
@@ -215,7 +244,7 @@ const ReportRegisterForWeek: React.FC<ReportRegisterForWeekProps> = ({
             expand="block"
             onClick={exportarExcel}
           >
-            Excel
+            Descargar Excel
           </IonButton>
         </div>
       </IonContent>

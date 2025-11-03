@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   IonHeader,
   IonToolbar,
@@ -7,7 +7,6 @@ import {
   IonButtons,
   IonButton,
   IonText,
-  IonLoading,
 } from "@ionic/react";
 import { supabase } from "../../../supabaseClient";
 
@@ -16,6 +15,8 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Capacitor } from "@capacitor/core";
+import { FileOpener } from "@capacitor-community/file-opener";
+import { Toast } from "@capacitor/toast";
 import "./report_used_product.css";
 
 interface Producto {
@@ -31,9 +32,13 @@ interface ReportUsedProductProps {
 }
 
 const ReportUsedProduct: React.FC<ReportUsedProductProps> = ({ onDidDismiss }) => {
-  const [isLoading, setIsLoading] = useState(false);
 
-  // 🔹 Función para solicitar permiso de almacenamiento en Android
+  // 🔹 Mostrar toast de notificación
+  const mostrarNotificacion = async (mensaje: string) => {
+    await Toast.show({ text: mensaje, duration: "long" });
+  };
+
+  // 🔹 Solicitar permiso de almacenamiento
   const solicitarPermisoDescarga = async (): Promise<boolean> => {
     if (Capacitor.getPlatform() === "android") {
       try {
@@ -41,7 +46,7 @@ const ReportUsedProduct: React.FC<ReportUsedProductProps> = ({ onDidDismiss }) =
         if (check.publicStorage !== "granted") {
           const request = await Filesystem.requestPermissions();
           if (request.publicStorage !== "granted") {
-            alert(
+            mostrarNotificacion(
               "Por favor, concede permiso de almacenamiento para descargar archivos."
             );
             return false;
@@ -49,14 +54,14 @@ const ReportUsedProduct: React.FC<ReportUsedProductProps> = ({ onDidDismiss }) =
         }
       } catch (err) {
         console.error("Error al verificar permisos de almacenamiento:", err);
-        alert("No se pudo obtener el permiso de almacenamiento.");
+        mostrarNotificacion("No se pudo obtener el permiso de almacenamiento.");
         return false;
       }
     }
     return true;
   };
 
-  // 🔹 Obtener productos filtrados por "Usado"
+  // 🔹 Obtener productos en estado "Usado"
   const fetchProductos = async (): Promise<Producto[]> => {
     const { data, error } = await supabase
       .from("productos")
@@ -77,19 +82,38 @@ const ReportUsedProduct: React.FC<ReportUsedProductProps> = ({ onDidDismiss }) =
     }));
   };
 
-  // 🔹 Guardar archivo en Descargas (público)
-  const guardarEnDispositivo = async (fileName: string, base64Data: string) => {
+  // 🔹 Guardar archivo y abrirlo
+  const guardarEnDispositivo = async (
+    fileName: string,
+    base64Data: string,
+    mimeType: string
+  ) => {
     try {
-      await Filesystem.writeFile({
+      const savedFile = await Filesystem.writeFile({
         path: fileName,
         data: base64Data,
-        directory: Directory.External, // Descargas
-        encoding: undefined, // quita Encoding.BASE64
+        directory: Directory.Documents,
+        recursive: true,
       });
-      alert(`Archivo guardado en Descargas como: ${fileName}`);
+
+      const fileUri = savedFile.uri;
+
+      try {
+        await FileOpener.open({
+          filePath: fileUri,
+          contentType: mimeType,
+        });
+      } catch (e) {
+        console.error("Error al abrir archivo automáticamente:", e);
+        mostrarNotificacion(
+          "Archivo guardado. Búscalo en la carpeta Documentos de tu dispositivo."
+        );
+      }
     } catch (e) {
       console.error("Error al guardar archivo", e);
-      alert("Error al guardar archivo. ¿Otorgaste permisos a la app?");
+      mostrarNotificacion(
+        "Error al guardar archivo. ¿Otorgaste permisos a la app?"
+      );
     }
   };
 
@@ -98,7 +122,8 @@ const ReportUsedProduct: React.FC<ReportUsedProductProps> = ({ onDidDismiss }) =
     const permitido = await solicitarPermisoDescarga();
     if (!permitido) return;
 
-    setIsLoading(true);
+    mostrarNotificacion("Generando PDF, la descarga se iniciará en breve...");
+
     try {
       const productos = await fetchProductos();
       const doc = new jsPDF();
@@ -125,16 +150,20 @@ const ReportUsedProduct: React.FC<ReportUsedProductProps> = ({ onDidDismiss }) =
 
       const base64Data = doc.output("datauristring").split(",")[1];
       const timestamp = new Date().getTime();
+
       await guardarEnDispositivo(
         `reporte_productos_usados_${timestamp}.pdf`,
-        base64Data
+        base64Data,
+        "application/pdf"
+      );
+
+      mostrarNotificacion(
+        "PDF descargado correctamente. Revisa el panel de notificaciones o la carpeta Documentos."
       );
     } catch (error) {
       console.error("Error PDF:", error);
-      alert("No se pudo generar el PDF.");
+      mostrarNotificacion("No se pudo generar el PDF.");
     }
-    setIsLoading(false);
-    onDidDismiss();
   };
 
   // 🔹 Exportar Excel
@@ -142,25 +171,38 @@ const ReportUsedProduct: React.FC<ReportUsedProductProps> = ({ onDidDismiss }) =
     const permitido = await solicitarPermisoDescarga();
     if (!permitido) return;
 
-    setIsLoading(true);
+    mostrarNotificacion("Generando Excel, la descarga se iniciará en breve...");
+
     try {
       const productos = await fetchProductos();
-      const ws = XLSX.utils.json_to_sheet(productos);
+      const datosExcel = productos.map((p) => ({
+        Código: p.codigo,
+        Nombre: p.nombre,
+        Cantidad: p.cantidad,
+        Estado: p.estado,
+        Categoría: p.categoria,
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(datosExcel);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Productos Usados");
 
       const base64Data = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
       const timestamp = new Date().getTime();
+
       await guardarEnDispositivo(
         `reporte_productos_usados_${timestamp}.xlsx`,
-        base64Data
+        base64Data,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+
+      mostrarNotificacion(
+        "Excel descargado correctamente. Revisa el panel de notificaciones o la carpeta Documentos."
       );
     } catch (error) {
       console.error("Error Excel:", error);
-      alert("No se pudo generar el Excel.");
+      mostrarNotificacion("No se pudo generar el Excel.");
     }
-    setIsLoading(false);
-    onDidDismiss();
   };
 
   return (
@@ -175,26 +217,20 @@ const ReportUsedProduct: React.FC<ReportUsedProductProps> = ({ onDidDismiss }) =
       </IonHeader>
 
       <IonContent className="ion-padding">
-        <IonLoading isOpen={isLoading} message={"Generando reporte..."} />
         <IonText>
-          <h3
-            style={{
-              textAlign: "center",
-              fontWeight: "bold",
-              marginTop: "1rem",
-            }}
-          >
+          <h3 style={{ textAlign: "center", fontWeight: "bold", marginTop: "1rem" }}>
             ¿Deseas descargar en formato PDF o Excel?
           </h3>
         </IonText>
-        <div className="modal-buttons-container">
+        <div className="modal-buttons-container" style={{ padding: "20px" }}>
           <IonButton
             className="modal-button"
             color="danger"
             expand="block"
             onClick={exportarPDF}
+            style={{ marginBottom: "10px" }}
           >
-            PDF
+            Descargar PDF
           </IonButton>
           <IonButton
             className="modal-button"
@@ -202,7 +238,7 @@ const ReportUsedProduct: React.FC<ReportUsedProductProps> = ({ onDidDismiss }) =
             expand="block"
             onClick={exportarExcel}
           >
-            Excel
+            Descargar Excel
           </IonButton>
         </div>
       </IonContent>

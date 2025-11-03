@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   IonHeader,
   IonToolbar,
@@ -7,7 +7,6 @@ import {
   IonButtons,
   IonButton,
   IonText,
-  IonLoading,
 } from "@ionic/react";
 import { supabase } from "../../../supabaseClient";
 
@@ -16,6 +15,8 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Capacitor } from "@capacitor/core";
+import { FileOpener } from "@capacitor-community/file-opener";
+import { Toast } from "@capacitor/toast";
 import "./report_stock_month.css";
 
 interface ReportStockMonthProps {
@@ -23,9 +24,13 @@ interface ReportStockMonthProps {
 }
 
 const ReportStockMonth: React.FC<ReportStockMonthProps> = ({ onDidDismiss }) => {
-  const [isLoading, setIsLoading] = useState(false);
 
-  // 🔹 Función para solicitar permisos en Android
+  // 🔹 Mostrar toast
+  const mostrarNotificacion = async (mensaje: string) => {
+    await Toast.show({ text: mensaje, duration: "long" });
+  };
+
+  // 🔹 Solicitar permiso de almacenamiento
   const solicitarPermisoDescarga = async (): Promise<boolean> => {
     if (Capacitor.getPlatform() === "android") {
       try {
@@ -33,7 +38,7 @@ const ReportStockMonth: React.FC<ReportStockMonthProps> = ({ onDidDismiss }) => 
         if (check.publicStorage !== "granted") {
           const request = await Filesystem.requestPermissions();
           if (request.publicStorage !== "granted") {
-            alert(
+            mostrarNotificacion(
               "Por favor, concede permiso de almacenamiento para descargar archivos."
             );
             return false;
@@ -41,20 +46,17 @@ const ReportStockMonth: React.FC<ReportStockMonthProps> = ({ onDidDismiss }) => 
         }
       } catch (err) {
         console.error("Error al verificar permisos de almacenamiento:", err);
-        alert("No se pudo obtener el permiso de almacenamiento.");
+        mostrarNotificacion("No se pudo obtener el permiso de almacenamiento.");
         return false;
       }
     }
     return true;
   };
 
-  // 🔹 Obtener datos de productos y ordenarlos por stock ascendente
+  // 🔹 Obtener datos y ordenarlos por stock ascendente
   const getReportData = async () => {
     const date = new Date();
-    const nombreMes = date.toLocaleString("es-ES", {
-      month: "long",
-      year: "numeric",
-    });
+    const nombreMes = date.toLocaleString("es-ES", { month: "long", year: "numeric" });
     const mes = nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1);
 
     const { data, error } = await supabase
@@ -66,31 +68,42 @@ const ReportStockMonth: React.FC<ReportStockMonthProps> = ({ onDidDismiss }) => 
       throw error;
     }
 
-    const mapped = (data ?? []).map((p: any) => ({
+    const productos = (data ?? []).map((p: any) => ({
       codigo: p.sku,
       nombre: p.nombre,
       cantidad: p.stock[0]?.cantidad ?? 0,
-      estado: p.estado || "desconocido",
-      categoria: p.marca || "general",
-    }));
+      estado: p.estado || "Desconocido",
+      categoria: p.marca || "General",
+    })).sort((a, b) => a.cantidad - b.cantidad);
 
-    const ordenados = mapped.sort((a, b) => a.cantidad - b.cantidad);
-
-    return { productos: ordenados, mes };
+    return { productos, mes };
   };
 
-  // 🔹 Guardar archivo en Descargas
-  const guardarEnDispositivo = async (fileName: string, base64Data: string) => {
+  // 🔹 Guardar archivo y abrir
+  const guardarEnDispositivo = async (fileName: string, base64Data: string, mimeType: string) => {
     try {
-      await Filesystem.writeFile({
+      const savedFile = await Filesystem.writeFile({
         path: fileName,
         data: base64Data,
-        directory: Directory.External, // Carpeta pública Descargas
+        directory: Directory.Documents,
+        recursive: true,
       });
-      alert(`Archivo guardado en Descargas como: ${fileName}`);
+
+      const fileUri = savedFile.uri;
+
+      try {
+        await FileOpener.open({ filePath: fileUri, contentType: mimeType });
+      } catch (e) {
+        console.error("Error al abrir archivo automáticamente:", e);
+        mostrarNotificacion(
+          "Archivo guardado. Búscalo en la carpeta Documentos de tu dispositivo."
+        );
+      }
     } catch (e) {
       console.error("Error al guardar archivo", e);
-      alert("Error al guardar archivo. ¿Otorgaste permisos a la app?");
+      mostrarNotificacion(
+        "Error al guardar archivo. ¿Otorgaste permisos a la app?"
+      );
     }
   };
 
@@ -99,7 +112,8 @@ const ReportStockMonth: React.FC<ReportStockMonthProps> = ({ onDidDismiss }) => 
     const permitido = await solicitarPermisoDescarga();
     if (!permitido) return;
 
-    setIsLoading(true);
+    mostrarNotificacion("Generando PDF...");
+
     try {
       const { productos, mes } = await getReportData();
       const doc = new jsPDF();
@@ -108,13 +122,7 @@ const ReportStockMonth: React.FC<ReportStockMonthProps> = ({ onDidDismiss }) => 
       autoTable(doc, {
         startY: 20,
         head: [["Código", "Nombre", "Cantidad", "Estado", "Categoría"]],
-        body: productos.map((p) => [
-          p.codigo,
-          p.nombre,
-          p.cantidad,
-          p.estado,
-          p.categoria,
-        ]),
+        body: productos.map((p) => [p.codigo, p.nombre, p.cantidad, p.estado, p.categoria]),
       });
 
       const finalY = (doc as any).lastAutoTable?.finalY || 30;
@@ -126,13 +134,13 @@ const ReportStockMonth: React.FC<ReportStockMonthProps> = ({ onDidDismiss }) => 
 
       const base64Data = doc.output("datauristring").split(",")[1];
       const timestamp = new Date().getTime();
-      await guardarEnDispositivo(`reporte_stock_${mes}_${timestamp}.pdf`, base64Data);
+      await guardarEnDispositivo(`reporte_stock_${mes}_${timestamp}.pdf`, base64Data, "application/pdf");
+
+      mostrarNotificacion("PDF descargado correctamente.");
     } catch (error) {
       console.error("Error PDF:", error);
-      alert("No se pudo generar el PDF.");
+      mostrarNotificacion("No se pudo generar el PDF.");
     }
-    setIsLoading(false);
-    onDidDismiss();
   };
 
   // 🔹 Exportar Excel
@@ -140,7 +148,8 @@ const ReportStockMonth: React.FC<ReportStockMonthProps> = ({ onDidDismiss }) => 
     const permitido = await solicitarPermisoDescarga();
     if (!permitido) return;
 
-    setIsLoading(true);
+    mostrarNotificacion("Generando Excel...");
+
     try {
       const { productos, mes } = await getReportData();
       const ws = XLSX.utils.json_to_sheet(productos);
@@ -149,13 +158,17 @@ const ReportStockMonth: React.FC<ReportStockMonthProps> = ({ onDidDismiss }) => 
 
       const base64Data = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
       const timestamp = new Date().getTime();
-      await guardarEnDispositivo(`reporte_stock_${mes}_${timestamp}.xlsx`, base64Data);
+      await guardarEnDispositivo(
+        `reporte_stock_${mes}_${timestamp}.xlsx`,
+        base64Data,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+
+      mostrarNotificacion("Excel descargado correctamente.");
     } catch (error) {
       console.error("Error Excel:", error);
-      alert("No se pudo generar el Excel.");
+      mostrarNotificacion("No se pudo generar el Excel.");
     }
-    setIsLoading(false);
-    onDidDismiss();
   };
 
   return (
@@ -170,26 +183,20 @@ const ReportStockMonth: React.FC<ReportStockMonthProps> = ({ onDidDismiss }) => 
       </IonHeader>
 
       <IonContent className="ion-padding">
-        <IonLoading isOpen={isLoading} message={"Generando reporte..."} />
         <IonText>
-          <h3
-            style={{
-              textAlign: "center",
-              fontWeight: "bold",
-              marginTop: "1rem",
-            }}
-          >
+          <h3 style={{ textAlign: "center", fontWeight: "bold", marginTop: "1rem" }}>
             ¿Deseas descargar en formato PDF o Excel?
           </h3>
         </IonText>
-        <div className="modal-buttons-container">
+        <div className="modal-buttons-container" style={{ padding: "20px" }}>
           <IonButton
             className="modal-button"
             color="danger"
             expand="block"
             onClick={exportarPDF}
+            style={{ marginBottom: "10px" }}
           >
-            PDF
+            Descargar PDF
           </IonButton>
           <IonButton
             className="modal-button"
@@ -197,7 +204,7 @@ const ReportStockMonth: React.FC<ReportStockMonthProps> = ({ onDidDismiss }) => 
             expand="block"
             onClick={exportarExcel}
           >
-            Excel
+            Descargar Excel
           </IonButton>
         </div>
       </IonContent>

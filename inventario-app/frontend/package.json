@@ -14,6 +14,7 @@
     "test": "react-scripts test"
   },
   "dependencies": {
+    "@capacitor-community/file-opener": "^7.0.1",
     "@capacitor-mlkit/barcode-scanning": "^7.3.0",
     "@capacitor/android": "^7.4.4",
     "@capacitor/app": "7.0.2",
@@ -24,6 +25,7 @@
     "@capacitor/haptics": "7.0.2",
     "@capacitor/keyboard": "7.0.2",
     "@capacitor/status-bar": "7.0.2",
+    "@capacitor/toast": "^7.0.2",
     "@ionic/react": "^8.7.8",
     "@ionic/react-router": "^8.5.0",
     "@ionic/storage": "^4.0.0",
