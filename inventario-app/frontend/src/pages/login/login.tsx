@@ -60,7 +60,7 @@ const Login: React.FC = () => {
         return;
       }
       await ensureProfile(data.user.id);
-      history.replace('/home');
+      history.replace('/tabs/home');
     } catch (err: any) {
       toast(err?.message ?? 'Error al iniciar sesión');
     } finally {
