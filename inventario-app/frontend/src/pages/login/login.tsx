@@ -10,6 +10,7 @@ import { useHistory } from 'react-router-dom';
 import { logoGoogle } from 'ionicons/icons';
 import { Camera } from '@capacitor/camera';
 import { Filesystem } from '@capacitor/filesystem';
+import { Geolocation } from '@capacitor/geolocation';
 import { Capacitor } from '@capacitor/core';
 
 import LoginForm from '../../components/login/login-form';
@@ -21,18 +22,27 @@ const Login: React.FC = () => {
     const [isLoading, setIsLoading] = useState(false);
     const history = useHistory();
 
-    // --- FUNCION PARA PEDIR PERMISOS ---
+    // --- Solicitar permisos esenciales ---
     const requestPermissions = async (): Promise<boolean> => {
         try {
-            // Pedir permiso de cámara
-            await Camera.requestPermissions();
-            
-            // Pedir permiso de archivos solo en Android
+            // Permiso de cámara
+            const camPerm = await Camera.requestPermissions();
+            if (camPerm.camera !== 'granted') return false;
+
+            // Permiso de almacenamiento solo en Android
             if (Capacitor.getPlatform() === 'android') {
-                await Filesystem.requestPermissions();
+                // La función requestPermissions() ya no acepta argumentos directamente.
+                // El modo de almacenamiento se configura en AndroidManifest.xml.
+                const fsPerm = await Filesystem.requestPermissions();
+
+                // Asumiendo que 'fsPerm' todavía devuelve un objeto con 'publicStorage'
+                if (!fsPerm.publicStorage) return false;
             }
 
-            // Aquí podrías agregar más permisos si tu app los necesita
+            // Permiso de ubicación
+            const geoPerm = await Geolocation.requestPermissions();
+            if (geoPerm.location !== 'granted') return false;
+
             return true;
         } catch (error) {
             console.error('❌ Error solicitando permisos:', error);
@@ -40,23 +50,22 @@ const Login: React.FC = () => {
         }
     };
 
-    // Función que simula login exitoso
+    // Login exitoso
     const handleLoginSuccess = async () => {
         setIsLoading(true);
 
-        // Pedir permisos antes de continuar
         const granted = await requestPermissions();
         if (!granted) {
-            alert('Debes conceder todos los permisos para continuar');
+            alert('Debes conceder cámara, almacenamiento y ubicación para continuar');
             setIsLoading(false);
             return;
         }
 
-        // Simular delay
+        // Simular un pequeño delay para mostrar el loading
         await new Promise((res) => setTimeout(res, 1000));
 
         setIsLoading(false);
-        history.push('/tabs/home'); // Redirigir a Home
+        history.push('/tabs/home');
     };
 
     // Login con email
