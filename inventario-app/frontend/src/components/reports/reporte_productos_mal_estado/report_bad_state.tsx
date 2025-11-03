@@ -25,6 +25,7 @@ interface Producto {
   cantidad: number;
   estado: string;
   categoria: string;
+  codigo_barras: string;
 }
 
 interface ReportBadStateProps {
@@ -32,27 +33,23 @@ interface ReportBadStateProps {
 }
 
 const ReportBadState: React.FC<ReportBadStateProps> = ({ onDidDismiss }) => {
-  // 🔹 Mostrar toast de notificación
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
+
+  // 🔹 Mostrar toast
   const mostrarNotificacion = async (mensaje: string) => {
-    await Toast.show({
-      text: mensaje,
-      duration: "long",
-    });
+    await Toast.show({ text: mensaje, duration: "long" });
   };
 
-  // 🔹 Función para solicitar permiso
+  // 🔹 Solicitar permisos de almacenamiento
   const solicitarPermisoDescarga = async (): Promise<boolean> => {
     if (Capacitor.getPlatform() === "android") {
       try {
-        const check = await Filesystem.checkPermissions();
-        if (check.publicStorage !== "granted") {
-          const request = await Filesystem.requestPermissions();
-          if (request.publicStorage !== "granted") {
-            mostrarNotificacion(
-              "Por favor, concede permiso de almacenamiento para descargar archivos."
-            );
-            return false;
-          }
+        const request = await Filesystem.requestPermissions();
+        if (request.publicStorage !== "granted") {
+          mostrarNotificacion(
+            "Por favor, concede permiso de almacenamiento para descargar archivos."
+          );
+          return false;
         }
       } catch (err) {
         console.error("Error al verificar permisos de almacenamiento:", err);
@@ -63,28 +60,42 @@ const ReportBadState: React.FC<ReportBadStateProps> = ({ onDidDismiss }) => {
     return true;
   };
 
-  // 🔹 Obtener productos en "Mal estado"
+  // 🔹 Traer productos en "Mal estado" desde Supabase
   const fetchProductos = async (): Promise<Producto[]> => {
+    console.log("📡 Consultando productos en mal estado...");
+
     const { data, error } = await supabase
       .from("productos")
-      .select("sku, nombre, estado, marca, stock!inner(cantidad)")
+      .select(`
+        id,
+        nombre,
+        estado,
+        marca,
+        codigo_barras,
+        stock(cantidad)
+      `)
       .eq("estado", "Mal estado");
 
     if (error) {
-      console.error("Error al obtener productos:", error.message);
+      console.error("❌ Error al obtener productos:", error.message);
       throw error;
     }
 
-    return (data ?? []).map((p: any) => ({
-      codigo: p.sku,
-      nombre: p.nombre,
-      cantidad: p.stock[0]?.cantidad ?? 0,
-      estado: p.estado || "Desconocido",
-      categoria: p.marca || "General",
+    const productosMapeados = (data ?? []).map((p: any) => ({
+      codigo: p.id ?? "",
+      nombre: p.nombre ?? "",
+      cantidad: p.stock?.[0]?.cantidad ?? 0,
+      estado: p.estado ?? "Desconocido",
+      categoria: p.marca ?? "General",
+      codigo_barras: p.codigo_barras ?? "Sin código",
     }));
+
+    console.log("✅ Productos mapeados:", productosMapeados);
+
+    return productosMapeados;
   };
 
-  // 🔹 Guardar archivo y abrirlo
+  // 🔹 Guardar archivo en dispositivo
   const guardarEnDispositivo = async (
     fileName: string,
     base64Data: string,
@@ -101,18 +112,15 @@ const ReportBadState: React.FC<ReportBadStateProps> = ({ onDidDismiss }) => {
       const fileUri = savedFile.uri;
 
       try {
-        await FileOpener.open({
-          filePath: fileUri,
-          contentType: mimeType,
-        });
+        await FileOpener.open({ filePath: fileUri, contentType: mimeType });
       } catch (e) {
-        console.error("Error al abrir archivo automáticamente:", e);
+        console.error("⚠️ Error al abrir archivo automáticamente:", e);
         mostrarNotificacion(
           "Archivo guardado. Búscalo en la carpeta Documentos de tu dispositivo."
         );
       }
     } catch (e) {
-      console.error("Error al guardar archivo", e);
+      console.error("❌ Error al guardar archivo", e);
       mostrarNotificacion(
         "Error al guardar archivo. ¿Otorgaste permisos a la app?"
       );
@@ -133,22 +141,16 @@ const ReportBadState: React.FC<ReportBadStateProps> = ({ onDidDismiss }) => {
 
       autoTable(doc, {
         startY: 20,
-        head: [["Código", "Nombre", "Cantidad", "Estado", "Categoría"]],
+        head: [["Código", "Nombre", "Cantidad", "Estado", "Categoría", "Código de Barras"]],
         body: productos.map((p) => [
           p.codigo,
           p.nombre,
-          p.cantidad,
+          p.cantidad.toString(),
           p.estado,
           p.categoria,
+          p.codigo_barras,
         ]),
       });
-
-      const finalY = (doc as any).lastAutoTable?.finalY || 30;
-      doc.text(
-        `Este reporte muestra los productos en "Mal estado". Se recomienda desecharlos ya que no están en buen uso.`,
-        14,
-        finalY + 10
-      );
 
       const base64Data = doc.output("datauristring").split(",")[1];
       const timestamp = new Date().getTime();
@@ -159,11 +161,9 @@ const ReportBadState: React.FC<ReportBadStateProps> = ({ onDidDismiss }) => {
         "application/pdf"
       );
 
-      mostrarNotificacion(
-        "PDF descargado correctamente. Revisa el panel de notificaciones o la carpeta Documentos."
-      );
+      mostrarNotificacion("PDF descargado correctamente. Revisa la carpeta Documentos.");
     } catch (error) {
-      console.error("Error PDF:", error);
+      console.error("❌ Error generando PDF:", error);
       mostrarNotificacion("No se pudo generar el PDF.");
     }
   };
@@ -177,43 +177,55 @@ const ReportBadState: React.FC<ReportBadStateProps> = ({ onDidDismiss }) => {
 
     try {
       const productos = await fetchProductos();
+
       const datosExcel = productos.map((p) => ({
         Código: p.codigo,
         Nombre: p.nombre,
-        Cantidad: p.cantidad,
+        Cantidad: Number(p.cantidad),
         Estado: p.estado,
         Categoría: p.categoria,
+        "Código de Barras": p.codigo_barras,
       }));
 
       const ws = XLSX.utils.json_to_sheet(datosExcel);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Productos Mal Estado");
 
-      const base64Data = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
-      const timestamp = new Date().getTime();
+      const base64Data = XLSX.write(wb, {
+        bookType: "xlsx",
+        type: "base64",
+      });
 
+      const timestamp = new Date().getTime();
       await guardarEnDispositivo(
         `reporte_productos_mal_estado_${timestamp}.xlsx`,
         base64Data,
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
 
-      mostrarNotificacion(
-        "Excel descargado correctamente. Revisa el panel de notificaciones o la carpeta Documentos."
-      );
+      mostrarNotificacion("Excel descargado correctamente. Revisa la carpeta Documentos.");
     } catch (error) {
-      console.error("Error Excel:", error);
+      console.error("❌ Error generando Excel:", error);
       mostrarNotificacion("No se pudo generar el Excel.");
     }
   };
 
   return (
     <>
+      {alertMessage && (
+        <div className="alert-popup">
+          <p>{alertMessage}</p>
+          <IonButton onClick={() => setAlertMessage(null)} expand="block">
+            Aceptar
+          </IonButton>
+        </div>
+      )}
+
       <IonHeader>
         <IonToolbar>
           <IonTitle>Productos en Mal Estado</IonTitle>
           <IonButtons slot="end">
-            <IonButton onClick={onDidDismiss}>Cancelar</IonButton>
+            <IonButton onClick={onDidDismiss}>Cerrar</IonButton>
           </IonButtons>
         </IonToolbar>
       </IonHeader>
@@ -223,7 +235,11 @@ const ReportBadState: React.FC<ReportBadStateProps> = ({ onDidDismiss }) => {
           <h3 style={{ textAlign: "center", fontWeight: "bold", marginTop: "1rem" }}>
             ¿Deseas descargar en formato PDF o Excel?
           </h3>
+          <p style={{ textAlign: "center", color: "#666", fontSize: "0.9rem" }}>
+            Este reporte incluye todos los productos en <b>Mal estado</b>, con su código de barras.
+          </p>
         </IonText>
+
         <div className="modal-buttons-container" style={{ padding: "20px" }}>
           <IonButton
             className="modal-button"
@@ -234,6 +250,7 @@ const ReportBadState: React.FC<ReportBadStateProps> = ({ onDidDismiss }) => {
           >
             Descargar PDF
           </IonButton>
+
           <IonButton
             className="modal-button"
             color="success"
