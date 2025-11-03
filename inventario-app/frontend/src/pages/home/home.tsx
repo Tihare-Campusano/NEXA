@@ -11,26 +11,6 @@ import { Capacitor } from "@capacitor/core"; // ✅ Solo esto
 export default function Home() {
   const [productosFiltrados, setProductosFiltrados] = useState<any[] | null>(null);
 
-  useEffect(() => {
-    const requestPermissions = async () => {
-      try {
-        // Permiso de cámara
-        await Camera.requestPermissions();
-
-        // Permiso de almacenamiento solo en Android
-        if (Capacitor.getPlatform() === "android") {
-          await Filesystem.requestPermissions();
-        }
-
-        console.log("✅ Permisos concedidos");
-      } catch (error) {
-        console.error("❌ Error solicitando permisos:", error);
-      }
-    };
-
-    requestPermissions();
-  }, []);
-
   return (
     <IonPage>
       <HeaderApp icon={<FaBoxes size={28} className="text-green-400" />} title="Gestor de inventarios" />
