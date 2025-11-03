@@ -4,12 +4,12 @@ import { IonInput, IonButton, IonItem, IonSpinner, IonIcon } from '@ionic/react'
 import { mailOutline, lockClosedOutline } from 'ionicons/icons';
 
 interface LoginFormProps {
-    email: string;
-    setEmail: (email: string) => void;
-    pass: string;
-    setPass: (pass: string) => void;
-    handleSubmit: (e: React.FormEvent) => void;
-    isLoading: boolean;
+  email: string;
+  setEmail: (email: string) => void;
+  pass: string;
+  setPass: (pass: string) => void;
+  handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void; 
+  isLoading: boolean;
 }
 
 const LoginForm: React.FC<LoginFormProps> = ({
