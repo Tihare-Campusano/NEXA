@@ -8,29 +8,56 @@ import {
 import { useHistory } from 'react-router-dom';
 import { logoGoogle } from 'ionicons/icons';
 import LoginForm from '../../components/login/login-form';
+import { Camera } from '@capacitor/camera';
+import { Filesystem } from '@capacitor/filesystem';
+import { Capacitor } from '@capacitor/core';
 
-// Importa el archivo CSS
 import './login.css';
 
 const Login: React.FC = () => {
     const [email, setEmail] = useState('');
     const [pass, setPass] = useState('');
-    const [isLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const history = useHistory();
 
-    // Login con email (Ahora redirige inmediatamente a /identificate)
-    const handleEmailLogin = (e: React.FormEvent) => {
-        e.preventDefault();
-        // Redirige al presionar Iniciar Sesión (simula un login exitoso)
-        history.push('/tabs/home');
-        // NOTA: Se ha eliminado la simulación de carga (setIsLoading) y la espera.
+    // 🔹 Función para solicitar permisos
+    const requestPermissions = async () => {
+        try {
+            // Permiso de cámara
+            await Camera.requestPermissions();
+
+            // Permiso de almacenamiento solo en Android
+            if (Capacitor.getPlatform() === 'android') {
+                await Filesystem.requestPermissions();
+            }
+
+            console.log('✅ Permisos concedidos');
+        } catch (error) {
+            console.error('❌ Error solicitando permisos:', error);
+        }
     };
 
-    // Login con google (Ahora redirige inmediatamente a /identificate)
-    const handleGoogleLogin = () => {
-        // Redirige al presionar Continuar con Google
+    // Login con email
+    const handleEmailLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsLoading(true);
+
+        // 🔹 Pedir permisos antes de redirigir
+        await requestPermissions();
+
+        setIsLoading(false);
         history.push('/tabs/home');
-        // NOTA: Se ha eliminado la simulación de carga (setIsLoading) y la espera.
+    };
+
+    // Login con Google
+    const handleGoogleLogin = async () => {
+        setIsLoading(true);
+
+        // 🔹 Pedir permisos antes de redirigir
+        await requestPermissions();
+
+        setIsLoading(false);
+        history.push('/tabs/home');
     };
     
     return (
@@ -51,7 +78,6 @@ const Login: React.FC = () => {
                         setEmail={setEmail}
                         pass={pass}
                         setPass={setPass}
-                        // Al hacer submit en el formulario, llama a handleEmailLogin que redirige.
                         handleSubmit={handleEmailLogin}
                         isLoading={isLoading}
                     />
@@ -61,7 +87,6 @@ const Login: React.FC = () => {
                     <IonButton
                         expand="block"
                         fill="outline"
-                        // Al hacer clic, llama a handleGoogleLogin que redirige.
                         onClick={handleGoogleLogin}
                         disabled={isLoading}
                         className="google-button"
@@ -69,7 +94,6 @@ const Login: React.FC = () => {
                         <IonIcon icon={logoGoogle} slot="start" />
                         Continuar con Google
                     </IonButton>
-                    {/* Botón de registro eliminado según tu solicitud */}
                 </div>
             </IonContent>
         </IonPage>
