@@ -21,7 +21,6 @@
     "@capacitor/haptics": "7.0.2",
     "@capacitor/keyboard": "7.0.2",
     "@capacitor/status-bar": "7.0.2",
-    "@codetrix-studio/capacitor-google-auth": "^3.4.0-rc.4",
     "@ionic/react": "^8.5.0",
     "@ionic/react-router": "^8.5.0",
     "@ionic/storage": "^4.0.0",
@@ -32,6 +31,7 @@
     "ionicons": "^7.4.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
+    "react-icons": "^5.5.0",
     "react-router": "^5.3.4",
     "react-router-dom": "^5.3.4"
   },

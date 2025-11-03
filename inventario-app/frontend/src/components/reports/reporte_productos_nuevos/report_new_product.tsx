@@ -40,7 +40,7 @@ const ReportNewProduct: React.FC<ReportNewProductProps> = ({ onDidDismiss }) => 
     // 👇 CORREGIDO: Usamos stock(cantidad) y filtramos por 'Nuevo'
     const { data, error } = await supabase
       .from("productos")
-      .select("sku, nombre, estado, marca, stock:stock(cantidad)") // 👈 CORREGIDO
+      .select("sku, nombre, estado, marca, stock!inner(cantidad)")
       .eq("estado", "Nuevo"); // 👈 Filtro específico de este reporte
 
     if (error) {
@@ -52,7 +52,7 @@ const ReportNewProduct: React.FC<ReportNewProductProps> = ({ onDidDismiss }) => 
       return data.map((p: any) => ({
         codigo: p.sku,
         nombre: p.nombre,
-        cantidad: p.stock?.cantidad || 0, // 👈 CORREGIDO
+        cantidad: p.stock[0]?.cantidad ?? 0,
         estado: p.estado || "Desconocido",
         categoria: p.marca || "General",
       }));

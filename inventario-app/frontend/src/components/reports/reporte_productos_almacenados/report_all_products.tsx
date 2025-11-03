@@ -40,7 +40,7 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
     // 👇 CORRECCIÓN 1: Se pide 'stock(cantidad)' en lugar de 'stock(stock_actual)'
     const { data, error } = await supabase
       .from("productos")
-      .select("sku, nombre, estado, marca, stock:stock(cantidad)"); // 👈 CORREGIDO
+      .select("sku, nombre, estado, marca, stock!inner(cantidad)");
 
     if (error) {
       console.error("Error al obtener productos:", error.message);
@@ -51,8 +51,8 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
       return data.map((p: any) => ({
         codigo: p.sku,
         nombre: p.nombre,
-        // 👇 CORRECCIÓN 2: Se usa 'p.stock.cantidad'
-        cantidad: p.stock?.cantidad || 0, // 👈 CORREGIDO
+        // 👇 CORRECCIÓN 2: Se usa 'p.stock[0].cantidad' porque la relación puede devolver un array
+        cantidad: p.stock[0]?.cantidad ?? 0,
         estado: p.estado || "Desconocido",
         categoria: p.marca || "General",
       }));

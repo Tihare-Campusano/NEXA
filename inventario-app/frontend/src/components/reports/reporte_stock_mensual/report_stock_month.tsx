@@ -41,7 +41,7 @@ const ReportStockMonth: React.FC<ReportStockMonthProps> = ({ onDidDismiss }) => 
     // 👇 CORREGIDO: 'estado' se saca de 'productos', no de 'stock'
     const { data, error } = await supabase
       .from("productos")
-      .select("sku, nombre, marca, estado, stock(cantidad)"); // 👈 CORREGIDO
+      .select("sku, nombre, marca, estado, stock!inner(cantidad)");
 
     if (error) {
       console.error("❌ Error al obtener productos:", error.message);
@@ -51,7 +51,7 @@ const ReportStockMonth: React.FC<ReportStockMonthProps> = ({ onDidDismiss }) => 
     const mapped = data.map((p: any) => ({
       codigo: p.sku,
       nombre: p.nombre,
-      cantidad: p.stock?.cantidad || 0,
+      cantidad: p.stock[0]?.cantidad ?? 0,
       estado: p.estado || "desconocido", // 👈 CORREGIDO (se usa p.estado)
       categoria: p.marca || "general",
     }));
