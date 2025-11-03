@@ -34,15 +34,12 @@ interface ReportAllProductsProps {
 const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) => {
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
-  // 🔹 Mostrar toast de notificación
+  // 🔹 Mostrar toast
   const mostrarNotificacion = async (mensaje: string) => {
-    await Toast.show({
-      text: mensaje,
-      duration: "long",
-    });
+    await Toast.show({ text: mensaje, duration: "long" });
   };
 
-  // 🔹 Función para solicitar permiso
+  // 🔹 Solicitar permisos de almacenamiento
   const solicitarPermisoDescarga = async (): Promise<boolean> => {
     if (Capacitor.getPlatform() === "android") {
       try {
@@ -62,11 +59,18 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
     return true;
   };
 
-  // 🔹 Obtener datos de Supabase
+  // 🔹 Traer todos los productos de Supabase
   const fetchProductos = async (): Promise<Producto[]> => {
     const { data, error } = await supabase
       .from("productos")
-      .select("sku, nombre, estado, marca, stock!inner(cantidad)");
+      .select(`
+        sku,
+        nombre,
+        estado,
+        marca,
+        stock(cantidad)
+      `);
+      console.log(data);
 
     if (error) {
       console.error("Error al obtener productos:", error.message);
@@ -74,15 +78,15 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
     }
 
     return (data ?? []).map((p: any) => ({
-      codigo: p.sku,
-      nombre: p.nombre,
-      cantidad: p.stock[0]?.cantidad ?? 0,
-      estado: p.estado || "Desconocido",
-      categoria: p.marca || "General",
+      codigo: p.sku ?? "",
+      nombre: p.nombre ?? "",
+      cantidad: p.stock?.[0]?.cantidad ?? 0,
+      estado: p.estado ?? "Desconocido",
+      categoria: p.marca ?? "General",
     }));
   };
 
-  // 🔹 Guardar archivo en dispositivo y abrirlo
+  // 🔹 Guardar archivo en dispositivo
   const guardarEnDispositivo = async (
     fileName: string,
     base64Data: string,
@@ -98,12 +102,8 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
 
       const fileUri = savedFile.uri;
 
-      // Intentar abrir el archivo automáticamente
       try {
-        await FileOpener.open({
-          filePath: fileUri,
-          contentType: mimeType,
-        });
+        await FileOpener.open({ filePath: fileUri, contentType: mimeType });
       } catch (e) {
         console.error("Error al abrir archivo automáticamente:", e);
         mostrarNotificacion(
@@ -118,7 +118,7 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
     }
   };
 
-  // 🔹 Exportar PDF
+  // 🔹 Exportar PDF con todos los productos
   const exportarPDF = async () => {
     const permitido = await solicitarPermisoDescarga();
     if (!permitido) return;
@@ -142,6 +142,7 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
         ]),
       });
 
+      console.log(productos);
       const base64Data = doc.output("datauristring").split(",")[1];
       const timestamp = new Date().getTime();
 
@@ -152,7 +153,7 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
       );
 
       mostrarNotificacion(
-        "PDF descargado correctamente. Revisa el panel de notificaciones o la carpeta Documentos."
+        "PDF descargado correctamente. Revisa la carpeta Documentos."
       );
     } catch (error) {
       console.error("Error PDF:", error);
@@ -160,7 +161,7 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
     }
   };
 
-  // 🔹 Exportar Excel
+  // 🔹 Exportar Excel con todos los productos
   const exportarExcel = async () => {
     const permitido = await solicitarPermisoDescarga();
     if (!permitido) return;
@@ -172,7 +173,7 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
       const datosExcel = productos.map((p) => ({
         Código: p.codigo,
         Nombre: p.nombre,
-        Cantidad: p.cantidad,
+        Cantidad: Number(p.cantidad),
         Estado: p.estado,
         Categoría: p.categoria,
       }));
@@ -194,7 +195,7 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
       );
 
       mostrarNotificacion(
-        "Excel descargado correctamente. Revisa el panel de notificaciones o la carpeta Documentos."
+        "Excel descargado correctamente. Revisa la carpeta Documentos."
       );
     } catch (error) {
       console.error("Error Excel:", error);
@@ -221,7 +222,11 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
           }}
         >
           <p>{alertMessage}</p>
-          <IonButton onClick={() => setAlertMessage(null)} expand="block" style={{ marginTop: "10px" }}>
+          <IonButton
+            onClick={() => setAlertMessage(null)}
+            expand="block"
+            style={{ marginTop: "10px" }}
+          >
             Aceptar
           </IonButton>
         </div>
@@ -237,14 +242,30 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
 
       <IonContent className="ion-padding">
         <IonText>
-          <h3 style={{ textAlign: "center", fontWeight: "bold", marginTop: "1rem" }}>
+          <h3
+            style={{
+              textAlign: "center",
+              fontWeight: "bold",
+              marginTop: "1rem",
+            }}
+          >
             ¿Deseas descargar en formato PDF o Excel?
           </h3>
-          <p style={{ textAlign: "center", fontSize: "0.9rem", color: "#666" }}>
-            Los archivos se guardarán en la carpeta <b>Documentos</b> de tu dispositivo.
+          <p
+            style={{
+              textAlign: "center",
+              fontSize: "0.9rem",
+              color: "#666",
+            }}
+          >
+            Los archivos se guardarán en la carpeta <b>Documentos</b> de tu
+            dispositivo.
           </p>
         </IonText>
-        <div className="modal-buttons-container" style={{ padding: "20px" }}>
+        <div
+          className="modal-buttons-container"
+          style={{ padding: "20px" }}
+        >
           <IonButton
             className="modal-button"
             color="danger"
