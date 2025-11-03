@@ -11,16 +11,13 @@ import {
 } from "@ionic/react";
 import { supabase } from "../../../supabaseClient";
 
-// --- Imports para generar archivos ---
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { Filesystem, Directory } from "@capacitor/filesystem";
-import "./report_stock_month.css"; // 👈 CSS para los botones
+import { Capacitor } from "@capacitor/core";
+import "./report_stock_month.css";
 
-// Tipos derivados de datos del backend (inferidos en tiempo de ejecución)
-
-// Props que el componente recibirá
 interface ReportStockMonthProps {
   onDidDismiss: () => void;
 }
@@ -28,9 +25,31 @@ interface ReportStockMonthProps {
 const ReportStockMonth: React.FC<ReportStockMonthProps> = ({ onDidDismiss }) => {
   const [isLoading, setIsLoading] = useState(false);
 
-  // 1. Lógica para OBTENER los datos (se llama al hacer clic)
+  // 🔹 Función para solicitar permisos en Android
+  const solicitarPermisoDescarga = async (): Promise<boolean> => {
+    if (Capacitor.getPlatform() === "android") {
+      try {
+        const check = await Filesystem.checkPermissions();
+        if (check.publicStorage !== "granted") {
+          const request = await Filesystem.requestPermissions();
+          if (request.publicStorage !== "granted") {
+            alert(
+              "Por favor, concede permiso de almacenamiento para descargar archivos."
+            );
+            return false;
+          }
+        }
+      } catch (err) {
+        console.error("Error al verificar permisos de almacenamiento:", err);
+        alert("No se pudo obtener el permiso de almacenamiento.");
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // 🔹 Obtener datos de productos y ordenarlos por stock ascendente
   const getReportData = async () => {
-    // Calcular nombre del mes
     const date = new Date();
     const nombreMes = date.toLocaleString("es-ES", {
       month: "long",
@@ -38,7 +57,6 @@ const ReportStockMonth: React.FC<ReportStockMonthProps> = ({ onDidDismiss }) => 
     });
     const mes = nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1);
 
-    // 👇 CORREGIDO: 'estado' se saca de 'productos', no de 'stock'
     const { data, error } = await supabase
       .from("productos")
       .select("sku, nombre, marca, estado, stock!inner(cantidad)");
@@ -48,37 +66,39 @@ const ReportStockMonth: React.FC<ReportStockMonthProps> = ({ onDidDismiss }) => 
       throw error;
     }
 
-    const mapped = data.map((p: any) => ({
+    const mapped = (data ?? []).map((p: any) => ({
       codigo: p.sku,
       nombre: p.nombre,
       cantidad: p.stock[0]?.cantidad ?? 0,
-      estado: p.estado || "desconocido", // 👈 CORREGIDO (se usa p.estado)
+      estado: p.estado || "desconocido",
       categoria: p.marca || "general",
     }));
 
-    // ordenar por stock ascendente (menor primero)
     const ordenados = mapped.sort((a, b) => a.cantidad - b.cantidad);
 
     return { productos: ordenados, mes };
   };
 
-  // 2. Lógica para GUARDAR en el dispositivo (Android/iOS)
+  // 🔹 Guardar archivo en Descargas
   const guardarEnDispositivo = async (fileName: string, base64Data: string) => {
     try {
       await Filesystem.writeFile({
         path: fileName,
         data: base64Data,
-        directory: Directory.Documents,
+        directory: Directory.External, // Carpeta pública Descargas
       });
-      alert(`Archivo guardado en 'Documents' como: ${fileName}`);
+      alert(`Archivo guardado en Descargas como: ${fileName}`);
     } catch (e) {
       console.error("Error al guardar archivo", e);
       alert("Error al guardar archivo. ¿Otorgaste permisos a la app?");
     }
   };
 
-  // 3. Lógica para EXPORTAR PDF
+  // 🔹 Exportar PDF
   const exportarPDF = async () => {
+    const permitido = await solicitarPermisoDescarga();
+    if (!permitido) return;
+
     setIsLoading(true);
     try {
       const { productos, mes } = await getReportData();
@@ -99,25 +119,27 @@ const ReportStockMonth: React.FC<ReportStockMonthProps> = ({ onDidDismiss }) => 
 
       const finalY = (doc as any).lastAutoTable?.finalY || 30;
       doc.text(
-        `Este reporte corresponde al mes de ${mes}.
-Los productos con menor stock aparecen arriba.`,
+        `Este reporte corresponde al mes de ${mes}.\nLos productos con menor stock aparecen arriba.`,
         14,
         finalY + 10
       );
 
       const base64Data = doc.output("datauristring").split(",")[1];
-      await guardarEnDispositivo(`reporte_stock_${mes}.pdf`, base64Data);
-
+      const timestamp = new Date().getTime();
+      await guardarEnDispositivo(`reporte_stock_${mes}_${timestamp}.pdf`, base64Data);
     } catch (error) {
       console.error("Error PDF:", error);
       alert("No se pudo generar el PDF.");
     }
     setIsLoading(false);
-    onDidDismiss(); // Cierra el modal
+    onDidDismiss();
   };
 
-  // 4. Lógica para EXPORTAR EXCEL
+  // 🔹 Exportar Excel
   const exportarExcel = async () => {
+    const permitido = await solicitarPermisoDescarga();
+    if (!permitido) return;
+
     setIsLoading(true);
     try {
       const { productos, mes } = await getReportData();
@@ -126,17 +148,16 @@ Los productos con menor stock aparecen arriba.`,
       XLSX.utils.book_append_sheet(wb, ws, `Stock ${mes}`);
 
       const base64Data = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
-      await guardarEnDispositivo(`reporte_stock_${mes}.xlsx`, base64Data);
-
+      const timestamp = new Date().getTime();
+      await guardarEnDispositivo(`reporte_stock_${mes}_${timestamp}.xlsx`, base64Data);
     } catch (error) {
       console.error("Error Excel:", error);
       alert("No se pudo generar el Excel.");
     }
     setIsLoading(false);
-    onDidDismiss(); // Cierra el modal
+    onDidDismiss();
   };
 
-  // 5. RENDER: El contenido del modal
   return (
     <>
       <IonHeader>

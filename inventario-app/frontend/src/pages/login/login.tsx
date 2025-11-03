@@ -4,17 +4,16 @@ import {
     IonContent,
     IonButton,
     IonIcon,
+    IonLoading,
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { logoGoogle } from 'ionicons/icons';
-import LoginForm from '../../components/login/login-form';
 import { Camera } from '@capacitor/camera';
 import { Filesystem } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
 
+import LoginForm from '../../components/login/login-form';
 import './login.css';
-
-// ...importaciones existentes
 
 const Login: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -22,16 +21,18 @@ const Login: React.FC = () => {
     const [isLoading, setIsLoading] = useState(false);
     const history = useHistory();
 
-    // Función para pedir permisos
-    const requestPermissions = async () => {
+    // --- FUNCION PARA PEDIR PERMISOS ---
+    const requestPermissions = async (): Promise<boolean> => {
         try {
-            // Cámara
-            const camStatus = await Camera.requestPermissions();
-            // Android: almacenamiento
+            // Pedir permiso de cámara
+            await Camera.requestPermissions();
+            
+            // Pedir permiso de archivos solo en Android
             if (Capacitor.getPlatform() === 'android') {
                 await Filesystem.requestPermissions();
             }
-            console.log('✅ Permisos concedidos', camStatus);
+
+            // Aquí podrías agregar más permisos si tu app los necesita
             return true;
         } catch (error) {
             console.error('❌ Error solicitando permisos:', error);
@@ -39,37 +40,44 @@ const Login: React.FC = () => {
         }
     };
 
+    // Función que simula login exitoso
     const handleLoginSuccess = async () => {
-        // Pedir permisos
+        setIsLoading(true);
+
+        // Pedir permisos antes de continuar
         const granted = await requestPermissions();
         if (!granted) {
-            alert('Debes conceder permisos para continuar');
+            alert('Debes conceder todos los permisos para continuar');
             setIsLoading(false);
             return;
         }
 
-        // Redirigir a Home
-        history.push('/tabs/home');
+        // Simular delay
+        await new Promise((res) => setTimeout(res, 1000));
+
+        setIsLoading(false);
+        history.push('/tabs/home'); // Redirigir a Home
     };
 
     // Login con email
     const handleEmailLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        setIsLoading(true);
-        // Aquí pondrías tu lógica real de login con email
+        if (!email || !pass) {
+            alert('Por favor ingresa email y contraseña');
+            return;
+        }
         await handleLoginSuccess();
     };
 
-    // Login con Google
+    // Login con Google (simulado)
     const handleGoogleLogin = async () => {
-        setIsLoading(true);
-        // Aquí pondrías tu lógica real de login con Google
         await handleLoginSuccess();
     };
 
     return (
         <IonPage>
             <IonContent className="login-page-content">
+                <IonLoading isOpen={isLoading} message="Iniciando sesión..." />
                 <div className="login-container">
                     <img src="/logo.png" alt="Logo de la App" className="login-logo" />
                     <h1 className="login-title">Bienvenido</h1>

@@ -11,16 +11,13 @@ import {
 } from "@ionic/react";
 import { supabase } from "../../../supabaseClient";
 
-// --- Imports para generar archivos ---
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { Filesystem, Directory } from "@capacitor/filesystem";
-import "./report_register_for_week.css"; // 👈 CSS para los botones
+import { Capacitor } from "@capacitor/core";
+import "./report_register_for_week.css";
 
-// Tipos derivados de datos del backend (inferidos en tiempo de ejecución)
-
-// Props que el componente recibirá
 interface ReportRegisterForWeekProps {
   onDidDismiss: () => void;
 }
@@ -30,17 +27,39 @@ const ReportRegisterForWeek: React.FC<ReportRegisterForWeekProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
 
-  // 1. Lógica para OBTENER los datos (se llama al hacer clic)
+  // 🔹 Función para solicitar permisos de almacenamiento en Android
+  const solicitarPermisoDescarga = async (): Promise<boolean> => {
+    if (Capacitor.getPlatform() === "android") {
+      try {
+        const check = await Filesystem.checkPermissions();
+        if (check.publicStorage !== "granted") {
+          const request = await Filesystem.requestPermissions();
+          if (request.publicStorage !== "granted") {
+            alert(
+              "Por favor, concede permiso de almacenamiento para descargar archivos."
+            );
+            return false;
+          }
+        }
+      } catch (err) {
+        console.error("Error al verificar permisos de almacenamiento:", err);
+        alert("No se pudo obtener el permiso de almacenamiento.");
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // 🔹 Obtener datos de la semana actual
   const getReportData = async () => {
-    // Calcular la semana actual (Domingo - Sábado)
     const hoy = new Date();
     const inicioSemana = new Date(hoy);
     inicioSemana.setDate(hoy.getDate() - hoy.getDay());
-    inicioSemana.setHours(0, 0, 0, 0); // Inicio del domingo
+    inicioSemana.setHours(0, 0, 0, 0);
 
     const finSemana = new Date(inicioSemana);
     finSemana.setDate(inicioSemana.getDate() + 6);
-    finSemana.setHours(23, 59, 59, 999); // Fin del sábado
+    finSemana.setHours(23, 59, 59, 999);
 
     const inicioISO = inicioSemana.toISOString();
     const finISO = finSemana.toISOString();
@@ -49,7 +68,6 @@ const ReportRegisterForWeek: React.FC<ReportRegisterForWeekProps> = ({
       "es-ES"
     )} al ${finSemana.toLocaleDateString("es-ES")}`;
 
-    // Buscar datos
     const { data, error } = await supabase
       .from("productos")
       .select("id, sku, nombre, marca, modelo, created_at")
@@ -61,8 +79,7 @@ const ReportRegisterForWeek: React.FC<ReportRegisterForWeekProps> = ({
       throw error;
     }
 
-    // Mapear datos
-    const productos = data.map((p: any) => ({
+    const productos = (data ?? []).map((p: any) => ({
       codigo: p.sku,
       nombre: p.nombre,
       marca: p.marca || "N/A",
@@ -73,23 +90,27 @@ const ReportRegisterForWeek: React.FC<ReportRegisterForWeekProps> = ({
     return { productos, semana };
   };
 
-  // 2. Lógica para GUARDAR en el dispositivo (Android/iOS)
+  // 🔹 Guardar archivo en Descargas
   const guardarEnDispositivo = async (fileName: string, base64Data: string) => {
     try {
       await Filesystem.writeFile({
         path: fileName,
         data: base64Data,
-        directory: Directory.Documents,
+        directory: Directory.External, // Carpeta pública
+        encoding: undefined,
       });
-      alert(`Archivo guardado en 'Documents' como: ${fileName}`);
+      alert(`Archivo guardado en Descargas como: ${fileName}`);
     } catch (e) {
       console.error("Error al guardar archivo", e);
       alert("Error al guardar archivo. ¿Otorgaste permisos a la app?");
     }
   };
 
-  // 3. Lógica para EXPORTAR PDF
+  // 🔹 Exportar PDF
   const exportarPDF = async () => {
+    const permitido = await solicitarPermisoDescarga();
+    if (!permitido) return;
+
     setIsLoading(true);
     try {
       const { productos, semana } = await getReportData();
@@ -116,43 +137,45 @@ const ReportRegisterForWeek: React.FC<ReportRegisterForWeekProps> = ({
       );
 
       const base64Data = doc.output("datauristring").split(",")[1];
+      const timestamp = new Date().getTime();
       await guardarEnDispositivo(
-        `reporte_registros_semana.pdf`,
+        `reporte_registros_semana_${timestamp}.pdf`,
         base64Data
       );
-
     } catch (error) {
       console.error("Error PDF:", error);
       alert("No se pudo generar el PDF.");
     }
     setIsLoading(false);
-    onDidDismiss(); // Cierra el modal
+    onDidDismiss();
   };
 
-  // 4. Lógica para EXPORTAR EXCEL
+  // 🔹 Exportar Excel
   const exportarExcel = async () => {
+    const permitido = await solicitarPermisoDescarga();
+    if (!permitido) return;
+
     setIsLoading(true);
     try {
-      const { productos } = await getReportData();
+      const { productos, semana } = await getReportData();
       const ws = XLSX.utils.json_to_sheet(productos);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, `Semana`);
 
       const base64Data = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
+      const timestamp = new Date().getTime();
       await guardarEnDispositivo(
-        `reporte_registros_semana.xlsx`,
+        `reporte_registros_semana_${timestamp}.xlsx`,
         base64Data
       );
-
     } catch (error) {
       console.error("Error Excel:", error);
       alert("No se pudo generar el Excel.");
     }
     setIsLoading(false);
-    onDidDismiss(); // Cierra el modal
+    onDidDismiss();
   };
 
-  // 5. RENDER: El contenido del modal
   return (
     <>
       <IonHeader>

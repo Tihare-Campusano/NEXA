@@ -11,15 +11,13 @@ import {
 } from "@ionic/react";
 import { supabase } from "../../../supabaseClient";
 
-// --- Imports para generar archivos ---
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
-import { Filesystem, Directory } from "@capacitor/filesystem";
+import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
 import { Capacitor } from "@capacitor/core";
-import "./report_all_products.css"; // CSS para los botones
+import "./report_all_products.css";
 
-// Interface para el tipo de producto
 interface Producto {
   codigo: string;
   nombre: string;
@@ -28,7 +26,6 @@ interface Producto {
   categoria: string;
 }
 
-// Props que el componente recibirá (una función para cerrarse)
 interface ReportAllProductsProps {
   onDidDismiss: () => void;
 }
@@ -36,7 +33,7 @@ interface ReportAllProductsProps {
 const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) => {
   const [isLoading, setIsLoading] = useState(false);
 
-  // 🔹 Función para solicitar permiso de almacenamiento (solo Android)
+  // 🔹 Función para solicitar permiso de descarga en Android
   const solicitarPermisoDescarga = async (): Promise<boolean> => {
     if (Capacitor.getPlatform() === "android") {
       try {
@@ -44,7 +41,9 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
         if (check.publicStorage !== "granted") {
           const request = await Filesystem.requestPermissions();
           if (request.publicStorage !== "granted") {
-            alert("Por favor, concede permiso de almacenamiento para descargar archivos.");
+            alert(
+              "Por favor, concede permiso de almacenamiento para descargar archivos."
+            );
             return false;
           }
         }
@@ -57,7 +56,7 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
     return true;
   };
 
-  // 1. Lógica para OBTENER los datos
+  // 🔹 Obtener datos de Supabase
   const fetchProductos = async (): Promise<Producto[]> => {
     const { data, error } = await supabase
       .from("productos")
@@ -77,22 +76,24 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
     }));
   };
 
-  // 2. Lógica para GUARDAR en el dispositivo (Android/iOS)
+  // 🔹 Guardar archivo en almacenamiento externo (Descargas)
   const guardarEnDispositivo = async (fileName: string, base64Data: string) => {
     try {
       await Filesystem.writeFile({
         path: fileName,
-        data: base64Data,
-        directory: Directory.Documents, // Carpeta 'Documents'
+        data: base64Data, // ya en base64
+        directory: Directory.External,
+        encoding: undefined, // <- quita Encoding.BASE64
       });
-      alert(`Archivo guardado en 'Documents' como: ${fileName}`);
+
+      alert(`Archivo guardado en Descargas como: ${fileName}`);
     } catch (e) {
       console.error("Error al guardar archivo", e);
       alert("Error al guardar archivo. ¿Otorgaste permisos a la app?");
     }
   };
 
-  // 3. Lógica para EXPORTAR PDF
+  // 🔹 Exportar PDF
   const exportarPDF = async () => {
     const permitido = await solicitarPermisoDescarga();
     if (!permitido) return;
@@ -116,7 +117,8 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
       });
 
       const base64Data = doc.output("datauristring").split(",")[1];
-      await guardarEnDispositivo("reporte_productos.pdf", base64Data);
+      const timestamp = new Date().getTime();
+      await guardarEnDispositivo(`reporte_productos_${timestamp}.pdf`, base64Data);
     } catch (error) {
       console.error("Error PDF:", error);
       alert("No se pudo generar el PDF.");
@@ -125,7 +127,7 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
     onDidDismiss();
   };
 
-  // 4. Lógica para EXPORTAR EXCEL
+  // 🔹 Exportar Excel
   const exportarExcel = async () => {
     const permitido = await solicitarPermisoDescarga();
     if (!permitido) return;
@@ -138,7 +140,11 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
       XLSX.utils.book_append_sheet(wb, ws, "Productos");
 
       const base64Data = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
-      await guardarEnDispositivo("reporte_productos.xlsx", base64Data);
+      const timestamp = new Date().getTime();
+      await guardarEnDispositivo(
+        `reporte_productos_${timestamp}.xlsx`,
+        base64Data
+      );
     } catch (error) {
       console.error("Error Excel:", error);
       alert("No se pudo generar el Excel.");
@@ -147,7 +153,6 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
     onDidDismiss();
   };
 
-  // 5. Render del modal
   return (
     <>
       <IonHeader>
@@ -162,9 +167,7 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
       <IonContent className="ion-padding">
         <IonLoading isOpen={isLoading} message={"Generando reporte..."} />
         <IonText>
-          <h3
-            style={{ textAlign: "center", fontWeight: "bold", marginTop: "1rem" }}
-          >
+          <h3 style={{ textAlign: "center", fontWeight: "bold", marginTop: "1rem" }}>
             ¿Deseas descargar en formato PDF o Excel?
           </h3>
         </IonText>

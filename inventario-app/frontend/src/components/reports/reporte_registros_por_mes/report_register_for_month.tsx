@@ -11,16 +11,13 @@ import {
 } from "@ionic/react";
 import { supabase } from "../../../supabaseClient";
 
-// --- Imports para generar archivos ---
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { Filesystem, Directory } from "@capacitor/filesystem";
-import "./report_register_for_month.css"; // 👈 CSS para los botones
+import { Capacitor } from "@capacitor/core";
+import "./report_register_for_month.css";
 
-// Tipos derivados de datos del backend (inferidos en tiempo de ejecución)
-
-// Props que el componente recibirá
 interface ReportRegisterForMonthProps {
   onDidDismiss: () => void;
 }
@@ -30,20 +27,41 @@ const ReportRegisterForMonth: React.FC<ReportRegisterForMonthProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
 
-  // 1. Lógica para OBTENER los datos y el mes (se llama al hacer clic)
+  // 🔹 Función para solicitar permisos de almacenamiento en Android
+  const solicitarPermisoDescarga = async (): Promise<boolean> => {
+    if (Capacitor.getPlatform() === "android") {
+      try {
+        const check = await Filesystem.checkPermissions();
+        if (check.publicStorage !== "granted") {
+          const request = await Filesystem.requestPermissions();
+          if (request.publicStorage !== "granted") {
+            alert(
+              "Por favor, concede permiso de almacenamiento para descargar archivos."
+            );
+            return false;
+          }
+        }
+      } catch (err) {
+        console.error("Error al verificar permisos de almacenamiento:", err);
+        alert("No se pudo obtener el permiso de almacenamiento.");
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // 🔹 Obtener datos del mes actual
   const getReportData = async () => {
     const date = new Date();
     const primerDia = new Date(date.getFullYear(), date.getMonth(), 1);
     const ultimoDia = new Date(date.getFullYear(), date.getMonth() + 1, 0);
 
-    // Calcular nombre del mes
     const nombreMes = date.toLocaleString("es-ES", {
       month: "long",
       year: "numeric",
     });
     const mes = nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1);
 
-    // Buscar datos
     const { data, error } = await supabase
       .from("productos")
       .select("id, sku, nombre, marca, created_at")
@@ -55,8 +73,7 @@ const ReportRegisterForMonth: React.FC<ReportRegisterForMonthProps> = ({
       throw error;
     }
 
-    // Mapear datos
-    const productos = data.map((p: any) => ({
+    const productos = (data ?? []).map((p: any) => ({
       codigo: p.sku,
       nombre: p.nombre,
       marca: p.marca || "General",
@@ -66,23 +83,27 @@ const ReportRegisterForMonth: React.FC<ReportRegisterForMonthProps> = ({
     return { productos, mes };
   };
 
-  // 2. Lógica para GUARDAR en el dispositivo (Android/iOS)
+  // 🔹 Guardar archivo en Descargas (público)
   const guardarEnDispositivo = async (fileName: string, base64Data: string) => {
     try {
       await Filesystem.writeFile({
         path: fileName,
         data: base64Data,
-        directory: Directory.Documents,
+        directory: Directory.External, // Carpeta Descargas
+        encoding: undefined,
       });
-      alert(`Archivo guardado en 'Documents' como: ${fileName}`);
+      alert(`Archivo guardado en Descargas como: ${fileName}`);
     } catch (e) {
       console.error("Error al guardar archivo", e);
       alert("Error al guardar archivo. ¿Otorgaste permisos a la app?");
     }
   };
 
-  // 3. Lógica para EXPORTAR PDF
+  // 🔹 Exportar PDF
   const exportarPDF = async () => {
+    const permitido = await solicitarPermisoDescarga();
+    if (!permitido) return;
+
     setIsLoading(true);
     try {
       const { productos, mes } = await getReportData();
@@ -103,18 +124,24 @@ const ReportRegisterForMonth: React.FC<ReportRegisterForMonthProps> = ({
       );
 
       const base64Data = doc.output("datauristring").split(",")[1];
-      await guardarEnDispositivo(`reporte_registros_${mes}.pdf`, base64Data);
-
+      const timestamp = new Date().getTime();
+      await guardarEnDispositivo(
+        `reporte_registros_${mes}_${timestamp}.pdf`,
+        base64Data
+      );
     } catch (error) {
       console.error("Error PDF:", error);
       alert("No se pudo generar el PDF.");
     }
     setIsLoading(false);
-    onDidDismiss(); // Cierra el modal
+    onDidDismiss();
   };
 
-  // 4. Lógica para EXPORTAR EXCEL
+  // 🔹 Exportar Excel
   const exportarExcel = async () => {
+    const permitido = await solicitarPermisoDescarga();
+    if (!permitido) return;
+
     setIsLoading(true);
     try {
       const { productos, mes } = await getReportData();
@@ -123,20 +150,19 @@ const ReportRegisterForMonth: React.FC<ReportRegisterForMonthProps> = ({
       XLSX.utils.book_append_sheet(wb, ws, `Registros ${mes}`);
 
       const base64Data = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
+      const timestamp = new Date().getTime();
       await guardarEnDispositivo(
-        `reporte_registros_${mes}.xlsx`,
+        `reporte_registros_${mes}_${timestamp}.xlsx`,
         base64Data
       );
-
     } catch (error) {
       console.error("Error Excel:", error);
       alert("No se pudo generar el Excel.");
     }
     setIsLoading(false);
-    onDidDismiss(); // Cierra el modal
+    onDidDismiss();
   };
 
-  // 5. RENDER: El contenido del modal
   return (
     <>
       <IonHeader>

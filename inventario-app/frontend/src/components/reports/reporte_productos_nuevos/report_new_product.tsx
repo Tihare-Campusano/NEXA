@@ -11,14 +11,13 @@ import {
 } from "@ionic/react";
 import { supabase } from "../../../supabaseClient";
 
-// --- Imports para generar archivos ---
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { Filesystem, Directory } from "@capacitor/filesystem";
-import "./report_new_product.css"; // 👈 CSS para los botones
+import { Capacitor } from "@capacitor/core";
+import "./report_new_product.css";
 
-// Interface para el tipo de producto
 interface Producto {
   codigo: string;
   nombre: string;
@@ -27,7 +26,6 @@ interface Producto {
   categoria: string;
 }
 
-// Props que el componente recibirá
 interface ReportNewProductProps {
   onDidDismiss: () => void;
 }
@@ -35,48 +33,71 @@ interface ReportNewProductProps {
 const ReportNewProduct: React.FC<ReportNewProductProps> = ({ onDidDismiss }) => {
   const [isLoading, setIsLoading] = useState(false);
 
-  // 1. Lógica para OBTENER los datos
+  // 🔹 Función para solicitar permiso de almacenamiento en Android
+  const solicitarPermisoDescarga = async (): Promise<boolean> => {
+    if (Capacitor.getPlatform() === "android") {
+      try {
+        const check = await Filesystem.checkPermissions();
+        if (check.publicStorage !== "granted") {
+          const request = await Filesystem.requestPermissions(); // sin argumentos
+          if (request.publicStorage !== "granted") {
+            alert(
+              "Por favor, concede permiso de almacenamiento para descargar archivos."
+            );
+            return false;
+          }
+        }
+      } catch (err) {
+        console.error("Error al verificar permisos de almacenamiento:", err);
+        alert("No se pudo obtener el permiso de almacenamiento.");
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // 🔹 Obtener productos filtrados por "Nuevo"
   const fetchProductos = async (): Promise<Producto[]> => {
-    // 👇 CORREGIDO: Usamos stock(cantidad) y filtramos por 'Nuevo'
     const { data, error } = await supabase
       .from("productos")
       .select("sku, nombre, estado, marca, stock!inner(cantidad)")
-      .eq("estado", "Nuevo"); // 👈 Filtro específico de este reporte
+      .eq("estado", "Nuevo");
 
     if (error) {
       console.error("Error al obtener productos:", error.message);
       throw error;
     }
 
-    if (data) {
-      return data.map((p: any) => ({
-        codigo: p.sku,
-        nombre: p.nombre,
-        cantidad: p.stock[0]?.cantidad ?? 0,
-        estado: p.estado || "Desconocido",
-        categoria: p.marca || "General",
-      }));
-    }
-    return [];
+    return (data ?? []).map((p: any) => ({
+      codigo: p.sku,
+      nombre: p.nombre,
+      cantidad: p.stock[0]?.cantidad ?? 0,
+      estado: p.estado || "Desconocido",
+      categoria: p.marca || "General",
+    }));
   };
 
-  // 2. Lógica para GUARDAR en el dispositivo (Android/iOS)
+  // 🔹 Guardar archivo en Descargas (público)
   const guardarEnDispositivo = async (fileName: string, base64Data: string) => {
     try {
       await Filesystem.writeFile({
         path: fileName,
         data: base64Data,
-        directory: Directory.Documents,
+        directory: Directory.External, // Descargas
+        encoding: undefined, // quita Encoding.BASE64
       });
-      alert(`Archivo guardado en 'Documents' como: ${fileName}`);
+      alert(`Archivo guardado en Descargas como: ${fileName}`);
     } catch (e) {
       console.error("Error al guardar archivo", e);
       alert("Error al guardar archivo. ¿Otorgaste permisos a la app?");
     }
   };
 
-  // 3. Lógica para EXPORTAR PDF
+  // 🔹 Exportar PDF
   const exportarPDF = async () => {
+    const permitido = await solicitarPermisoDescarga();
+    if (!permitido) return;
+
     setIsLoading(true);
     try {
       const productos = await fetchProductos();
@@ -95,28 +116,32 @@ const ReportNewProduct: React.FC<ReportNewProductProps> = ({ onDidDismiss }) => 
         ]),
       });
 
-      // Añadimos el texto extra (como en tu código original)
       const finalY = (doc as any).lastAutoTable?.finalY || 30;
       doc.text(
-        `Este reporte muestra todos los productos clasificados como "Nuevos".
-Se recomienda usar primero los usados y luego los nuevos.`,
+        `Este reporte muestra todos los productos clasificados como "Nuevos". Se recomienda usar primero los usados y luego los nuevos.`,
         14,
         finalY + 10
       );
 
       const base64Data = doc.output("datauristring").split(",")[1];
-      await guardarEnDispositivo("reporte_productos_nuevos.pdf", base64Data);
-
+      const timestamp = new Date().getTime();
+      await guardarEnDispositivo(
+        `reporte_productos_nuevos_${timestamp}.pdf`,
+        base64Data
+      );
     } catch (error) {
       console.error("Error PDF:", error);
       alert("No se pudo generar el PDF.");
     }
     setIsLoading(false);
-    onDidDismiss(); // Cierra el modal
+    onDidDismiss();
   };
 
-  // 4. Lógica para EXPORTAR EXCEL
+  // 🔹 Exportar Excel
   const exportarExcel = async () => {
+    const permitido = await solicitarPermisoDescarga();
+    if (!permitido) return;
+
     setIsLoading(true);
     try {
       const productos = await fetchProductos();
@@ -125,20 +150,19 @@ Se recomienda usar primero los usados y luego los nuevos.`,
       XLSX.utils.book_append_sheet(wb, ws, "Productos Nuevos");
 
       const base64Data = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
+      const timestamp = new Date().getTime();
       await guardarEnDispositivo(
-        "reporte_productos_nuevos.xlsx",
+        `reporte_productos_nuevos_${timestamp}.xlsx`,
         base64Data
       );
-
     } catch (error) {
       console.error("Error Excel:", error);
       alert("No se pudo generar el Excel.");
     }
     setIsLoading(false);
-    onDidDismiss(); // Cierra el modal
+    onDidDismiss();
   };
 
-  // 5. RENDER: El contenido del modal
   return (
     <>
       <IonHeader>
