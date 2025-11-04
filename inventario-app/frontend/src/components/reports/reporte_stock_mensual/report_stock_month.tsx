@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   IonHeader,
   IonToolbar,
@@ -7,79 +7,113 @@ import {
   IonButtons,
   IonButton,
   IonText,
-  IonLoading,
 } from "@ionic/react";
 import { supabase } from "../../../supabaseClient";
 
-// --- Imports para generar archivos ---
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { Filesystem, Directory } from "@capacitor/filesystem";
-import "./report_stock_month.css"; // 👈 CSS para los botones
+import { Capacitor } from "@capacitor/core";
+import { FileOpener } from "@capacitor-community/file-opener";
+import { Toast } from "@capacitor/toast";
+import "./report_stock_month.css";
 
-// Tipos derivados de datos del backend (inferidos en tiempo de ejecución)
-
-// Props que el componente recibirá
 interface ReportStockMonthProps {
   onDidDismiss: () => void;
 }
 
 const ReportStockMonth: React.FC<ReportStockMonthProps> = ({ onDidDismiss }) => {
-  const [isLoading, setIsLoading] = useState(false);
 
-  // 1. Lógica para OBTENER los datos (se llama al hacer clic)
+  // 🔹 Mostrar toast
+  const mostrarNotificacion = async (mensaje: string) => {
+    await Toast.show({ text: mensaje, duration: "long" });
+  };
+
+  // 🔹 Solicitar permiso de almacenamiento
+  const solicitarPermisoDescarga = async (): Promise<boolean> => {
+    if (Capacitor.getPlatform() === "android") {
+      try {
+        const check = await Filesystem.checkPermissions();
+        if (check.publicStorage !== "granted") {
+          const request = await Filesystem.requestPermissions();
+          if (request.publicStorage !== "granted") {
+            mostrarNotificacion(
+              "Por favor, concede permiso de almacenamiento para descargar archivos."
+            );
+            return false;
+          }
+        }
+      } catch (err) {
+        console.error("Error al verificar permisos de almacenamiento:", err);
+        mostrarNotificacion("No se pudo obtener el permiso de almacenamiento.");
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // 🔹 Obtener datos y ordenarlos por stock ascendente
   const getReportData = async () => {
-    // Calcular nombre del mes
     const date = new Date();
-    const nombreMes = date.toLocaleString("es-ES", {
-      month: "long",
-      year: "numeric",
-    });
+    const nombreMes = date.toLocaleString("es-ES", { month: "long", year: "numeric" });
     const mes = nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1);
 
-    // 👇 CORREGIDO: 'estado' se saca de 'productos', no de 'stock'
     const { data, error } = await supabase
       .from("productos")
-      .select("sku, nombre, marca, estado, stock(cantidad)"); // 👈 CORREGIDO
+      .select("sku, nombre, marca, estado, stock!inner(cantidad)");
 
     if (error) {
       console.error("❌ Error al obtener productos:", error.message);
       throw error;
     }
 
-    const mapped = data.map((p: any) => ({
+    const productos = (data ?? []).map((p: any) => ({
       codigo: p.sku,
       nombre: p.nombre,
-      cantidad: p.stock?.cantidad || 0,
-      estado: p.estado || "desconocido", // 👈 CORREGIDO (se usa p.estado)
-      categoria: p.marca || "general",
-    }));
+      cantidad: p.stock[0]?.cantidad ?? 0,
+      estado: p.estado || "Desconocido",
+      categoria: p.marca || "General",
+    })).sort((a, b) => a.cantidad - b.cantidad);
 
-    // ordenar por stock ascendente (menor primero)
-    const ordenados = mapped.sort((a, b) => a.cantidad - b.cantidad);
-
-    return { productos: ordenados, mes };
+    return { productos, mes };
   };
 
-  // 2. Lógica para GUARDAR en el dispositivo (Android/iOS)
-  const guardarEnDispositivo = async (fileName: string, base64Data: string) => {
+  // 🔹 Guardar archivo y abrir
+  const guardarEnDispositivo = async (fileName: string, base64Data: string, mimeType: string) => {
     try {
-      await Filesystem.writeFile({
+      const savedFile = await Filesystem.writeFile({
         path: fileName,
         data: base64Data,
         directory: Directory.Documents,
+        recursive: true,
       });
-      alert(`Archivo guardado en 'Documents' como: ${fileName}`);
+
+      const fileUri = savedFile.uri;
+
+      try {
+        await FileOpener.open({ filePath: fileUri, contentType: mimeType });
+      } catch (e) {
+        console.error("Error al abrir archivo automáticamente:", e);
+        mostrarNotificacion(
+          "Archivo guardado. Búscalo en la carpeta Documentos de tu dispositivo."
+        );
+      }
     } catch (e) {
       console.error("Error al guardar archivo", e);
-      alert("Error al guardar archivo. ¿Otorgaste permisos a la app?");
+      mostrarNotificacion(
+        "Error al guardar archivo. ¿Otorgaste permisos a la app?"
+      );
     }
   };
 
-  // 3. Lógica para EXPORTAR PDF
+  // 🔹 Exportar PDF
   const exportarPDF = async () => {
-    setIsLoading(true);
+    const permitido = await solicitarPermisoDescarga();
+    if (!permitido) return;
+
+    mostrarNotificacion("Generando PDF...");
+
     try {
       const { productos, mes } = await getReportData();
       const doc = new jsPDF();
@@ -88,37 +122,34 @@ const ReportStockMonth: React.FC<ReportStockMonthProps> = ({ onDidDismiss }) => 
       autoTable(doc, {
         startY: 20,
         head: [["Código", "Nombre", "Cantidad", "Estado", "Categoría"]],
-        body: productos.map((p) => [
-          p.codigo,
-          p.nombre,
-          p.cantidad,
-          p.estado,
-          p.categoria,
-        ]),
+        body: productos.map((p) => [p.codigo, p.nombre, p.cantidad, p.estado, p.categoria]),
       });
 
       const finalY = (doc as any).lastAutoTable?.finalY || 30;
       doc.text(
-        `Este reporte corresponde al mes de ${mes}.
-Los productos con menor stock aparecen arriba.`,
+        `Este reporte corresponde al mes de ${mes}.\nLos productos con menor stock aparecen arriba.`,
         14,
         finalY + 10
       );
 
       const base64Data = doc.output("datauristring").split(",")[1];
-      await guardarEnDispositivo(`reporte_stock_${mes}.pdf`, base64Data);
+      const timestamp = new Date().getTime();
+      await guardarEnDispositivo(`reporte_stock_${mes}_${timestamp}.pdf`, base64Data, "application/pdf");
 
+      mostrarNotificacion("PDF descargado correctamente.");
     } catch (error) {
       console.error("Error PDF:", error);
-      alert("No se pudo generar el PDF.");
+      mostrarNotificacion("No se pudo generar el PDF.");
     }
-    setIsLoading(false);
-    onDidDismiss(); // Cierra el modal
   };
 
-  // 4. Lógica para EXPORTAR EXCEL
+  // 🔹 Exportar Excel
   const exportarExcel = async () => {
-    setIsLoading(true);
+    const permitido = await solicitarPermisoDescarga();
+    if (!permitido) return;
+
+    mostrarNotificacion("Generando Excel...");
+
     try {
       const { productos, mes } = await getReportData();
       const ws = XLSX.utils.json_to_sheet(productos);
@@ -126,17 +157,20 @@ Los productos con menor stock aparecen arriba.`,
       XLSX.utils.book_append_sheet(wb, ws, `Stock ${mes}`);
 
       const base64Data = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
-      await guardarEnDispositivo(`reporte_stock_${mes}.xlsx`, base64Data);
+      const timestamp = new Date().getTime();
+      await guardarEnDispositivo(
+        `reporte_stock_${mes}_${timestamp}.xlsx`,
+        base64Data,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
 
+      mostrarNotificacion("Excel descargado correctamente.");
     } catch (error) {
       console.error("Error Excel:", error);
-      alert("No se pudo generar el Excel.");
+      mostrarNotificacion("No se pudo generar el Excel.");
     }
-    setIsLoading(false);
-    onDidDismiss(); // Cierra el modal
   };
 
-  // 5. RENDER: El contenido del modal
   return (
     <>
       <IonHeader>
@@ -149,26 +183,20 @@ Los productos con menor stock aparecen arriba.`,
       </IonHeader>
 
       <IonContent className="ion-padding">
-        <IonLoading isOpen={isLoading} message={"Generando reporte..."} />
         <IonText>
-          <h3
-            style={{
-              textAlign: "center",
-              fontWeight: "bold",
-              marginTop: "1rem",
-            }}
-          >
+          <h3 style={{ textAlign: "center", fontWeight: "bold", marginTop: "1rem" }}>
             ¿Deseas descargar en formato PDF o Excel?
           </h3>
         </IonText>
-        <div className="modal-buttons-container">
+        <div className="modal-buttons-container" style={{ padding: "20px" }}>
           <IonButton
             className="modal-button"
             color="danger"
             expand="block"
             onClick={exportarPDF}
+            style={{ marginBottom: "10px" }}
           >
-            PDF
+            Descargar PDF
           </IonButton>
           <IonButton
             className="modal-button"
@@ -176,7 +204,7 @@ Los productos con menor stock aparecen arriba.`,
             expand="block"
             onClick={exportarExcel}
           >
-            Excel
+            Descargar Excel
           </IonButton>
         </div>
       </IonContent>

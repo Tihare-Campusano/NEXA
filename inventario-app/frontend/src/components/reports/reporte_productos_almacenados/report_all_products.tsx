@@ -7,18 +7,18 @@ import {
   IonButtons,
   IonButton,
   IonText,
-  IonLoading,
 } from "@ionic/react";
 import { supabase } from "../../../supabaseClient";
 
-// --- Imports para generar archivos ---
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { Filesystem, Directory } from "@capacitor/filesystem";
-import "./report_all_products.css"; // CSS para los botones
+import { Capacitor } from "@capacitor/core";
+import { FileOpener } from "@capacitor-community/file-opener";
+import { Toast } from "@capacitor/toast";
+import "./report_all_products.css";
 
-// Interface para el tipo de producto
 interface Producto {
   codigo: string;
   nombre: string;
@@ -27,57 +27,104 @@ interface Producto {
   categoria: string;
 }
 
-// Props que el componente recibirá (una función para cerrarse)
 interface ReportAllProductsProps {
   onDidDismiss: () => void;
 }
 
 const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) => {
-  const [isLoading, setIsLoading] = useState(false);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
-  // 1. Lógica para OBTENER los datos
+  // 🔹 Mostrar toast
+  const mostrarNotificacion = async (mensaje: string) => {
+    await Toast.show({ text: mensaje, duration: "long" });
+  };
+
+  // 🔹 Solicitar permisos de almacenamiento
+  const solicitarPermisoDescarga = async (): Promise<boolean> => {
+    if (Capacitor.getPlatform() === "android") {
+      try {
+        const request = await Filesystem.requestPermissions();
+        if (request.publicStorage !== "granted") {
+          mostrarNotificacion(
+            "Por favor, concede permiso de almacenamiento para descargar archivos."
+          );
+          return false;
+        }
+      } catch (err) {
+        console.error("Error al verificar permisos de almacenamiento:", err);
+        mostrarNotificacion("No se pudo obtener el permiso de almacenamiento.");
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // 🔹 Traer todos los productos de Supabase
   const fetchProductos = async (): Promise<Producto[]> => {
-    // 👇 CORRECCIÓN 1: Se pide 'stock(cantidad)' en lugar de 'stock(stock_actual)'
     const { data, error } = await supabase
       .from("productos")
-      .select("sku, nombre, estado, marca, stock:stock(cantidad)"); // 👈 CORREGIDO
+      .select(`
+        sku,
+        nombre,
+        estado,
+        marca,
+        stock(cantidad)
+      `);
+      console.log(data);
 
     if (error) {
       console.error("Error al obtener productos:", error.message);
       throw error;
     }
 
-    if (data) {
-      return data.map((p: any) => ({
-        codigo: p.sku,
-        nombre: p.nombre,
-        // 👇 CORRECCIÓN 2: Se usa 'p.stock.cantidad'
-        cantidad: p.stock?.cantidad || 0, // 👈 CORREGIDO
-        estado: p.estado || "Desconocido",
-        categoria: p.marca || "General",
-      }));
-    }
-    return [];
+    return (data ?? []).map((p: any) => ({
+      codigo: p.sku ?? "",
+      nombre: p.nombre ?? "",
+      cantidad: p.stock?.[0]?.cantidad ?? 0,
+      estado: p.estado ?? "Desconocido",
+      categoria: p.marca ?? "General",
+    }));
   };
 
-  // 2. Lógica para GUARDAR en el dispositivo (Android/iOS)
-  const guardarEnDispositivo = async (fileName: string, base64Data: string) => {
+  // 🔹 Guardar archivo en dispositivo
+  const guardarEnDispositivo = async (
+    fileName: string,
+    base64Data: string,
+    mimeType: string
+  ) => {
     try {
-      await Filesystem.writeFile({
+      const savedFile = await Filesystem.writeFile({
         path: fileName,
         data: base64Data,
-        directory: Directory.Documents, // Carpeta 'Documents'
+        directory: Directory.Documents,
+        recursive: true,
       });
-      alert(`Archivo guardado en 'Documents' como: ${fileName}`);
+
+      const fileUri = savedFile.uri;
+
+      try {
+        await FileOpener.open({ filePath: fileUri, contentType: mimeType });
+      } catch (e) {
+        console.error("Error al abrir archivo automáticamente:", e);
+        mostrarNotificacion(
+          "Archivo guardado. Búscalo en la carpeta Documentos de tu dispositivo."
+        );
+      }
     } catch (e) {
       console.error("Error al guardar archivo", e);
-      alert("Error al guardar archivo. ¿Otorgaste permisos a la app?");
+      mostrarNotificacion(
+        "Error al guardar archivo. ¿Otorgaste permisos a la app?"
+      );
     }
   };
 
-  // 3. Lógica para EXPORTAR PDF
+  // 🔹 Exportar PDF con todos los productos
   const exportarPDF = async () => {
-    setIsLoading(true);
+    const permitido = await solicitarPermisoDescarga();
+    if (!permitido) return;
+
+    mostrarNotificacion("Generando PDF, la descarga se iniciará en breve...");
+
     try {
       const productos = await fetchProductos();
       const doc = new jsPDF();
@@ -89,74 +136,144 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
         body: productos.map((p) => [
           p.codigo,
           p.nombre,
-          p.cantidad,
+          p.cantidad.toString(),
           p.estado,
           p.categoria,
         ]),
       });
 
-      // Genera como string base64 (no .save())
+      console.log(productos);
       const base64Data = doc.output("datauristring").split(",")[1];
-      await guardarEnDispositivo("reporte_productos.pdf", base64Data);
+      const timestamp = new Date().getTime();
 
+      await guardarEnDispositivo(
+        `reporte_productos_${timestamp}.pdf`,
+        base64Data,
+        "application/pdf"
+      );
+
+      mostrarNotificacion(
+        "PDF descargado correctamente. Revisa la carpeta Documentos."
+      );
     } catch (error) {
       console.error("Error PDF:", error);
-      alert("No se pudo generar el PDF.");
+      mostrarNotificacion("No se pudo generar el PDF.");
     }
-    setIsLoading(false);
-    onDidDismiss(); // Cierra el modal
   };
 
-  // 4. Lógica para EXPORTAR EXCEL
+  // 🔹 Exportar Excel con todos los productos
   const exportarExcel = async () => {
-    setIsLoading(true);
+    const permitido = await solicitarPermisoDescarga();
+    if (!permitido) return;
+
+    mostrarNotificacion("Generando Excel, la descarga se iniciará en breve...");
+
     try {
       const productos = await fetchProductos();
-      const ws = XLSX.utils.json_to_sheet(productos);
+      const datosExcel = productos.map((p) => ({
+        Código: p.codigo,
+        Nombre: p.nombre,
+        Cantidad: Number(p.cantidad),
+        Estado: p.estado,
+        Categoría: p.categoria,
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(datosExcel);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Productos");
 
-      // Genera como string base64 (no .writeFile())
-      const base64Data = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
-      await guardarEnDispositivo("reporte_productos.xlsx", base64Data);
+      const base64Data = XLSX.write(wb, {
+        bookType: "xlsx",
+        type: "base64",
+      });
 
+      const timestamp = new Date().getTime();
+      await guardarEnDispositivo(
+        `reporte_productos_${timestamp}.xlsx`,
+        base64Data,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+
+      mostrarNotificacion(
+        "Excel descargado correctamente. Revisa la carpeta Documentos."
+      );
     } catch (error) {
       console.error("Error Excel:", error);
-      alert("No se pudo generar el Excel.");
+      mostrarNotificacion("No se pudo generar el Excel.");
     }
-    setIsLoading(false);
-    onDidDismiss(); // Cierra el modal
   };
 
-  // 5. RENDER: Esto es lo que se verá dentro del modal
   return (
     <>
-      {/* Encabezado del Modal */}
+      {alertMessage && (
+        <div
+          style={{
+            position: "fixed",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            zIndex: 10000,
+            background: "white",
+            padding: "20px",
+            borderRadius: "10px",
+            boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
+            maxWidth: "80%",
+            textAlign: "center",
+          }}
+        >
+          <p>{alertMessage}</p>
+          <IonButton
+            onClick={() => setAlertMessage(null)}
+            expand="block"
+            style={{ marginTop: "10px" }}
+          >
+            Aceptar
+          </IonButton>
+        </div>
+      )}
       <IonHeader>
         <IonToolbar>
-          <IonTitle>Todos los Productos</IonTitle>
+          <IonTitle>Reporte de Productos</IonTitle>
           <IonButtons slot="end">
-            <IonButton onClick={onDidDismiss}>Cancelar</IonButton>
+            <IonButton onClick={onDidDismiss}>Cerrar</IonButton>
           </IonButtons>
         </IonToolbar>
       </IonHeader>
 
-      {/* Contenido del Modal */}
       <IonContent className="ion-padding">
-        <IonLoading isOpen={isLoading} message={"Generando reporte..."} />
         <IonText>
-          <h3 style={{ textAlign: "center", fontWeight: "bold", marginTop: '1rem' }}>
+          <h3
+            style={{
+              textAlign: "center",
+              fontWeight: "bold",
+              marginTop: "1rem",
+            }}
+          >
             ¿Deseas descargar en formato PDF o Excel?
           </h3>
+          <p
+            style={{
+              textAlign: "center",
+              fontSize: "0.9rem",
+              color: "#666",
+            }}
+          >
+            Los archivos se guardarán en la carpeta <b>Documentos</b> de tu
+            dispositivo.
+          </p>
         </IonText>
-        <div className="modal-buttons-container">
+        <div
+          className="modal-buttons-container"
+          style={{ padding: "20px" }}
+        >
           <IonButton
             className="modal-button"
             color="danger"
             expand="block"
             onClick={exportarPDF}
+            style={{ marginBottom: "10px" }}
           >
-            PDF
+            Descargar PDF
           </IonButton>
           <IonButton
             className="modal-button"
@@ -164,7 +281,7 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
             expand="block"
             onClick={exportarExcel}
           >
-            Excel
+            Descargar Excel
           </IonButton>
         </div>
       </IonContent>
