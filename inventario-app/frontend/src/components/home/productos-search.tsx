@@ -31,7 +31,7 @@ export default function ProductosSearch({ onResults }: Props) {
         created_at,
         stock ( cantidad, estado, ultima_actualizacion )
       `)
-            .ilike("nombre", `%${query}%`); // similitud básica
+            .ilike("nombre", `%${query}%`);
 
         if (error) {
             console.error("Error en la búsqueda:", error.message);
@@ -41,7 +41,6 @@ export default function ProductosSearch({ onResults }: Props) {
                 nombre: p.nombre,
                 marca: p.marca,
                 modelo: p.modelo,
-                // Normalizamos: prioriza 'codigo_barras' y cae a 'sku' si no existe
                 codigo_barras: p.codigo_barras ?? p.sku ?? null,
                 activo: p.activo,
                 stock: p.stock?.cantidad ?? 0,
@@ -77,7 +76,6 @@ export default function ProductosSearch({ onResults }: Props) {
                 nombre: p.nombre,
                 marca: p.marca,
                 modelo: p.modelo,
-                // Normalizamos: prioriza 'codigo_barras' y cae a 'sku' si no existe
                 codigo_barras: p.codigo_barras ?? p.sku ?? null,
                 activo: p.activo,
                 stock: p.stock?.cantidad ?? 0,
@@ -92,7 +90,7 @@ export default function ProductosSearch({ onResults }: Props) {
     useEffect(() => {
         const timeout = setTimeout(() => {
             if (query.trim().length === 0) {
-                fetchAllProductos(); // 🔹 en vez de limpiar, recargo todos
+                fetchAllProductos();
             } else {
                 handleSearch();
             }
@@ -102,27 +100,29 @@ export default function ProductosSearch({ onResults }: Props) {
     }, [query, fetchAllProductos, handleSearch]);
 
     return (
-        <div className="search-box">
-            <span className="search-icon">🔎</span>
-            <input
-                type="text"
-                placeholder="Buscar producto..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="search-input"
-            />
-            {query && !loading && (
-                <button
-                    className="clear-btn"
-                    onClick={() => {
-                        setQuery("");
-                        fetchAllProductos(); // 🔹 al limpiar, refresca la tabla
-                    }}
-                >
-                    ❌
-                </button>
-            )}
-            {loading && <span className="loading-spinner"></span>}
+        <div className="search-bar-container">
+            <div className="search-box">
+                <span className="search-icon">🔎</span>
+                <input
+                    type="text"
+                    placeholder="Buscar producto..."
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    className="search-input"
+                />
+                {query && !loading && (
+                    <button
+                        className="clear-btn"
+                        onClick={() => {
+                            setQuery("");
+                            fetchAllProductos();
+                        }}
+                    >
+                        ❌
+                    </button>
+                )}
+                {loading && <span className="loading-spinner"></span>}
+            </div>
         </div>
     );
 }

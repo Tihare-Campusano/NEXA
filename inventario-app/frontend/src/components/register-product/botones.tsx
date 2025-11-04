@@ -1,6 +1,6 @@
 import { IonButton } from "@ionic/react";
 import { useHistory } from "react-router-dom";
-import "./Botones.css";
+import "./botones.css";
 
 const Botones: React.FC = () => {
     const history = useHistory();

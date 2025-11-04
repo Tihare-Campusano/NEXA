@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   IonHeader,
   IonToolbar,
@@ -7,20 +7,18 @@ import {
   IonButtons,
   IonButton,
   IonText,
-  IonLoading,
 } from "@ionic/react";
 import { supabase } from "../../../supabaseClient";
 
-// --- Imports para generar archivos ---
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { Filesystem, Directory } from "@capacitor/filesystem";
-import "./report_register_for_month.css"; // 👈 CSS para los botones
+import { Capacitor } from "@capacitor/core";
+import { FileOpener } from "@capacitor-community/file-opener";
+import { Toast } from "@capacitor/toast";
+import "./report_register_for_month.css";
 
-// Tipos derivados de datos del backend (inferidos en tiempo de ejecución)
-
-// Props que el componente recibirá
 interface ReportRegisterForMonthProps {
   onDidDismiss: () => void;
 }
@@ -28,22 +26,47 @@ interface ReportRegisterForMonthProps {
 const ReportRegisterForMonth: React.FC<ReportRegisterForMonthProps> = ({
   onDidDismiss,
 }) => {
-  const [isLoading, setIsLoading] = useState(false);
 
-  // 1. Lógica para OBTENER los datos y el mes (se llama al hacer clic)
+  // 🔹 Mostrar toast
+  const mostrarNotificacion = async (mensaje: string) => {
+    await Toast.show({ text: mensaje, duration: "long" });
+  };
+
+  // 🔹 Solicitar permiso de almacenamiento
+  const solicitarPermisoDescarga = async (): Promise<boolean> => {
+    if (Capacitor.getPlatform() === "android") {
+      try {
+        const check = await Filesystem.checkPermissions();
+        if (check.publicStorage !== "granted") {
+          const request = await Filesystem.requestPermissions();
+          if (request.publicStorage !== "granted") {
+            mostrarNotificacion(
+              "Por favor, concede permiso de almacenamiento para descargar archivos."
+            );
+            return false;
+          }
+        }
+      } catch (err) {
+        console.error("Error al verificar permisos de almacenamiento:", err);
+        mostrarNotificacion("No se pudo obtener el permiso de almacenamiento.");
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // 🔹 Obtener datos del mes actual
   const getReportData = async () => {
     const date = new Date();
     const primerDia = new Date(date.getFullYear(), date.getMonth(), 1);
     const ultimoDia = new Date(date.getFullYear(), date.getMonth() + 1, 0);
 
-    // Calcular nombre del mes
     const nombreMes = date.toLocaleString("es-ES", {
       month: "long",
       year: "numeric",
     });
     const mes = nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1);
 
-    // Buscar datos
     const { data, error } = await supabase
       .from("productos")
       .select("id, sku, nombre, marca, created_at")
@@ -55,8 +78,7 @@ const ReportRegisterForMonth: React.FC<ReportRegisterForMonthProps> = ({
       throw error;
     }
 
-    // Mapear datos
-    const productos = data.map((p: any) => ({
+    const productos = (data ?? []).map((p: any) => ({
       codigo: p.sku,
       nombre: p.nombre,
       marca: p.marca || "General",
@@ -66,24 +88,48 @@ const ReportRegisterForMonth: React.FC<ReportRegisterForMonthProps> = ({
     return { productos, mes };
   };
 
-  // 2. Lógica para GUARDAR en el dispositivo (Android/iOS)
-  const guardarEnDispositivo = async (fileName: string, base64Data: string) => {
+  // 🔹 Guardar archivo y abrirlo
+  const guardarEnDispositivo = async (
+    fileName: string,
+    base64Data: string,
+    mimeType: string
+  ) => {
     try {
-      await Filesystem.writeFile({
+      const savedFile = await Filesystem.writeFile({
         path: fileName,
         data: base64Data,
         directory: Directory.Documents,
+        recursive: true,
       });
-      alert(`Archivo guardado en 'Documents' como: ${fileName}`);
+
+      const fileUri = savedFile.uri;
+
+      try {
+        await FileOpener.open({
+          filePath: fileUri,
+          contentType: mimeType,
+        });
+      } catch (e) {
+        console.error("Error al abrir archivo automáticamente:", e);
+        mostrarNotificacion(
+          "Archivo guardado. Búscalo en la carpeta Documentos de tu dispositivo."
+        );
+      }
     } catch (e) {
       console.error("Error al guardar archivo", e);
-      alert("Error al guardar archivo. ¿Otorgaste permisos a la app?");
+      mostrarNotificacion(
+        "Error al guardar archivo. ¿Otorgaste permisos a la app?"
+      );
     }
   };
 
-  // 3. Lógica para EXPORTAR PDF
+  // 🔹 Exportar PDF
   const exportarPDF = async () => {
-    setIsLoading(true);
+    const permitido = await solicitarPermisoDescarga();
+    if (!permitido) return;
+
+    mostrarNotificacion("Generando PDF, la descarga se iniciará en breve...");
+
     try {
       const { productos, mes } = await getReportData();
       const doc = new jsPDF();
@@ -103,19 +149,29 @@ const ReportRegisterForMonth: React.FC<ReportRegisterForMonthProps> = ({
       );
 
       const base64Data = doc.output("datauristring").split(",")[1];
-      await guardarEnDispositivo(`reporte_registros_${mes}.pdf`, base64Data);
+      const timestamp = new Date().getTime();
+      await guardarEnDispositivo(
+        `reporte_registros_${mes}_${timestamp}.pdf`,
+        base64Data,
+        "application/pdf"
+      );
 
+      mostrarNotificacion(
+        "PDF descargado correctamente. Revisa el panel de notificaciones o la carpeta Documentos."
+      );
     } catch (error) {
       console.error("Error PDF:", error);
-      alert("No se pudo generar el PDF.");
+      mostrarNotificacion("No se pudo generar el PDF.");
     }
-    setIsLoading(false);
-    onDidDismiss(); // Cierra el modal
   };
 
-  // 4. Lógica para EXPORTAR EXCEL
+  // 🔹 Exportar Excel
   const exportarExcel = async () => {
-    setIsLoading(true);
+    const permitido = await solicitarPermisoDescarga();
+    if (!permitido) return;
+
+    mostrarNotificacion("Generando Excel, la descarga se iniciará en breve...");
+
     try {
       const { productos, mes } = await getReportData();
       const ws = XLSX.utils.json_to_sheet(productos);
@@ -123,20 +179,22 @@ const ReportRegisterForMonth: React.FC<ReportRegisterForMonthProps> = ({
       XLSX.utils.book_append_sheet(wb, ws, `Registros ${mes}`);
 
       const base64Data = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
+      const timestamp = new Date().getTime();
       await guardarEnDispositivo(
-        `reporte_registros_${mes}.xlsx`,
-        base64Data
+        `reporte_registros_${mes}_${timestamp}.xlsx`,
+        base64Data,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
 
+      mostrarNotificacion(
+        "Excel descargado correctamente. Revisa el panel de notificaciones o la carpeta Documentos."
+      );
     } catch (error) {
       console.error("Error Excel:", error);
-      alert("No se pudo generar el Excel.");
+      mostrarNotificacion("No se pudo generar el Excel.");
     }
-    setIsLoading(false);
-    onDidDismiss(); // Cierra el modal
   };
 
-  // 5. RENDER: El contenido del modal
   return (
     <>
       <IonHeader>
@@ -149,7 +207,6 @@ const ReportRegisterForMonth: React.FC<ReportRegisterForMonthProps> = ({
       </IonHeader>
 
       <IonContent className="ion-padding">
-        <IonLoading isOpen={isLoading} message={"Generando reporte..."} />
         <IonText>
           <h3
             style={{
@@ -161,14 +218,15 @@ const ReportRegisterForMonth: React.FC<ReportRegisterForMonthProps> = ({
             ¿Deseas descargar en formato PDF o Excel?
           </h3>
         </IonText>
-        <div className="modal-buttons-container">
+        <div className="modal-buttons-container" style={{ padding: "20px" }}>
           <IonButton
             className="modal-button"
             color="danger"
             expand="block"
             onClick={exportarPDF}
+            style={{ marginBottom: "10px" }}
           >
-            PDF
+            Descargar PDF
           </IonButton>
           <IonButton
             className="modal-button"
@@ -176,7 +234,7 @@ const ReportRegisterForMonth: React.FC<ReportRegisterForMonthProps> = ({
             expand="block"
             onClick={exportarExcel}
           >
-            Excel
+            Descargar Excel
           </IonButton>
         </div>
       </IonContent>
