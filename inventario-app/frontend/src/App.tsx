@@ -49,20 +49,6 @@ import IAImagen from "./pages/register-product/ia-images/ia-images";
 setupIonicReact();
 
 const App: React.FC = () => {
-    // const history = useHistory(); // Se comenta, ya no se usa
-
-    // ❌ LÓGICA DE AUTENTICACIÓN Y REDIRECCIÓN ELIMINADA ❌
-    // El listener de onAuthStateChange ya no existe aquí.
-    // Esto significa que la app no protegerá las rutas ni creará perfiles de forma automática.
-    /*
-    useEffect(() => {
-        console.log("🟢 App.tsx: Listener de autenticación eliminado.");
-        return () => {
-            // No hay nada que limpiar.
-        };
-    }, []); 
-    */
-
     return (
         <IonApp>
             <IonReactRouter>
@@ -70,8 +56,6 @@ const App: React.FC = () => {
                     {/* Rutas Públicas (ahora todas son accesibles directamente) */}
                     <Route exact path="/" render={() => <Redirect to="/login" />} />
                     <Route exact path="/login" component={Login} />
-                    {/* Ruta eliminada: /identificate */}
-                    {/* Rutas con Tabs (ahora desprotegidas) */}
                     <Route path="/tabs" render={() => <TabsLayout />} />
                 </IonRouterOutlet>
             </IonReactRouter>

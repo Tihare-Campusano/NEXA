@@ -17,7 +17,6 @@ export default function Productos() {
         {/* Buscador opcional */}
         <ProductosSearch onResults={(arr) => setProductosFiltrados(arr as Producto[])} />
         <br />
-
         {/* Tabla de productos */}
         <ProductosTable productos={productosFiltrados ?? undefined} />
       </IonContent>
