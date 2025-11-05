@@ -1,5 +1,8 @@
+// IAImagen.tsx
+// Componente para tomar una foto, analizarla con el modelo TFLite de estado de producto
+// y actualizar el estado de stock en el formulario de registro.
+
 // --- 1. IMPORTACIONES ---
-// Importamos los componentes de la interfaz de usuario de Ionic (botones, imágenes, spinners, etc.).
 import {
     IonPage,
     IonContent,
@@ -8,155 +11,92 @@ import {
     IonText,
     IonLoading,
 } from "@ionic/react";
-// Importamos los 'hooks' de React para manejar el estado (useState) y el ciclo de vida (useEffect).
 import { useState, useEffect } from "react";
-// Importamos Capacitor para acceder a funcionalidades nativas como la cámara y detectar la plataforma.
 import { Capacitor } from "@capacitor/core";
 import { Camera, CameraResultType } from "@capacitor/camera";
-// Importamos el cliente de Supabase para conectar con nuestra base de datos y almacenamiento.
 import { createClient } from "@supabase/supabase-js";
-// Importamos hooks de React Router para la navegación y para recibir datos de otras páginas.
 import { useHistory, useLocation } from "react-router-dom";
-// Importamos TensorFlow.js (tf) y la librería para modelos TFLite.
 import * as tf from "@tensorflow/tfjs";
 import * as tflite from "@tensorflow/tfjs-tflite";
-// Importamos los "motores" (backends) de TFJS. Sin esto, la IA no puede hacer cálculos.
 import '@tensorflow/tfjs-backend-webgl';
 import '@tensorflow/tfjs-backend-wasm';
 
 // --- 2. CONFIGURACIÓN DE SUPABASE ---
-// Creamos una instancia del cliente de Supabase para poder interactuar con nuestra base de datos.
 const supabase = createClient(
     import.meta.env.VITE_SUPABASE_URL as string,
     import.meta.env.VITE_SUPABASE_ANON_KEY as string
 );
 
 // --- 3. DEFINICIÓN DEL COMPONENTE ---
+// Definición de tipos para la data que llega por `history.push`
+interface FormData {
+    codigo: string;
+    nombre: string;
+    stock: string; // Stock actual como string
+    [key: string]: any; // Permite otras propiedades
+}
+
 export default function IAImagen() {
     // --- Hooks de Navegación ---
-    const history = useHistory(); // Hook para poder navegar a otras páginas (ej: volver al formulario).
-    const location = useLocation(); // Hook para acceder a los datos pasados desde la página anterior.
-    // Obtenemos los datos del formulario que se enviaron desde la página de registro.
-    const formData = (location.state as any)?.formData || {};
+    const history = useHistory();
+    const location = useLocation();
+    // Obtener los datos del formulario (código, stock actual, etc.)
+    const formData = (location.state as { formData?: FormData })?.formData || {} as FormData;
 
     // --- 4. ESTADOS DEL COMPONENTE ---
-    // 'useState' nos permite guardar información que cambia y que redibuja la pantalla cuando se actualiza.
-    const [image, setImage] = useState<string | null>(null); // Guarda la URL de la imagen tomada.
-    const [loading, setLoading] = useState(false); // Controla si una operación está en curso (para deshabilitar botones).
-    const [estadoIA, setEstadoIA] = useState<string | null>(null); // Guarda el resultado de la predicción de la IA (ej: "Nuevo").
-    const [modeloLite, setModeloLite] = useState<tflite.TFLiteModel | null>(null); // Guarda el modelo de IA una vez cargado en memoria.
-    const [showLoadingOverlay, setShowLoadingOverlay] = useState(false); // Controla un indicador de carga de pantalla completa.
+    const [image, setImage] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [estadoIA, setEstadoIA] = useState<string | null>(null);
+    const [modeloLite, setModeloLite] = useState<tflite.TFLiteModel | null>(null);
+    const [showLoadingOverlay, setShowLoadingOverlay] = useState(false);
 
     // --- 5. CARGA DEL MODELO DE IA ---
-    // 'useEffect' se ejecuta una sola vez cuando el componente se muestra en pantalla.
-    // Es el lugar perfecto para realizar tareas de inicialización.
     useEffect(() => {
         const loadModelLite = async () => {
-            setShowLoadingOverlay(true); // Muestra el indicador de carga.
+            setShowLoadingOverlay(true);
             try {
-                // Esperamos a que el motor de TensorFlow.js esté 100% listo. Esto previene errores.
+                // Asegurar que el backend (WebAssembly o WebGL) esté listo
                 await tf.ready();
                 console.log("✅ Backend de TensorFlow listo.");
 
-                // Cargamos el archivo del modelo desde la carpeta 'public/ml'.
-                const m = await tflite.loadTFLiteModel("../ml/modelo_final.tflite");
+                // Cargamos el modelo TFLite. Asegúrate que la ruta sea correcta.
+                // Si el modelo está en la carpeta 'public/ml', esta ruta es correcta.
+                const m = await tflite.loadTFLiteModel("../modelo_ia/modelo_final.tflite");
                 
-                // Guardamos el modelo cargado en nuestro estado para poder usarlo después.
                 setModeloLite(m);
                 console.log("✅ Modelo TFLite cargado correctamente");
             } catch (err) {
                 console.error("❌ Error cargando modelo TFLite:", err);
-                alert("Error al cargar el modelo de IA.");
+                alert("Error al cargar el modelo de IA. Revisa la consola.");
             }
-            setShowLoadingOverlay(false); // Oculta el indicador de carga.
+            setShowLoadingOverlay(false);
         };
         loadModelLite();
-    }, []); // El array vacío `[]` asegura que esto se ejecute solo una vez.
+    }, []);
 
     // --- 6. FUNCIÓN PARA TOMAR FOTO ---
     const tomarFoto = async () => {
+        // Reiniciar estados de análisis al tomar nueva foto
+        setEstadoIA(null); 
+        setLoading(true);
+
         try {
-            // Detectamos si la app corre en un celular (nativo) o en la web.
             const isNative = Capacitor.isNativePlatform();
             
-            // Llamamos al plugin de la cámara.
             const foto = await Camera.getPhoto({
                 quality: 90,
                 allowEditing: false,
-                // Optimizamos: en celular pedimos la ruta del archivo (Uri) para ahorrar memoria.
-                // En la web, pedimos el DataUrl (texto base64).
                 resultType: isNative ? CameraResultType.Uri : CameraResultType.DataUrl,
             });
 
-            // Guardamos la ruta de la imagen en el estado. `webPath` funciona en ambas plataformas.
             setImage(foto.webPath || foto.dataUrl || null);
-            // Limpiamos cualquier predicción anterior, ya que la foto es nueva.
-            setEstadoIA(null);
-        } catch {
-            // Si el usuario cancela la cámara, se produce un error que capturamos aquí para evitar que la app se rompa.
-            console.log("El usuario canceló la toma de la foto.");
+        } catch (e) {
+            console.log("El usuario canceló la toma de la foto o hubo un error en la cámara.", e);
+        } finally {
+            setLoading(false);
         }
     };
 
-    // --- 7. FUNCIÓN PARA PREDECIR CON LA IA ---
-    const predecirEstadoLite = async () => {
-        // No hacer nada si no tenemos un modelo cargado o una imagen para analizar.
-        if (!modeloLite || !image) return;
-
-        setLoading(true);
-        setShowLoadingOverlay(true);
-
-        // Creamos un objeto de imagen en JavaScript para que TensorFlow pueda leerlo.
-        const img = new Image();
-        img.src = image;
-
-        // Esta función se ejecutará cuando la imagen se haya cargado completamente en el navegador/app.
-        // ✅ --- INICIO DEL CÓDIGO ACTUALIZADO --- ✅
-        img.onload = async () => {
-            try {
-                await tf.ready();
-
-                const tensor = tf.browser.fromPixels(img)
-                    .resizeNearestNeighbor([224, 224])
-                    .toFloat().div(tf.scalar(255))
-                    .expandDims(0);
-
-                const output = (await modeloLite.predict(tensor)) as tf.Tensor;
-
-                // --- CORRECCIÓN IMPORTANTE ---
-                // Añadimos una verificación para asegurarnos de que la predicción tuvo éxito.
-                if (!output) {
-                    // Si output es null, lanzamos un error claro y detenemos la ejecución.
-                    throw new Error("La predicción del modelo falló y devolvió un resultado nulo. Esto suele deberse a una operación no soportada en el modelo TFLite para la web.");
-                }
-
-                const scores = (await output.array()) as number[][];
-                const idx = scores[0].indexOf(Math.max(...scores[0]));
-                const etiquetas = ["Mal estado", "Nuevo", "Usado"];
-                const resultado = etiquetas[idx] || "Desconocido";
-
-                setEstadoIA(resultado);
-                alert(`Estado detectado: ${resultado}`);
-
-            } catch (error) {
-                // Ahora, el error que lanzamos arriba será capturado aquí.
-                console.error("Error al predecir:", error);
-                alert("Ocurrió un error al analizar la imagen. Revisa la consola para más detalles.");
-            } finally {
-                setLoading(false);
-                setShowLoadingOverlay(false);
-            }
-        };
-        // ✅ --- FIN DEL CÓDIGO ACTUALIZADO --- ✅
-        
-        // Manejador de error por si la imagen no se puede cargar.
-        img.onerror = () => {
-            alert("No se pudo cargar la imagen para analizar.");
-            setLoading(false);
-            setShowLoadingOverlay(false);
-        };
-    };
-    
     // ✅ NUEVO: Función para calcular la disponibilidad según las reglas especificadas.
     const calcularDisponibilidad = (cantidad: number): string => {
         if (cantidad <= 0) return "Sin stock";
@@ -165,9 +105,66 @@ export default function IAImagen() {
         return "Alta disponibilidad"; // Para 11 en adelante
     };
 
+    // --- 7. FUNCIÓN PARA PREDECIR CON LA IA ---
+    const predecirEstadoLite = async () => {
+        if (!modeloLite || !image) return;
+
+        setLoading(true);
+        setShowLoadingOverlay(true);
+
+        const img = new Image();
+        img.src = image;
+
+        img.onload = async () => {
+            let output: tf.Tensor | null = null;
+            try {
+                await tf.ready();
+
+                // 1. Preprocesamiento: Cargar, redimensionar, convertir a float y normalizar
+                const tensor = tf.browser.fromPixels(img)
+                    .resizeNearestNeighbor([224, 224])
+                    .toFloat().div(tf.scalar(255)) // Normalizar a [0, 1]
+                    .expandDims(0); // Añadir la dimensión de batch (1, 224, 224, 3)
+
+                // 2. Predicción
+                output = modeloLite.predict(tensor) as tf.Tensor;
+
+                if (!output) {
+                    throw new Error("La predicción del modelo devolvió un resultado nulo.");
+                }
+
+                // 3. Postprocesamiento: Obtener el índice de la clase con mayor probabilidad
+                const scores = (await output.array()) as number[][];
+                const idx = scores[0].indexOf(Math.max(...scores[0]));
+                
+                // ❗ ASUMIMOS ESTE ORDEN DE ETIQUETAS (ALFABÉTICO basado en tus clases)
+                // Debes verificar el orden real que tu modelo está usando.
+                const etiquetas = ["mal_estado", "nuevo", "usado"]; 
+                const resultado = etiquetas[idx] || "Desconocido";
+
+                setEstadoIA(resultado);
+                alert(`Estado detectado: ${resultado}`);
+
+            } catch (error) {
+                console.error("Error al predecir:", error);
+                alert("Ocurrió un error al analizar la imagen. Esto puede ser por la operación TFLite.");
+            } finally {
+                if (output) output.dispose(); // Limpieza de memoria del tensor
+                setLoading(false);
+                setShowLoadingOverlay(false);
+            }
+        };
+        
+        img.onerror = () => {
+            alert("No se pudo cargar la imagen para analizar.");
+            setLoading(false);
+            setShowLoadingOverlay(false);
+        };
+    };
+    
     // --- 8. FUNCIÓN PARA GUARDAR Y VOLVER AL FORMULARIO ---
     const guardarYVolver = async () => {
-        // Validaciones para asegurar que tenemos toda la información necesaria.
+        // Asegurarse que tenemos la información mínima
         if (!image || !estadoIA || !formData.codigo) {
             alert("Se necesita una foto, un análisis de IA y un código de producto para continuar.");
             return;
@@ -177,36 +174,46 @@ export default function IAImagen() {
         setShowLoadingOverlay(true);
 
         try {
-            // Convertimos la imagen (sea Uri o DataUrl) a un formato 'blob' que Supabase puede almacenar.
+            // --- 8.1 Subir Imagen a Supabase ---
             const response = await fetch(image);
             const blob = await response.blob();
-            // Creamos un nombre de archivo único para evitar sobrescribir imágenes.
             const fileName = `productos/${formData.codigo}_${Date.now()}.png`;
-            // Subimos el archivo 'blob' al bucket 'imagenes-productos' de Supabase Storage.
-            const { error } = await supabase.storage.from("imagenes-productos").upload(fileName, blob);
-            if (error) throw error; // Si hay un error, lo lanzamos para que lo capture el 'catch'.
 
-            // Obtenemos la URL pública de la imagen que acabamos de subir.
-            const { data: publicUrlData } = supabase.storage.from("imagenes-productos").getPublicUrl(fileName);
+            const { error: uploadError } = await supabase.storage
+                .from("imagenes-productos")
+                .upload(fileName, blob, {
+                    cacheControl: '3600',
+                    upsert: false
+                });
 
-            // ✅ CORRECCIÓN: Calculamos el nuevo stock y la nueva disponibilidad aquí.
-            const newStock = parseInt(formData.stock || "0", 10) + 1;
+            if (uploadError) throw uploadError;
+
+            // Obtener la URL pública de la imagen
+            const { data: publicUrlData } = supabase.storage
+                .from("imagenes-productos")
+                .getPublicUrl(fileName);
+
+            // --- 8.2 Actualizar Stock y Disponibilidad ---
+            // El stock en formData es el stock inicial/actual
+            const currentStock = parseInt(formData.stock || "0", 10);
+            const newStock = currentStock + 1; // Incrementamos el stock en 1 unidad
             const newDisponibilidad = calcularDisponibilidad(newStock);
 
-            // Creamos un nuevo objeto con todos los datos del formulario anterior, más los nuevos datos de la IA.
+            // --- 8.3 Preparar Data y Navegar ---
             const updatedForm = {
                 ...formData,
-                imagen_url: publicUrlData.publicUrl || "", // La URL de la imagen.
-                estadoIA: estadoIA, // El estado detectado.
-                stock: newStock.toString(), // Enviamos el nuevo stock.
-                disponibilidad: newDisponibilidad, // Enviamos la nueva disponibilidad ya calculada.
+                imagen_url: publicUrlData.publicUrl || "",
+                estado_ia: estadoIA, // Usamos estado_ia para claridad en el formulario
+                stock: newStock.toString(), // Enviamos el nuevo stock como string
+                disponibilidad: newDisponibilidad,
             };
             
-            // Navegamos de vuelta a la página de registro, pasándole el objeto con todos los datos actualizados.
+            // Navegar de vuelta a la página de registro con los datos actualizados
             history.push("/tabs/registro/ia", { formData: updatedForm });
 
         } catch (error: any) {
-            alert(`Error al subir imagen: ${error.message}`);
+            console.error("Error completo:", error);
+            alert(`Error en el proceso de guardado: ${error.message}`);
         } finally {
             setLoading(false);
             setShowLoadingOverlay(false);
@@ -217,25 +224,44 @@ export default function IAImagen() {
     return (
         <IonPage>
             <IonContent className="ion-padding">
-                {/* Botón para activar la cámara */}
-                <IonButton expand="block" onClick={tomarFoto} disabled={loading}>Tomar Foto</IonButton>
+                
+                {/* Mostrar código del producto actual (para referencia) */}
+                <IonText color="medium"><p>Producto: <b>{formData.codigo || "Cargando..."}</b></p></IonText>
 
-                {/* Muestra la imagen solo si el estado 'image' tiene un valor */}
+                {/* Botón para activar la cámara */}
+                <IonButton expand="block" onClick={tomarFoto} disabled={loading}>
+                    📸 Tomar Foto
+                </IonButton>
+
+                {/* Muestra la imagen */}
                 {image && <IonImg src={image} style={{ marginTop: "1rem" }} />}
                 
-                {/* Muestra el botón de analizar solo si hay una imagen Y todavía no se ha analizado */}
+                {/* Muestra el botón de analizar */}
                 {image && !estadoIA && (
-                    <IonButton color="secondary" expand="block" onClick={predecirEstadoLite} disabled={loading || !modeloLite} style={{ marginTop: "1rem" }}>
-                        Analizar con IA
+                    <IonButton 
+                        color="secondary" 
+                        expand="block" 
+                        onClick={predecirEstadoLite} 
+                        // Deshabilitar si está cargando o si el modelo aún no está listo
+                        disabled={loading || !modeloLite} 
+                        style={{ marginTop: "1rem" }}
+                    >
+                        🔬 Analizar con IA
                     </IonButton>
                 )}
 
-                {/* Muestra el resultado y el botón de confirmar solo si ya hay un estado detectado por la IA */}
+                {/* Muestra el resultado y el botón de confirmar */}
                 {estadoIA && (
                     <>
-                        <IonText><h2 style={{ textAlign: "center", marginTop: "1rem" }}>Estado: {estadoIA}</h2></IonText>
-                        <IonButton color="success" expand="block" onClick={guardarYVolver} disabled={loading} style={{ marginTop: "1rem" }}>
-                            Confirmar y Volver
+                        <IonText><h2 style={{ textAlign: "center", marginTop: "1rem" }}>Estado detectado: **{estadoIA}**</h2></IonText>
+                        <IonButton 
+                            color="success" 
+                            expand="block" 
+                            onClick={guardarYVolver} 
+                            disabled={loading} 
+                            style={{ marginTop: "1rem" }}
+                        >
+                            💾 Confirmar, Subir Imagen y Actualizar Stock
                         </IonButton>
                     </>
                 )}
