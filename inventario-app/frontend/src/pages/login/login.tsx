@@ -10,8 +10,7 @@ import {
 import { useHistory } from 'react-router-dom';
 import { logoGoogle } from 'ionicons/icons';
 import { Camera } from '@capacitor/camera';
-import { Filesystem } from '@capacitor/filesystem';
-import { Geolocation } from '@capacitor/geolocation';
+import { Filesystem } from '@capacitor/filesystem'; // Se mantiene por si se usa en otras partes del código, pero no lo usaremos para pedir permisos.
 import { Capacitor } from '@capacitor/core';
 
 import LoginForm from '../../components/login/login-form';
@@ -55,19 +54,29 @@ const Login: React.FC = () => {
   // --- Solicitar permisos esenciales ---
   const requestPermissions = async (): Promise<boolean> => {
     try {
-      // Cámara
+      // 1. Cámara
       const camPerm = await Camera.requestPermissions();
-      if (camPerm.camera !== 'granted') return false;
+      if (camPerm.camera !== 'granted') {
+        toast('Permiso de Cámara denegado.');
+        return false;
+      }
 
-      // Archivos (solo Android)
-      if (Capacitor.getPlatform() === 'android') {
-        const fsPerm = await Filesystem.requestPermissions();
-        if (!fsPerm.publicStorage) return false;
+      // 2. Archivos/Almacenamiento (Acceso a Fotos/Media)
+      // Usamos el plugin Camera.requestPermissions con el parámetro 'photos'
+      // Esto es el método moderno de Capacitor para acceder a la galería y archivos.
+      if (Capacitor.getPlatform() === 'android' || Capacitor.getPlatform() === 'ios') {
+        const photosPerm = await Camera.requestPermissions({ permissions: ['photos'] });
+
+        if (photosPerm.photos !== 'granted') {
+          toast('Permiso de Fotos/Media denegado.');
+          return false;
+        }
       }
 
       return true;
     } catch (error) {
       console.error('❌ Error solicitando permisos:', error);
+      toast('Error al solicitar permisos. Verifica tu configuración nativa.');
       return false;
     }
   };
@@ -93,10 +102,12 @@ const Login: React.FC = () => {
 
       await ensureProfile(data.user.id);
 
-      // Solicitar permisos antes de entrar
+      // Solicitamos permisos DESPUÉS de un login exitoso.
       const granted = await requestPermissions();
+
+      // Corregimos el mensaje para solo mencionar Cámara y Almacenamiento
       if (!granted) {
-        toast('Debes conceder cámara, almacenamiento y ubicación para continuar');
+        toast('Debes conceder Cámara y Almacenamiento/Fotos para continuar');
         return;
       }
 
