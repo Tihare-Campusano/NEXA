@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import {
-<<<<<<< HEAD
   IonPage,
   IonContent,
   IonButton,
   IonIcon,
+  IonLoading,
   useIonToast,
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
@@ -28,7 +28,7 @@ const Login: React.FC = () => {
   const toast = (msg: string) =>
     present({ message: msg, duration: 2200, position: 'top' });
 
-  // Crea/asegura el perfil en public.usuarios (por si no usas trigger)
+  // --- Asegura que el usuario tenga un perfil en la tabla "usuarios"
   const ensureProfile = async (authUid: string) => {
     const { data: perfil, error: selErr } = await supabase
       .from('usuarios')
@@ -51,112 +51,39 @@ const Login: React.FC = () => {
       if (insErr) console.warn('[usuarios] insert error:', insErr.message);
     }
   };
-=======
-    IonPage,
-    IonContent,
-    IonButton,
-    IonIcon,
-    IonLoading,
-} from '@ionic/react';
-import { useHistory } from 'react-router-dom';
-import { logoGoogle } from 'ionicons/icons';
-import { Camera } from '@capacitor/camera';
-import { Filesystem } from '@capacitor/filesystem';
-import { Geolocation } from '@capacitor/geolocation';
-import { Capacitor } from '@capacitor/core';
 
-import LoginForm from '../../components/login/login-form';
-import './login.css';
+  // --- Solicitar permisos esenciales ---
+  const requestPermissions = async (): Promise<boolean> => {
+    try {
+      // Cámara
+      const camPerm = await Camera.requestPermissions();
+      if (camPerm.camera !== 'granted') return false;
 
-const Login: React.FC = () => {
-    const [email, setEmail] = useState('');
-    const [pass, setPass] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const history = useHistory();
+      // Archivos (solo Android)
+      if (Capacitor.getPlatform() === 'android') {
+        const fsPerm = await Filesystem.requestPermissions();
+        if (!fsPerm.publicStorage) return false;
+      }
 
-    // --- Solicitar permisos esenciales ---
-    const requestPermissions = async (): Promise<boolean> => {
-        try {
-            // Permiso de cámara
-            const camPerm = await Camera.requestPermissions();
-            if (camPerm.camera !== 'granted') return false;
+      // Ubicación
+      const geoPerm = await Geolocation.requestPermissions();
+      if (geoPerm.location !== 'granted') return false;
 
-            // Permiso de almacenamiento solo en Android
-            if (Capacitor.getPlatform() === 'android') {
-                // La función requestPermissions() ya no acepta argumentos directamente.
-                // El modo de almacenamiento se configura en AndroidManifest.xml.
-                const fsPerm = await Filesystem.requestPermissions();
+      return true;
+    } catch (error) {
+      console.error('❌ Error solicitando permisos:', error);
+      return false;
+    }
+  };
 
-                // Asumiendo que 'fsPerm' todavía devuelve un objeto con 'publicStorage'
-                if (!fsPerm.publicStorage) return false;
-            }
-
-            // Permiso de ubicación
-            const geoPerm = await Geolocation.requestPermissions();
-            if (geoPerm.location !== 'granted') return false;
-
-            return true;
-        } catch (error) {
-            console.error('❌ Error solicitando permisos:', error);
-            return false;
-        }
-    };
-
-    // Login exitoso
-    const handleLoginSuccess = async () => {
-        setIsLoading(true);
-
-        const granted = await requestPermissions();
-        if (!granted) {
-            alert('Debes conceder cámara, almacenamiento y ubicación para continuar');
-            setIsLoading(false);
-            return;
-        }
-
-        // Simular un pequeño delay para mostrar el loading
-        await new Promise((res) => setTimeout(res, 1000));
-
-        setIsLoading(false);
-        history.push('/tabs/home');
-    };
-
-    // Login con email
-    const handleEmailLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!email || !pass) {
-            alert('Por favor ingresa email y contraseña');
-            return;
-        }
-        await handleLoginSuccess();
-    };
-
-    // Login con Google (simulado)
-    const handleGoogleLogin = async () => {
-        await handleLoginSuccess();
-    };
-
-    return (
-        <IonPage>
-            <IonContent className="login-page-content">
-                <IonLoading isOpen={isLoading} message="Iniciando sesión..." />
-                <div className="login-container">
-                    <img src="/logo.png" alt="Logo de la App" className="login-logo" />
-                    <h1 className="login-title">Bienvenido</h1>
-                    <p className="login-subtitle">Inicia sesión para continuar</p>
-
-                    <LoginForm
-                        email={email}
-                        setEmail={setEmail}
-                        pass={pass}
-                        setPass={setPass}
-                        handleSubmit={handleEmailLogin}
-                        isLoading={isLoading}
-                    />
->>>>>>> tihare_dev
-
-  // Login real con email/contraseña
+  // --- Login con email y contraseña ---
   const handleEmailLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!email || !pass) {
+      toast('Por favor ingresa email y contraseña');
+      return;
+    }
+
     setIsLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -167,7 +94,16 @@ const Login: React.FC = () => {
         toast(error.message);
         return;
       }
+
       await ensureProfile(data.user.id);
+
+      // Solicitar permisos antes de entrar
+      const granted = await requestPermissions();
+      if (!granted) {
+        toast('Debes conceder cámara, almacenamiento y ubicación para continuar');
+        return;
+      }
+
       history.replace('/tabs/home');
     } catch (err: any) {
       toast(err?.message ?? 'Error al iniciar sesión');
@@ -176,17 +112,15 @@ const Login: React.FC = () => {
     }
   };
 
-<<<<<<< HEAD
-  // Login con Google (OAuth)
+  // --- Login con Google (OAuth) ---
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: window.location.origin + '/home' },
+        options: { redirectTo: window.location.origin + '/tabs/home' },
       });
       if (error) toast(error.message);
-      // después del redirect quedas autenticado
     } catch (err: any) {
       toast(err?.message ?? 'Error con Google');
     } finally {
@@ -197,6 +131,7 @@ const Login: React.FC = () => {
   return (
     <IonPage>
       <IonContent className="login-page-content">
+        <IonLoading isOpen={isLoading} message="Iniciando sesión..." />
         <div className="login-container">
           <img src="/logo.png" alt="Logo de la App" className="login-logo" />
           <h1 className="login-title">Bienvenido</h1>
@@ -207,7 +142,7 @@ const Login: React.FC = () => {
             setEmail={setEmail}
             pass={pass}
             setPass={setPass}
-            handleSubmit={handleEmailLogin}  
+            handleSubmit={handleEmailLogin}
             isLoading={isLoading}
           />
 
@@ -227,22 +162,6 @@ const Login: React.FC = () => {
       </IonContent>
     </IonPage>
   );
-=======
-                    <IonButton
-                        expand="block"
-                        fill="outline"
-                        onClick={handleGoogleLogin}
-                        disabled={isLoading}
-                        className="google-button"
-                    >
-                        <IonIcon icon={logoGoogle} slot="start" />
-                        Continuar con Google
-                    </IonButton>
-                </div>
-            </IonContent>
-        </IonPage>
-    );
->>>>>>> tihare_dev
 };
 
 export default Login;
