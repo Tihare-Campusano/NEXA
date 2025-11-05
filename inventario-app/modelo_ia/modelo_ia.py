@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 # modelo_ia.py - Entrenamiento optimizado + Fine-tuning + exportación TFLite/TFJS
-# Compatible con TensorFlow 2.15+ y Keras 3
+# Compatible con TensorFlow 2.15+ (usando tf.keras para compatibilidad)
 
 import os
 import tensorflow as tf
-from keras.preprocessing.image import ImageDataGenerator
-from keras.applications import MobileNetV2
-from keras.models import Model
-from keras.layers import Dense, GlobalAveragePooling2D, Dropout
-from keras.optimizers import Adam
-from keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
+# ✅ CORRECCIÓN: Usamos tf.keras para asegurar la compatibilidad con TensorFlow
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
 import matplotlib.pyplot as plt
 
 # -----------------------------
@@ -193,10 +194,16 @@ except Exception as e:
 # -----------------------------
 # 11️⃣ Graficar historial
 # -----------------------------
+# Aquí debes combinar el historial de ambos entrenamientos correctamente.
+# history.epoch y history_fine.epoch podrían estar fuera de sincronización si hubo EarlyStopping.
+# Para graficar, usaremos las listas completas.
 acc = history.history.get("accuracy", []) + history_fine.history.get("accuracy", [])
 val_acc = history.history.get("val_accuracy", []) + history_fine.history.get("val_accuracy", [])
 loss = history.history.get("loss", []) + history_fine.history.get("loss", [])
 val_loss = history.history.get("val_loss", []) + history_fine.history.get("val_loss", [])
+
+# Ajuste si EarlyStopping detuvo el primer entrenamiento temprano.
+# Solo necesitamos las listas combinadas.
 
 plt.figure(figsize=(10, 5))
 plt.subplot(1, 2, 1)
