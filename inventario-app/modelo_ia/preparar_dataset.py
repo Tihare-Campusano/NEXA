@@ -7,7 +7,6 @@ import numpy as np
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 # --- Configuración general ---
-
 BASE_DIR = "inventario-app/modelo_ia/dataset_inicial"   # Dataset descargado
 OUTPUT_DIR = "inventario-app/modelo_ia/dataset_limpio"  # Dataset procesado
 IMG_SIZE = (224, 224)                                   # Tamaño estándar (para modelos tipo MobileNet o ResNet)
@@ -29,10 +28,9 @@ def procesar_y_guardar(lista_imgs, split, estado):
             img = img.resize(IMG_SIZE)
 
             # Guardar en carpeta correspondiente
-            nombre = os.path.basename(img_path)
             destino = os.path.join(OUTPUT_DIR, split, estado, f"{estado}_{idx}.jpg")
-
             img.save(destino, quality=95)
+
         except (UnidentifiedImageError, OSError) as e:
             print(f"[ERROR] Imagen inválida o dañada: {img_path} ({e})")
         except Exception as e:
@@ -53,6 +51,10 @@ for estado in os.listdir(BASE_DIR):
         if f.lower().endswith(('.jpg', '.jpeg', '.png'))
     ]
 
+    if not imagenes:
+        print(f"[ADVERTENCIA] No se encontraron imágenes en {estado_path}")
+        continue
+
     # Dividir dataset en train/val/test
     imgs_train, imgs_temp = train_test_split(
         imagenes, test_size=(VAL_RATIO + TEST_RATIO), random_state=42
@@ -66,7 +68,7 @@ for estado in os.listdir(BASE_DIR):
     procesar_y_guardar(imgs_val, "val", estado)
     procesar_y_guardar(imgs_test, "test", estado)
 
-print("\n✅ Dataset limpiado, redimensionado y dividido correctamente.")
+print("\n[OK] Dataset limpiado, redimensionado y dividido correctamente.")
 
 # --- Generadores de datos para Keras ---
 train_datagen = ImageDataGenerator(
@@ -96,4 +98,4 @@ val_generator = val_datagen.flow_from_directory(
     class_mode="categorical"
 )
 
-print("\n✅ Generadores Keras listos para entrenamiento")
+print("\n[OK] Generadores Keras listos para entrenamiento.")
