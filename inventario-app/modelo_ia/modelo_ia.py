@@ -4,6 +4,8 @@
 
 import os
 import tensorflow as tf
+import matplotlib.pyplot as plt
+
 # ✅ CORRECCIÓN: Usamos tf.keras para asegurar la compatibilidad con TensorFlow
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.applications import MobileNetV2
@@ -11,7 +13,6 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
-import matplotlib.pyplot as plt
 
 # -----------------------------
 # 1️⃣ Configuración general
@@ -22,14 +23,22 @@ EPOCHS = 20
 FINE_TUNE_EPOCHS = 10
 NUM_CLASSES = 3  # nuevo, usado, mal_estado
 LEARNING_RATE = 1e-4
+
+# Rutas de trabajo
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATASET_DIR = os.path.join(BASE_DIR, "dataset_inicial")  # ✅ actualizado al nuevo dataset
+# ✅ CORRECCIÓN: La carpeta del dataset se llama 'dataset_limpio'
+DATASET_DIR = os.path.join(BASE_DIR, "dataset_limpio")
+# ✅ CORRECCIÓN: La carpeta de guardado es el mismo directorio del script
+SAVE_DIR = BASE_DIR
+
+print(f"--- Dataset cargado desde: {DATASET_DIR}")
+print(f"--- Modelos se guardarán en: {SAVE_DIR}")
 
 # Verificar estructura de carpetas
 for subdir in ["train", "val", "test"]:
     path = os.path.join(DATASET_DIR, subdir)
     if not os.path.exists(path):
-        raise FileNotFoundError(f"No se encontró la carpeta '{subdir}' en {DATASET_DIR}")
+        raise FileNotFoundError(f"No se encontró la carpeta '{subdir}' en {DATASET_DIR}. Asegúrate de que tu dataset tenga esa estructura.")
 
 # -----------------------------
 # 2️⃣ Generadores de imágenes
@@ -104,7 +113,8 @@ model.summary()
 # -----------------------------
 callbacks = [
     ModelCheckpoint(
-        "modelo_mejor.h5",
+        # Usar la ruta de guardado fija
+        os.path.join(SAVE_DIR, "modelo_mejor.h5"),
         monitor="val_accuracy",
         save_best_only=True,
         verbose=1
@@ -161,10 +171,12 @@ history_fine = model.fit(
 # 8️⃣ Evaluación y guardado final
 # -----------------------------
 test_loss, test_acc = model.evaluate(test_generator)
-print(f"\n✅ Precisión final en test: {test_acc:.2%}")
+# Texto sin emoji para evitar UnicodeEncodeError
+print(f"\n--- Precisión final en test: {test_acc:.2%}")
 
-model.save("modelo_final.h5")
-print("✅ Modelo guardado como modelo_final.h5")
+MODEL_H5_PATH = os.path.join(SAVE_DIR, "modelo_final.h5")
+model.save(MODEL_H5_PATH)
+print(f"--- Modelo guardado como {MODEL_H5_PATH}")
 
 # -----------------------------
 # 9️⃣ Exportar a TensorFlow Lite
@@ -173,37 +185,34 @@ try:
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
     tflite_model = converter.convert()
-    with open("modelo_final.tflite", "wb") as f:
+    TFLITE_PATH = os.path.join(SAVE_DIR, "modelo_final.tflite")
+    with open(TFLITE_PATH, "wb") as f:
         f.write(tflite_model)
-    print("✅ Modelo convertido a TensorFlow Lite (modelo_final.tflite)")
+    # Texto sin emoji
+    print(f"--- Modelo convertido a TensorFlow Lite: {TFLITE_PATH}")
 except Exception as e:
-    print(f"⚠️ Error al convertir a TFLite: {e}")
+    print(f"--- Error al convertir a TFLite: {e}") 
 
 # -----------------------------
 # 🔟 Exportar a TensorFlow.js
 # -----------------------------
 try:
     import tensorflowjs as tfjs
-    TFJS_DIR = os.path.join(BASE_DIR, "modelo_tfjs")
+    TFJS_DIR = os.path.join(SAVE_DIR, "modelo_tfjs")
     os.makedirs(TFJS_DIR, exist_ok=True)
     tfjs.converters.save_keras_model(model, TFJS_DIR)
-    print(f"✅ Modelo exportado a TensorFlow.js en: {TFJS_DIR}")
+    # Texto sin emoji
+    print(f"--- Modelo exportado a TensorFlow.js en: {TFJS_DIR}")
 except Exception as e:
-    print(f"⚠️ Error al exportar a TensorFlow.js: {e}")
+    print(f"--- Error al exportar a TensorFlow.js: {e}") 
 
 # -----------------------------
 # 11️⃣ Graficar historial
 # -----------------------------
-# Aquí debes combinar el historial de ambos entrenamientos correctamente.
-# history.epoch y history_fine.epoch podrían estar fuera de sincronización si hubo EarlyStopping.
-# Para graficar, usaremos las listas completas.
 acc = history.history.get("accuracy", []) + history_fine.history.get("accuracy", [])
 val_acc = history.history.get("val_accuracy", []) + history_fine.history.get("val_accuracy", [])
 loss = history.history.get("loss", []) + history_fine.history.get("loss", [])
 val_loss = history.history.get("val_loss", []) + history_fine.history.get("val_loss", [])
-
-# Ajuste si EarlyStopping detuvo el primer entrenamiento temprano.
-# Solo necesitamos las listas combinadas.
 
 plt.figure(figsize=(10, 5))
 plt.subplot(1, 2, 1)
