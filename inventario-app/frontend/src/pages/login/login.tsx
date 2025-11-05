@@ -65,10 +65,6 @@ const Login: React.FC = () => {
         if (!fsPerm.publicStorage) return false;
       }
 
-      // Ubicación
-      const geoPerm = await Geolocation.requestPermissions();
-      if (geoPerm.location !== 'granted') return false;
-
       return true;
     } catch (error) {
       console.error('❌ Error solicitando permisos:', error);
