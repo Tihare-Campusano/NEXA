@@ -9,8 +9,7 @@ import {
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { logoGoogle } from 'ionicons/icons';
-import { Camera } from '@capacitor/camera';
-import { Filesystem } from '@capacitor/filesystem'; // Se mantiene por si se usa en otras partes del código, pero no lo usaremos para pedir permisos.
+import { Camera, CameraSource, CameraResultType } from '@capacitor/camera';
 import { Capacitor } from '@capacitor/core';
 
 import LoginForm from '../../components/login/login-form';
@@ -51,26 +50,27 @@ const Login: React.FC = () => {
     }
   };
 
-  // --- Solicitar permisos esenciales ---
+  // --- Solicitar permisos de Cámara y Galería usando Camera.getPhoto ---
   const requestPermissions = async (): Promise<boolean> => {
     try {
-      // 1. Cámara
+      // 1️⃣ Solicitar permiso de Cámara
       const camPerm = await Camera.requestPermissions();
       if (camPerm.camera !== 'granted') {
-        toast('Permiso de Cámara denegado.');
+        toast('Debes otorgar permiso de Cámara.');
         return false;
       }
 
-      // 2. Archivos/Almacenamiento (Acceso a Fotos/Media)
-      // Usamos el plugin Camera.requestPermissions con el parámetro 'photos'
-      // Esto es el método moderno de Capacitor para acceder a la galería y archivos.
-      if (Capacitor.getPlatform() === 'android' || Capacitor.getPlatform() === 'ios') {
-        const photosPerm = await Camera.requestPermissions({ permissions: ['photos'] });
-
-        if (photosPerm.photos !== 'granted') {
-          toast('Permiso de Fotos/Media denegado.');
-          return false;
-        }
+      // 2️⃣ Solicitar permiso de Galería / Fotos
+      // Camera.getPhoto automáticamente pide permiso si no está concedido
+      try {
+        await Camera.getPhoto({
+          resultType: CameraResultType.Uri, // ✅ CORRECTO para TypeScript
+          source: CameraSource.Photos,
+          quality: 50,
+        });
+      } catch (err) {
+        toast('Debes otorgar permiso de Fotos/Media.');
+        return false;
       }
 
       return true;
@@ -102,14 +102,9 @@ const Login: React.FC = () => {
 
       await ensureProfile(data.user.id);
 
-      // Solicitamos permisos DESPUÉS de un login exitoso.
+      // 🔑 Solicitar permisos ANTES de navegar al home
       const granted = await requestPermissions();
-
-      // Corregimos el mensaje para solo mencionar Cámara y Almacenamiento
-      if (!granted) {
-        toast('Debes conceder Cámara y Almacenamiento/Fotos para continuar');
-        return;
-      }
+      if (!granted) return; // El toast ya fue mostrado
 
       history.replace('/tabs/home');
     } catch (err: any) {

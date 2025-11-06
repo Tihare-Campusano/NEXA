@@ -35,10 +35,14 @@
         </provider>
     </application>
 
-    <!-- Permissions -->
+    <!-- Permisos generales -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Android 12 y anteriores -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/> 
+
+    <!-- Android 13+ (obligatorio para acceder a fotos/media) -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
 </manifest>
