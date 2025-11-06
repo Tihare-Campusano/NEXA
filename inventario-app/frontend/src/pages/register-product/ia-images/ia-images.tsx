@@ -1,4 +1,4 @@
-// IAImagen.tsx - Versión optimizada para móviles Android + TFLite
+// IAImagen.tsx - Versión final optimizada para TFLite + Ionic React
 import {
     IonPage,
     IonContent,
@@ -20,9 +20,12 @@ import { useHistory, useLocation } from "react-router-dom";
 import * as tf from "@tensorflow/tfjs";
 import * as tflite from "@tensorflow/tfjs-tflite";
 import "@tensorflow/tfjs-backend-wasm";
+import "@tensorflow/tfjs-backend-webgl";
 
+// ⚙️ Ruta del modelo
 const MODEL_URL = "/modelo_final.tflite";
 
+// 🔗 Conexión a Supabase
 const supabase = createClient(
     import.meta.env.VITE_SUPABASE_URL as string,
     import.meta.env.VITE_SUPABASE_ANON_KEY as string
@@ -47,24 +50,30 @@ export default function IAImagen() {
     const [modeloLite, setModeloLite] = useState<tflite.TFLiteModel | null>(null);
     const [showLoadingOverlay, setShowLoadingOverlay] = useState(false);
 
-    // --- Cargar modelo de IA ---
+    // ---------------------------
+    // 🚀 Cargar modelo TFLite
+    // ---------------------------
     useEffect(() => {
         const loadModelLite = async () => {
             setShowLoadingOverlay(true);
             try {
-                await tf.setBackend("wasm");
+                // ✅ Verifica qué backends están disponibles
+                const availableBackends = await tf.engine().registryFactory;
+                const useWebGL = tf.findBackend("webgl");
+                const backendToUse = useWebGL ? "webgl" : "wasm";
+
+                await tf.setBackend(backendToUse);
                 await tf.ready();
 
                 console.log(`✅ Backend TensorFlow listo: ${tf.getBackend()}`);
 
-                const m = await tflite.loadTFLiteModel(MODEL_URL);
-                setModeloLite(m);
-
+                const model = await tflite.loadTFLiteModel(MODEL_URL);
+                setModeloLite(model);
                 console.log("✅ Modelo TFLite cargado correctamente");
             } catch (err) {
                 console.error("❌ Error cargando modelo TFLite:", err);
                 alert(
-                    "Error cargando el modelo de IA. Verifica que 'modelo_final.tflite' esté en /public."
+                    "Error cargando el modelo de IA. Asegúrate de que 'modelo_final.tflite' esté en /public."
                 );
             } finally {
                 setShowLoadingOverlay(false);
@@ -74,7 +83,10 @@ export default function IAImagen() {
         loadModelLite();
     }, []);
 
-    // --- Tomar foto ---
+
+    // ---------------------------
+    // 📸 Tomar foto con la cámara
+    // ---------------------------
     const tomarFoto = async () => {
         if (!modeloLite) {
             alert("El modelo de IA aún no está listo.");
@@ -104,14 +116,9 @@ export default function IAImagen() {
         }
     };
 
-    const calcularDisponibilidad = (cantidad: number): string => {
-        if (cantidad <= 0) return "Sin stock";
-        if (cantidad <= 4) return "Baja disponibilidad";
-        if (cantidad <= 10) return "Disponibilidad media";
-        return "Alta disponibilidad";
-    };
-
-    // --- Predicción IA ---
+    // ---------------------------
+    // 🧠 Predicción con el modelo
+    // ---------------------------
     const predecirEstadoLite = useCallback(async () => {
         if (!modeloLite || !image) return;
 
@@ -132,26 +139,21 @@ export default function IAImagen() {
                     .fromPixels(img)
                     .resizeBilinear([224, 224])
                     .toFloat()
-                    .div(tf.scalar(127.5))
-                    .sub(tf.scalar(1))
+                    .div(tf.scalar(255.0))
                     .expandDims(0);
 
-                const rawOutput = modeloLite.predict(tensor) as Record<string, tf.Tensor>;
-                const outputKey =
-                    Object.keys(rawOutput).find((k) =>
-                        ["output", "softmax"].some((s) => k.toLowerCase().includes(s))
-                    ) || Object.keys(rawOutput)[0];
-
-                const scoresTensor = rawOutput[outputKey];
-                const scores = scoresTensor.dataSync();
+                // 🔹 predict() devuelve directamente un tensor
+                const output = modeloLite.predict(tensor) as tf.Tensor;
+                const scores = output.dataSync();
                 const idx = scores.indexOf(Math.max(...scores));
 
+                // ⚠️ Asegúrate de usar el mismo orden de clases que en entrenamiento
                 const etiquetas = ["mal_estado", "nuevo", "usado"];
                 return etiquetas[idx] || "Desconocido";
             });
 
             setEstadoIA(resultado);
-            console.log("✅ Estado IA:", resultado);
+            console.log("✅ Estado IA detectado:", resultado);
         } catch (error) {
             console.error("❌ Error IA:", error);
             alert("No se pudo analizar la imagen. Inténtalo nuevamente.");
@@ -165,7 +167,16 @@ export default function IAImagen() {
         if (image && modeloLite) predecirEstadoLite();
     }, [image, modeloLite, predecirEstadoLite]);
 
-    // --- Guardar y volver ---
+    // ---------------------------
+    // 📦 Guardar datos en Supabase
+    // ---------------------------
+    const calcularDisponibilidad = (cantidad: number): string => {
+        if (cantidad <= 0) return "Sin stock";
+        if (cantidad <= 4) return "Baja disponibilidad";
+        if (cantidad <= 10) return "Disponibilidad media";
+        return "Alta disponibilidad";
+    };
+
     const guardarYVolver = async () => {
         if (!image || !estadoIA || !formData.codigo) {
             alert("Falta información para guardar.");
@@ -203,7 +214,7 @@ export default function IAImagen() {
 
             history.push("/tabs/registro/ia", { formData: updatedForm });
         } catch (error: any) {
-            console.error("Error guardando:", error);
+            console.error("❌ Error guardando:", error);
             alert("Error guardando los datos: " + error.message);
         } finally {
             setLoading(false);
@@ -211,6 +222,9 @@ export default function IAImagen() {
         }
     };
 
+    // ---------------------------
+    // 🧩 UI
+    // ---------------------------
     return (
         <IonPage>
             <IonContent className="ion-padding">
@@ -275,7 +289,9 @@ export default function IAImagen() {
                 <IonLoading
                     isOpen={showLoadingOverlay}
                     message={
-                        loading ? "Analizando imagen..." : "Cargando modelo de inteligencia artificial..."
+                        loading
+                            ? "Analizando imagen..."
+                            : "Cargando modelo de inteligencia artificial..."
                     }
                     duration={0}
                 />
