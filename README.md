@@ -1,4 +1,4 @@
-# NEXA — Inventario App (Ionic + React + FastAPI + Supabase)
+# NEXA — Inventario App (Ionic + React + Supabase)
 
 > Aplicación móvil de inventario desarrollada como proyecto Capstone, usando tecnologías modernas para frontend, backend y base de datos.
 
@@ -26,8 +26,7 @@ El objetivo es facilitar el manejo de inventarios a través de una interfaz móv
 El stack incluye:
 
 - **Ionic + React** para la aplicación móvil / frontend  
-- **FastAPI** como API backend en Python  
-- **Supabase** como servicio de base de datos / autenticación / almacenamiento  
+- **Supabase** como servicio de base de datos / autenticación / almacenamiento /API 
 
 ---
 
@@ -36,7 +35,7 @@ El stack incluye:
 | Capa | Tecnología | Rol / Responsabilidad |
 |------|-------------|------------------------|
 | Frontend / Mobile | Ionic + React | UI, navegación, llamadas a API |
-| Backend / API | FastAPI | construcción de la API, integrando lógica de negocio y validaciones, IA |
+| Backend / API | Api Supabase | construcción de la API, integrando lógica de negocio y validaciones, IA |
 | BBDD / Auth / Storage | Supabase | Base de datos PostgreSQL, autenticación (Auth), Storage, triggers |
 | Otros | TypeScript, Python, CSS | Lenguajes base para frontend y backend |
 
@@ -45,22 +44,51 @@ En este proyecto se emplean tecnologías modernas que abarcan todo el ciclo de d
 
 ## 🏗 Arquitectura & Estructura del proyecto
 
-/
-├── README.md
-├── package.json
+inventario-app
+├── backend
+│   ├── app
+│   └── requirements.txt
+├── docs
+│   ├── diagramas
+│   └── diagramas_img
+├── frontend
+│   ├── .vscode
+│   ├── android
+│   ├── Cypress
+│   ├── dist
+│   ├── node_modules
+│   ├── public
+│   └── src
+├── .browserslistrc
+├── .env
+├── .gitignore
+├── capacitor.config.ts
+├── cypress.config.js
+├── eslint.config.js
+├── global.css
+├── index.html
+├── ionic.config.json
 ├── package-lock.json
-├── backend/ # código del backend (FastAPI)
-│ ├── app/
-│ ├── main.py
-│ ├── requirements.txt
-│ └── etc.
-├── frontend/ # código de la app móvil (Ionic + React)
-│ ├── src/
-│ ├── public/
-│ ├── ionic.config.json
-│ └── etc.
-└── .gitignore
--- ml
+├── package.json
+├── postcss.config.js
+├── tailwind.config.js
+├── tsconfig.json
+├── tsconfig.node.json
+├── vite.config.ts
+├── modelo_ia
+│   ├── dataset_inicial
+│   ├── dataset_limpio
+│   ├── descargar_dataset.py
+│   ├── modelo_final.h5
+│   ├── modelo_final.tflite
+│   ├── modelo_ia.py
+│   └── preparar_dataset.py
+├── node_modules
+├── .gitattributes
+├── .gitignore
+├── package-lock.json
+├── package.json
+└── README.md
 
 - El **frontend** se comunica con el backend vía HTTP (REST).  
 - El **backend** gestiona la lógica, validaciones, autenticación, operaciones CRUD.  
@@ -83,7 +111,7 @@ En este proyecto se emplean tecnologías modernas que abarcan todo el ciclo de d
 
 - Node.js ≥ 16  
 - npm 
-- Python 3.9+  
+- Python 3.10+  
 - pip  
 - Supabase (proyecto configurado con URL y claves)  
 - Ionic CLI  
