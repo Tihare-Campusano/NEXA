@@ -11,6 +11,7 @@ export default defineConfig({
     react(),
     legacy(),
   ],
+  assetsInclude: ['**/*.tflite'],
   base: './',
   resolve: {
     alias: {
