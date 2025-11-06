@@ -20,7 +20,8 @@ import { useHistory, useLocation } from "react-router-dom";
 import * as tf from "@tensorflow/tfjs";
 import * as tflite from "@tensorflow/tfjs-tflite";
 import '@tensorflow/tfjs-backend-webgl';
-import '@tensorflow/tfjs-backend-wasm'; // Importante para la estabilidad en Android
+import '@tensorflow/tfjs-backend-wasm'; 
+import MODEL_URL from '../../../../../modelo_ia/modelo_final.tflite';
 
 // --- 2. CONFIGURACIÓN DE SUPABASE (SIN CAMBIOS) ---
 const supabase = createClient(
@@ -64,8 +65,8 @@ export default function IAImagen() {
                 await tf.ready();
                 console.log(`✅ Backend de TensorFlow listo: ${tf.getBackend()}`);
 
-                // Cargamos el modelo TFLite. (Asumiendo que esta ruta es correcta desde /public)
-                const m = await tflite.loadTFLiteModel("/modelo_ia/modelo_final.tflite");
+                // Cargamos el modelo TFLite.
+                const m = await tflite.loadTFLiteModel(MODEL_URL);
                 
                 setModeloLite(m);
                 console.log("✅ Modelo TFLite cargado correctamente");
