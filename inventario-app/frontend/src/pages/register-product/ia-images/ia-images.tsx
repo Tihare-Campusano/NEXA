@@ -13,14 +13,14 @@ import {
 } from "@ionic/react";
 import React, { useState, useEffect } from "react";
 import { Capacitor } from "@capacitor/core";
-// Importamos Source y Prompt, que son cruciales para el comportamiento deseado de la cámara
-import { Camera, CameraResultType, CameraSource, CameraDirection } from "@capacitor/camera"; 
+// Importamos Source y Prompt
+import { Camera, CameraResultType, CameraSource, CameraDirection } from "@capacitor/camera";
 import { createClient } from "@supabase/supabase-js";
 import { useHistory, useLocation } from "react-router-dom";
 import * as tf from "@tensorflow/tfjs";
 import * as tflite from "@tensorflow/tfjs-tflite";
 import '@tensorflow/tfjs-backend-webgl';
-import '@tensorflow/tfjs-backend-wasm';
+import '@tensorflow/tfjs-backend-wasm'; // Importante para la estabilidad en Android
 
 // --- 2. CONFIGURACIÓN DE SUPABASE (SIN CAMBIOS) ---
 const supabase = createClient(
@@ -56,21 +56,21 @@ export default function IAImagen() {
         const loadModelLite = async () => {
             setShowLoadingOverlay(true);
             try {
-                // Asegurar que el backend (WebAssembly o WebGL) esté listo
+                // **CORRECCIÓN DE ESTABILIDAD 1: Inicialización de Backend**
+                // Intentamos usar WASM en nativo para mayor estabilidad
+                if (Capacitor.isNativePlatform()) {
+                    await tf.setBackend('wasm');
+                }
                 await tf.ready();
-                console.log("✅ Backend de TensorFlow listo.");
+                console.log(`✅ Backend de TensorFlow listo: ${tf.getBackend()}`);
 
-                // Cargamos el modelo TFLite. 
-                // Ruta corregida: Usamos una ruta absoluta desde la carpeta 'public'.
-                // La ruta 'C:\Users\cornu\...' es local de tu PC y no funcionará en la app.
+                // Cargamos el modelo TFLite. (Asumiendo que esta ruta es correcta desde /public)
                 const m = await tflite.loadTFLiteModel("/modelo_ia/modelo_final.tflite");
                 
                 setModeloLite(m);
                 console.log("✅ Modelo TFLite cargado correctamente");
             } catch (err) {
-                console.error("❌ Error cargando modelo TFLite. VERIFICA LA RUTA DEL ARCHIVO:", err);
-                // Usamos una alerta más amigable
-                console.error("Asegúrate de que '/modelo_ia/modelo_final.tflite' sea la ruta correcta relativa a tu carpeta 'public'.");
+                console.error("❌ Error cargando modelo TFLite. Verifica la ruta o el archivo:", err);
             }
             setShowLoadingOverlay(false);
         };
@@ -81,6 +81,7 @@ export default function IAImagen() {
     const tomarFoto = async () => {
         // Reiniciar estados de análisis al tomar nueva foto
         setEstadoIA(null); 
+        setImage(null);
         setLoading(true);
 
         try {
@@ -89,13 +90,12 @@ export default function IAImagen() {
             const foto = await Camera.getPhoto({
                 quality: 90,
                 allowEditing: false,
-                // ** CORRECCIÓN 1: Usamos Base64 en nativo para evitar problemas de permisos (CORS/filesystem)**
-                // Si estamos en un dispositivo nativo, Base64 es la forma más segura.
+                // ** CORRECCIÓN 2: Usamos Base64 en nativo para evitar problemas de permisos**
                 resultType: isNative ? CameraResultType.Base64 : CameraResultType.DataUrl, 
                 
-                // ** CORRECCIÓN 2: Forzamos la apertura de la cámara (CameraSource.Camera)**
-                source: CameraSource.Camera, // Forzar uso de la cámara, ignora la galería
-                direction: CameraDirection.Rear, // Opción: usar cámara trasera por defecto
+                // Forzamos la apertura de la cámara
+                source: CameraSource.Camera,
+                direction: CameraDirection.Rear,
             });
 
             let imageUrl: string | null = null;
@@ -104,11 +104,9 @@ export default function IAImagen() {
                 // Si Base64 fue exitoso, construimos el DataURL
                 imageUrl = `data:image/jpeg;base64,${foto.base64String}`;
             } else if (foto.dataUrl) {
-                // Si no es Base64, usamos DataUrl (generalmente en Web)
                 imageUrl = foto.dataUrl;
             } else if (foto.webPath) {
-                // Fallback para webPath si es necesario, aunque Base64 es preferido en nativo
-                 imageUrl = foto.webPath;
+                imageUrl = foto.webPath;
             }
             
             setImage(imageUrl);
@@ -120,16 +118,16 @@ export default function IAImagen() {
         }
     };
 
-    // ✅ Función para calcular la disponibilidad según las reglas especificadas (SIN CAMBIOS)
+    // ✅ Función para calcular la disponibilidad (SIN CAMBIOS)
     const calcularDisponibilidad = (cantidad: number): string => {
         if (cantidad <= 0) return "Sin stock";
         if (cantidad >= 1 && cantidad <= 4) return "Baja disponibilidad";
         if (cantidad >= 5 && cantidad <= 10) return "Disponibilidad media";
-        return "Alta disponibilidad"; // Para 11 en adelante
+        return "Alta disponibilidad";
     };
 
-    // --- 7. FUNCIÓN PARA PREDECIR CON LA IA (CORREGIDA) ---
-    // Usamos useEffect para que la predicción se ejecute automáticamente cuando 'image' cambie y no sea null.
+    // --- 7. FUNCIÓN PARA PREDECIR CON LA IA (CORRECCIÓN CRÍTICA DE TFLITE) ---
+    // Usamos useEffect para que la predicción se ejecute automáticamente
     useEffect(() => {
         if (image && modeloLite) {
             predecirEstadoLite();
@@ -142,9 +140,10 @@ export default function IAImagen() {
 
         setLoading(true);
         setShowLoadingOverlay(true);
-        
+
         // Creamos un objeto Image para cargar la imagen (funciona con DataURL de Base64)
         const img = new Image();
+        img.crossOrigin = "anonymous"; // Recomendado para evitar problemas CORS
         img.src = image;
 
         // Utilizamos una promesa para esperar correctamente a que la imagen se cargue.
@@ -156,22 +155,38 @@ export default function IAImagen() {
                 console.error("Error al cargar la imagen para TFLite:", e);
                 reject(new Error("No se pudo cargar la imagen para analizar."));
             };
+        }).catch(err => {
+            // Manejar error de carga de imagen si ocurre
+            alert("No se pudo cargar la imagen: " + err.message);
+            setLoading(false);
+            setShowLoadingOverlay(false);
+            return; // Salir de la función si la imagen no carga
         });
         
+        let tensor: tf.Tensor | null = null;
         let output: tf.Tensor | null = null;
+
         try {
-            await tf.ready();
-            
-            // 1. Preprocesamiento: Cargar, redimensionar, convertir a float y normalizar
-            const tensor = tf.browser.fromPixels(img)
+            await tf.ready(); // Asegurar que TF está listo
+
+            // 1. Preprocesamiento: Cargar, redimensionar, convertir a float
+            // **CORRECCIÓN CRÍTICA DE TFLITE 3: Flujo de Tensor**
+            tensor = tf.browser.fromPixels(img)
                 .resizeNearestNeighbor([224, 224])
-                .toFloat().div(tf.scalar(255)) // Normalizar a [0, 1]
-                .expandDims(0); // Añadir la dimensión de batch (1, 224, 224, 3)
+                .toFloat();
             
-            console.log("Dimensiones del tensor de entrada:", tensor.shape);
+            // ⚠️ NORMALIZACIÓN: **Esto DEBE coincidir con el entrenamiento de tu modelo.**
+            // Asumimos normalización a [0, 1] (dividir por 255).
+            // Si el error persiste, prueba: const normalizedTensor = tensor.div(tf.scalar(127.5)).sub(tf.scalar(1));
+            const normalizedTensor = tensor.div(tf.scalar(255)); 
+            
+            // Añadir la dimensión de batch (1, 224, 224, 3)
+            const finalTensor = normalizedTensor.expandDims(0); 
+
+            console.log("Dimensiones del tensor de entrada:", finalTensor.shape);
             
             // 2. Predicción
-            output = modeloLite.predict(tensor) as tf.Tensor;
+            output = modeloLite.predict(finalTensor) as tf.Tensor;
 
             if (!output) {
                 throw new Error("La predicción del modelo devolvió un resultado nulo.");
@@ -181,21 +196,23 @@ export default function IAImagen() {
             const scores = (await output.array()) as number[][];
             const idx = scores[0].indexOf(Math.max(...scores[0]));
             
-            // Etiquetado de resultados (Asegúrate de que este orden sea CORRECTO)
-            const etiquetas = ["mal_estado", "nuevo", "usado"]; 
+            // Etiquetado de resultados (Verifica que este orden sea CORRECTO: 0=mal_estado, 1=nuevo, 2=usado)
+            const etiquetas = ["mal_estado", "nuevo", "usado"];  
             const resultado = etiquetas[idx] || "Desconocido";
 
             setEstadoIA(resultado);
-            // Reemplazamos alert() con console.log o un modal, pero dejamos el log aquí por si acaso.
-            console.log(`Estado detectado por IA: ${resultado}`); 
+            console.log(`Estado detectado por IA: ${resultado}`);  
             
 
         } catch (error) {
-            console.error("❌ Error al predecir con TFLite. Revisar consola para detalles.", error);
-            // Este es el mensaje de error de la captura original
-            alert("Ocurrió un error al analizar la imagen. Esto puede ser por la operación TFLite."); 
+            console.error("❌ Error al predecir con TFLite. Probablemente un problema de preprocesamiento o compatibilidad.", error);
+            // Mostrar el mensaje de error original en la app
+            alert("Ocurrió un error al analizar la imagen. Esto puede ser por la operación TFLite.");  
         } finally {
-            if (output) output.dispose(); // Limpieza de memoria del tensor
+            // **CORRECCIÓN CRÍTICA DE TFLITE 4: Liberación de Memoria**
+            // Es vital liberar los tensores para evitar errores de memoria en móvil.
+            if (tensor) tensor.dispose();
+            if (output) output.dispose();
             setLoading(false);
             setShowLoadingOverlay(false);
         }
@@ -214,7 +231,6 @@ export default function IAImagen() {
 
         try {
             // --- 8.1 Subir Imagen a Supabase ---
-            // Solo podemos hacer fetch si es un DataURL o WebPath válido.
             if (!image.startsWith("data:")) {
                 throw new Error("La URL de la imagen no es un DataURL válido.");
             }
@@ -238,7 +254,6 @@ export default function IAImagen() {
                 .getPublicUrl(fileName);
 
             // --- 8.2 Actualizar Stock y Disponibilidad ---
-            // El stock en formData es el stock inicial/actual
             const currentStock = parseInt(formData.stock || "0", 10);
             const newStock = currentStock + 1; // Incrementamos el stock en 1 unidad
             const newDisponibilidad = calcularDisponibilidad(newStock);
@@ -247,8 +262,8 @@ export default function IAImagen() {
             const updatedForm = {
                 ...formData,
                 imagen_url: publicUrlData.publicUrl || "",
-                estado_ia: estadoIA, // Usamos estado_ia para claridad en el formulario
-                stock: newStock.toString(), // Enviamos el nuevo stock como string
+                estado_ia: estadoIA,
+                stock: newStock.toString(),
                 disponibilidad: newDisponibilidad,
             };
             
@@ -275,7 +290,7 @@ export default function IAImagen() {
                 {/* Estado del Modelo de IA */}
                 <IonText color={modeloLite ? "success" : "danger"}>
                     <p style={{ textAlign: "center", marginBottom: "1rem" }}>
-                        {modeloLite ? "Modelo de IA Listo" : "Cargando Modelo de IA..."}
+                        {modeloLite ? "✅ Modelo de IA Listo" : "⏳ Cargando Modelo de IA..."}
                     </p>
                 </IonText>
 
@@ -318,16 +333,6 @@ export default function IAImagen() {
                     </>
                 )}
 
-
-                {/* Muestra el botón de analizar solo si la imagen está pero la IA no se ha ejecutado */}
-                {/* // Hemos movido la predicción a un useEffect para que se ejecute automáticamente
-                // al tomar la foto (cuando 'image' cambia). Por lo tanto, este botón ya no es necesario.
-                {image && !estadoIA && (
-                    <IonButton color="secondary" expand="block" onClick={predecirEstadoLite} disabled={loading || !modeloLite} style={{ marginTop: "1rem" }}>
-                        🔬 Analizar con IA
-                    </IonButton>
-                )} 
-                */}
 
                 {/* Componente de Ionic que muestra una pantalla de carga completa */}
                 <IonLoading 
