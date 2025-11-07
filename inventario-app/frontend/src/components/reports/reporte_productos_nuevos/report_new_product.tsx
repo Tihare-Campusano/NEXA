@@ -32,13 +32,10 @@ interface ReportNewProductProps {
 }
 
 const ReportNewProduct: React.FC<ReportNewProductProps> = ({ onDidDismiss }) => {
-
-  // 🔹 Mostrar toast de notificación
   const mostrarNotificacion = async (mensaje: string) => {
     await Toast.show({ text: mensaje, duration: "long" });
   };
 
-  // 🔹 Solicitar permiso de almacenamiento
   const solicitarPermisoDescarga = async (): Promise<boolean> => {
     if (Capacitor.getPlatform() === "android") {
       try {
@@ -46,26 +43,29 @@ const ReportNewProduct: React.FC<ReportNewProductProps> = ({ onDidDismiss }) => 
         if (check.publicStorage !== "granted") {
           const request = await Filesystem.requestPermissions();
           if (request.publicStorage !== "granted") {
-            mostrarNotificacion(
-              "Por favor, concede permiso de almacenamiento para descargar archivos."
-            );
+            mostrarNotificacion("Se requiere permiso de almacenamiento.");
             return false;
           }
         }
       } catch (err) {
-        console.error("Error al verificar permisos de almacenamiento:", err);
-        mostrarNotificacion("No se pudo obtener el permiso de almacenamiento.");
+        console.error("Error permisos:", err);
+        mostrarNotificacion("Error obteniendo permisos");
         return false;
       }
     }
     return true;
   };
 
-  // 🔹 Obtener productos en estado "Nuevo"
   const fetchProductos = async (): Promise<Producto[]> => {
     const { data, error } = await supabase
       .from("productos")
-      .select("sku, nombre, estado, marca, stock!inner(cantidad)")
+      .select(`
+        sku,
+        nombre,
+        estado,
+        categoria:categorias(nombre),
+        stock:stock(stock_actual)
+      `)
       .eq("estado", "Nuevo");
 
     if (error) {
@@ -76,13 +76,12 @@ const ReportNewProduct: React.FC<ReportNewProductProps> = ({ onDidDismiss }) => 
     return (data ?? []).map((p: any) => ({
       codigo: p.sku,
       nombre: p.nombre,
-      cantidad: p.stock[0]?.cantidad ?? 0,
+      cantidad: p.stock?.stock_actual ?? 0,
       estado: p.estado || "Desconocido",
-      categoria: p.marca || "General",
+      categoria: p.categoria?.nombre || "Sin categoría",
     }));
   };
 
-  // 🔹 Guardar archivo y abrirlo
   const guardarEnDispositivo = async (
     fileName: string,
     base64Data: string,
@@ -96,33 +95,20 @@ const ReportNewProduct: React.FC<ReportNewProductProps> = ({ onDidDismiss }) => 
         recursive: true,
       });
 
-      const fileUri = savedFile.uri;
-
-      try {
-        await FileOpener.open({
-          filePath: fileUri,
-          contentType: mimeType,
-        });
-      } catch (e) {
-        console.error("Error al abrir archivo automáticamente:", e);
-        mostrarNotificacion(
-          "Archivo guardado. Búscalo en la carpeta Documentos de tu dispositivo."
-        );
-      }
+      await FileOpener.open({
+        filePath: savedFile.uri,
+        contentType: mimeType,
+      });
     } catch (e) {
       console.error("Error al guardar archivo", e);
-      mostrarNotificacion(
-        "Error al guardar archivo. ¿Otorgaste permisos a la app?"
-      );
+      mostrarNotificacion("Archivo guardado en Documentos");
     }
   };
 
-  // 🔹 Exportar PDF
   const exportarPDF = async () => {
     const permitido = await solicitarPermisoDescarga();
     if (!permitido) return;
-
-    mostrarNotificacion("Generando PDF, la descarga se iniciará en breve...");
+    mostrarNotificacion("Generando PDF...");
 
     try {
       const productos = await fetchProductos();
@@ -141,15 +127,8 @@ const ReportNewProduct: React.FC<ReportNewProductProps> = ({ onDidDismiss }) => 
         ]),
       });
 
-      const finalY = (doc as any).lastAutoTable?.finalY || 30;
-      doc.text(
-        `Este reporte muestra todos los productos clasificados como "Nuevos". Se recomienda usar primero los usados y luego los nuevos.`,
-        14,
-        finalY + 10
-      );
-
       const base64Data = doc.output("datauristring").split(",")[1];
-      const timestamp = new Date().getTime();
+      const timestamp = Date.now();
 
       await guardarEnDispositivo(
         `reporte_productos_nuevos_${timestamp}.pdf`,
@@ -157,38 +136,26 @@ const ReportNewProduct: React.FC<ReportNewProductProps> = ({ onDidDismiss }) => 
         "application/pdf"
       );
 
-      mostrarNotificacion(
-        "PDF descargado correctamente. Revisa el panel de notificaciones o la carpeta Documentos."
-      );
+      mostrarNotificacion("PDF listo ✅");
     } catch (error) {
       console.error("Error PDF:", error);
-      mostrarNotificacion("No se pudo generar el PDF.");
+      mostrarNotificacion("Error al generar PDF ❌");
     }
   };
 
-  // 🔹 Exportar Excel
   const exportarExcel = async () => {
     const permitido = await solicitarPermisoDescarga();
     if (!permitido) return;
-
-    mostrarNotificacion("Generando Excel, la descarga se iniciará en breve...");
+    mostrarNotificacion("Generando Excel...");
 
     try {
       const productos = await fetchProductos();
-      const datosExcel = productos.map((p) => ({
-        Código: p.codigo,
-        Nombre: p.nombre,
-        Cantidad: p.cantidad,
-        Estado: p.estado,
-        Categoría: p.categoria,
-      }));
-
-      const ws = XLSX.utils.json_to_sheet(datosExcel);
+      const ws = XLSX.utils.json_to_sheet(productos);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Productos Nuevos");
+      XLSX.utils.book_append_sheet(wb, ws, "Nuevos");
 
       const base64Data = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
-      const timestamp = new Date().getTime();
+      const timestamp = Date.now();
 
       await guardarEnDispositivo(
         `reporte_productos_nuevos_${timestamp}.xlsx`,
@@ -196,12 +163,10 @@ const ReportNewProduct: React.FC<ReportNewProductProps> = ({ onDidDismiss }) => 
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
 
-      mostrarNotificacion(
-        "Excel descargado correctamente. Revisa el panel de notificaciones o la carpeta Documentos."
-      );
+      mostrarNotificacion("Excel listo ✅");
     } catch (error) {
       console.error("Error Excel:", error);
-      mostrarNotificacion("No se pudo generar el Excel.");
+      mostrarNotificacion("Error al generar Excel ❌");
     }
   };
 
@@ -219,25 +184,14 @@ const ReportNewProduct: React.FC<ReportNewProductProps> = ({ onDidDismiss }) => 
       <IonContent className="ion-padding">
         <IonText>
           <h3 style={{ textAlign: "center", fontWeight: "bold", marginTop: "1rem" }}>
-            ¿Deseas descargar en formato PDF o Excel?
+            ¿En qué formato deseas descargar el reporte?
           </h3>
         </IonText>
-        <div className="modal-buttons-container" style={{ padding: "20px" }}>
-          <IonButton
-            className="modal-button"
-            color="danger"
-            expand="block"
-            onClick={exportarPDF}
-            style={{ marginBottom: "10px" }}
-          >
+        <div className="modal-buttons-container">
+          <IonButton expand="block" color="danger" onClick={exportarPDF}>
             Descargar PDF
           </IonButton>
-          <IonButton
-            className="modal-button"
-            color="success"
-            expand="block"
-            onClick={exportarExcel}
-          >
+          <IonButton expand="block" color="success" onClick={exportarExcel}>
             Descargar Excel
           </IonButton>
         </div>
