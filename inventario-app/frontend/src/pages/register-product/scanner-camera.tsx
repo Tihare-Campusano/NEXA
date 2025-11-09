@@ -1,160 +1,123 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   IonPage,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
   IonContent,
   IonButton,
-  IonInput,
-  IonItem,
-  IonLabel,
-  IonToast,
+  IonIcon,
+  IonText,
 } from "@ionic/react";
-import HeaderApp from "../../components/header_app";
-import { FaClipboard } from "react-icons/fa";
+import { arrowBackOutline } from "ionicons/icons";
+import { BrowserMultiFormatReader } from "@zxing/browser";
+import { Result } from "@zxing/library"; // ✅ Import correcto del tipo Result
+import { useHistory } from "react-router-dom";
+import "./scanner-camera.css";
 
-// Importaciones combinadas de ambas versiones
-import { Capacitor } from "@capacitor/core";
-import { BarcodeScanner } from "@capacitor-mlkit/barcode-scanning";
-import Botones from "../../components/register-product/botones";
+const RegistroCamara: React.FC = () => {
+  const history = useHistory();
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string>("");
 
-export default function ScannerCamera() {
-  const [form, setForm] = useState({
-    codigo: "",
-    nombre: "",
-    stock: "",
-    fecha: "",
-    disponibilidad: "",
-    estado: "",
-  });
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  useEffect(() => {
+    startCamera();
+    return () => stopCamera();
+  }, []);
 
-  const handleChange = (field: string, value?: string | null) =>
-    setForm((f) => ({ ...f, [field]: value ?? "" }));
-
-  // 🔹 Función principal de escaneo
-  const scanBarcode = async () => {
-    // Verifica que sea un dispositivo nativo
-    if (!Capacitor.isNativePlatform()) {
-      setToastMsg("El escáner solo funciona en Android o iOS.");
-      return;
-    }
-
+  const startCamera = async () => {
     try {
-      // Solicita permisos de cámara
-      const perm = await BarcodeScanner.requestPermissions();
-      if (perm.camera !== "granted") {
-        setToastMsg("Debes permitir el acceso a la cámara.");
-        return;
+      setErrorMsg("");
+
+      // Preferir cámara trasera
+      const constraints: MediaStreamConstraints = {
+        video: { facingMode: { ideal: "environment" } },
+        audio: false,
+      };
+
+      // Pide acceso a la cámara
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
       }
 
-      // Abre la cámara y espera el resultado
-      const { barcodes } = await BarcodeScanner.scan();
+      // Inicializa el lector de ZXing
+      const reader = new BrowserMultiFormatReader();
+      codeReaderRef.current = reader;
 
-      if (barcodes.length > 0) {
-        const code = barcodes[0].rawValue;
-        handleChange("codigo", code);
-        setToastMsg(`Código detectado: ${code}`);
-      } else {
-        setToastMsg("No se detectó ningún código.");
-      }
-    } catch (error) {
-      console.error("Error escaneando código:", error);
-      setToastMsg("Error al escanear.");
+      // Escaneo continuo sobre el <video>
+      reader.decodeFromVideoDevice(
+        undefined,
+        videoRef.current as HTMLVideoElement,
+        (result: Result | undefined, err: unknown) => {
+          // Si se detecta un código válido
+          if (result?.getText) {
+            const code = result.getText();
+            stopCamera();
+            // Al detectar el código, vuelve al registro con el valor leído
+            history.replace("/tabs/registro", { scannedCode: code });
+          }
+        }
+      );
+    } catch (err: any) {
+      console.error("Error abriendo cámara:", err);
+      setErrorMsg(
+        "No se pudo abrir la cámara. Revisa permisos o usa un dispositivo físico."
+      );
     }
+  };
+
+  const stopCamera = () => {
+    try {
+      (codeReaderRef.current as any)?.reset?.();
+    } catch {
+      /* ignora errores al resetear */
+    }
+
+    const media = (videoRef.current?.srcObject as MediaStream) || null;
+    media?.getTracks().forEach((t) => t.stop());
+    if (videoRef.current) videoRef.current.srcObject = null;
   };
 
   return (
     <IonPage>
-      <HeaderApp
-        icon={<FaClipboard size={28} className="text-green-500" />}
-        title="Registro de productos"
-      />
+      <IonHeader>
+        <IonToolbar>
+          <IonButton
+            slot="start"
+            fill="clear"
+            onClick={() => {
+              stopCamera();
+              history.goBack();
+            }}
+          >
+            <IonIcon icon={arrowBackOutline} />
+          </IonButton>
+          <IonTitle>Escanear código</IonTitle>
+        </IonToolbar>
+      </IonHeader>
 
-      <IonContent className="ion-padding bg-white">
-        {/* 🔹 Botones superiores (usando el componente refactorizado) */}
-        <Botones />
+      <IonContent fullscreen>
+        <div className="scanner-wrapper">
+          {/* Video de la cámara */}
+          <video ref={videoRef} className="camera-video" playsInline muted />
 
-        <h2 className="text-center text-xl font-extrabold my-4">Escáner con cámara</h2>
+          {/* Overlay: cuadrado de guía */}
+          <div className="overlay">
+            <div className="overlay-box" />
+          </div>
 
-        {/* 🔹 Botón para escanear */}
-        <IonButton
-          expand="block"
-          color="primary"
-          className="rounded-xl h-12 mb-4"
-          onClick={scanBarcode}
-        >
-          Escanear código de barra
-        </IonButton>
-
-        {/* 🔹 Formulario completo */}
-        <div className="grid grid-cols-2 gap-3 mb-6">
-          <IonItem className="rounded-lg">
-            <IonLabel position="floating">Código</IonLabel>
-            <IonInput
-              value={form.codigo}
-              onIonChange={(e) => handleChange("codigo", e.detail.value)}
-            />
-          </IonItem>
-
-          <IonItem className="rounded-lg">
-            <IonLabel position="floating">Nombre</IonLabel>
-            <IonInput
-              value={form.nombre}
-              onIonChange={(e) => handleChange("nombre", e.detail.value)}
-            />
-          </IonItem>
-
-          <IonItem className="rounded-lg">
-            <IonLabel position="floating">Stock</IonLabel>
-            <IonInput
-              type="number"
-              value={form.stock}
-              onIonChange={(e) => handleChange("stock", e.detail.value)}
-            />
-          </IonItem>
-
-          <IonItem className="rounded-lg">
-            <IonLabel position="floating">Fecha</IonLabel>
-            <IonInput
-              value={form.fecha}
-              onIonChange={(e) => handleChange("fecha", e.detail.value)}
-            />
-          </IonItem>
-
-          <IonItem className="rounded-lg">
-            <IonLabel position="floating">Disponibilidad</IonLabel>
-            <IonInput
-              value={form.disponibilidad}
-              onIonChange={(e) => handleChange("disponibilidad", e.detail.value)}
-            />
-          </IonItem>
-
-          <IonItem className="rounded-lg">
-            <IonLabel position="floating">Estado</IonLabel>
-            <IonInput
-              value={form.estado}
-              onIonChange={(e) => handleChange("estado", e.detail.value)}
-            />
-          </IonItem>
+          {errorMsg && (
+            <div className="scanner-error">
+              <IonText color="danger">{errorMsg}</IonText>
+            </div>
+          )}
         </div>
-
-        <IonButton
-          expand="block"
-          color="success"
-          className="rounded-xl font-bold h-12"
-          onClick={() => console.log("Siguiente →", form)}
-        >
-          Siguiente
-        </IonButton>
-
-        <div className="h-20" />
-
-        <IonToast
-          isOpen={!!toastMsg}
-          message={toastMsg ?? ""}
-          duration={2000}
-          onDidDismiss={() => setToastMsg(null)}
-        />
       </IonContent>
     </IonPage>
   );
-}
+};
+
+export default RegistroCamara;

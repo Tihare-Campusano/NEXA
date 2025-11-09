@@ -42,7 +42,7 @@ import Perfil from "./pages/perfil/perfil";
 
 /* Páginas de Registro */
 import RegisterManual from "./pages/register-product/register-manual";
-import ScannerGun from "./pages/register-product/scanner-gun";
+import ScannerGun from "./pages/register-product/registro_pistola";
 import ScannerCamera from "./pages/register-product/scanner-camera";
 import IAImagen from "./pages/register-product/ia-images/ia-images";
 

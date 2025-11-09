@@ -8,13 +8,6 @@ const Botones: React.FC = () => {
     return (
         <div className="botones-container">
             <IonButton
-                color="primary"
-                expand="block"
-                onClick={() => history.push("/tabs/registro")}
-            >
-                Registro Manual
-            </IonButton>
-            <IonButton
                 color="secondary"
                 expand="block"
                 onClick={() => history.push("/tabs/registro/pistola")}
