@@ -1,179 +1,247 @@
 # -*- coding: utf-8 -*-
 """
-preparar_dataset_mejorado.py
+preparar_dataset_mejorado_full_v2.py
 ----------------------------------------------------
-Prepara un dataset balanceado, limpio y aumentado para modelos CNN.
-Optimizado para aumentar precisión (70–90 %) con MobileNetV2 o EfficientNet.
+Prepara un dataset BALANCEADO y AMPLIADO (train/val/test) para CNNs.
+Genera augmentations internamente sin dejar archivos temporales.
 """
 
 import os
 import shutil
-from PIL import Image, ImageOps, ImageEnhance, UnidentifiedImageError
+import numpy as np
+import random
+from PIL import Image, ImageOps, UnidentifiedImageError
 from sklearn.model_selection import train_test_split
 from sklearn.utils.class_weight import compute_class_weight
-import numpy as np
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-import time
+from tensorflow.keras.preprocessing.image import ImageDataGenerator, img_to_array, array_to_img
+import tensorflow as tf
 
 # ----------------------------------------------------
-# CONFIGURACIÓN
+# CONFIGURACIÓN GENERAL
 # ----------------------------------------------------
 BASE_DIR = "inventario-app/modelo_ia/dataset_inicial"
 OUTPUT_DIR = "inventario-app/modelo_ia/dataset_limpio"
 IMG_SIZE = (224, 224)
 VAL_RATIO = 0.15
 TEST_RATIO = 0.15
-AUGMENT_MULTIPLIER = 3  # Genera 3 imágenes adicionales por cada imagen de entrenamiento
+RANDOM_STATE = 42
+BATCH_SIZE = 32
+TARGET_PER_CLASS = 20000  # objetivo mínimo por clase
+
+preprocess_fn = tf.keras.applications.mobilenet_v2.preprocess_input
 
 # ----------------------------------------------------
-# CREAR ESTRUCTURA LIMPIA
+# CREAR ESTRUCTURA BASE
 # ----------------------------------------------------
+print(f"\n[INICIO] Preparando dataset desde {BASE_DIR}")
+
 if os.path.exists(OUTPUT_DIR):
     shutil.rmtree(OUTPUT_DIR)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+categorias = [c for c in os.listdir(BASE_DIR) if os.path.isdir(os.path.join(BASE_DIR, c))]
+if not categorias:
+    raise Exception(f"No se encontraron categorías en {BASE_DIR}")
+
 for split in ["train", "val", "test"]:
-    for estado in os.listdir(BASE_DIR):
-        estado_path = os.path.join(BASE_DIR, estado)
-        if os.path.isdir(estado_path):
-            os.makedirs(os.path.join(OUTPUT_DIR, split, estado), exist_ok=True)
+    for cat in categorias:
+        os.makedirs(os.path.join(OUTPUT_DIR, split, cat), exist_ok=True)
+
+print("[OK] Estructura creada correctamente.")
 
 # ----------------------------------------------------
-# FUNCIÓN: limpiar, recortar y normalizar imagen
+# FUNCIONES AUXILIARES
 # ----------------------------------------------------
 def limpiar_imagen(img: Image.Image) -> Image.Image:
     img = img.convert("RGB")
     img = ImageOps.fit(img, IMG_SIZE, Image.Resampling.LANCZOS)
-    img = ImageEnhance.Contrast(img).enhance(1.3)
-    img = ImageEnhance.Brightness(img).enhance(1.15)
     return img
 
+def es_imagen_plana(img: Image.Image, umbral_varianza=10):
+    img_gray = img.convert("L")
+    varianza = np.var(np.array(img_gray))
+    return varianza < umbral_varianza
+
+def procesar_y_guardar(img_paths, split, clase):
+    """Guarda imágenes procesadas en su carpeta final."""
+    for idx, ruta in enumerate(img_paths):
+        try:
+            with Image.open(ruta) as img:
+                img = limpiar_imagen(img)
+                if es_imagen_plana(img):
+                    continue
+                destino = os.path.join(OUTPUT_DIR, split, clase, f"{clase}_{idx:05d}.jpg")
+                img.save(destino, quality=95)
+        except (UnidentifiedImageError, OSError, PermissionError):
+            continue
+
+def generar_augmented_images(img_paths, clase, n_target):
+    """Genera imágenes aumentadas hasta alcanzar n_target por clase."""
+    valid_imgs = []
+    for ruta in img_paths:
+        try:
+            with Image.open(ruta) as img:
+                img = limpiar_imagen(img)
+                if not es_imagen_plana(img):
+                    valid_imgs.append(img_to_array(img))
+        except Exception:
+            continue
+
+    if not valid_imgs:
+        return []
+
+    valid_imgs = np.array(valid_imgs)
+    aug_gen = ImageDataGenerator(
+        rotation_range=25,
+        width_shift_range=0.15,
+        height_shift_range=0.15,
+        shear_range=0.15,
+        zoom_range=[0.85, 1.15],
+        brightness_range=[0.8, 1.2],
+        horizontal_flip=True,
+        fill_mode="nearest"
+    )
+
+    generated_paths = []
+    total_needed = max(0, n_target - len(valid_imgs))
+    print(f"  -> {clase}: generando {total_needed} imágenes sintéticas...")
+
+    i = 0
+    for batch in aug_gen.flow(valid_imgs, batch_size=1):
+        img_aug = array_to_img(batch[0])
+        destino = os.path.join(BASE_DIR, clase, f"{clase}_aug_{i:05d}.jpg")
+        img_aug.save(destino, quality=95)
+        generated_paths.append(destino)
+        i += 1
+        if i >= total_needed:
+            break
+
+    return generated_paths
+
 # ----------------------------------------------------
-# DATA AUGMENTATION (online)
+# CARGA Y BALANCEO CON AUGMENTATION
+# ----------------------------------------------------
+print("\n[CARGA] Leyendo imágenes y aplicando expansión balanceada...")
+
+all_images, all_labels = [], []
+for cat in categorias:
+    ruta_cat = os.path.join(BASE_DIR, cat)
+    imgs = [os.path.join(ruta_cat, f)
+            for f in os.listdir(ruta_cat)
+            if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+    all_images.extend(imgs)
+    all_labels.extend([cat] * len(imgs))
+
+expanded_imgs, expanded_labels = [], []
+for cat in categorias:
+    imgs_cat = [img for img, lbl in zip(all_images, all_labels) if lbl == cat]
+    print(f"Procesando clase '{cat}' con {len(imgs_cat)} imágenes originales...")
+
+    if len(imgs_cat) < TARGET_PER_CLASS:
+        generated = generar_augmented_images(imgs_cat, cat, TARGET_PER_CLASS)
+        imgs_cat.extend(generated)
+
+    expanded_imgs.extend(imgs_cat)
+    expanded_labels.extend([cat] * len(imgs_cat))
+
+print("[OK] Dataset expandido balanceado correctamente.")
+
+# ----------------------------------------------------
+# DIVISIÓN ESTRATIFICADA
+# ----------------------------------------------------
+test_temp_ratio = VAL_RATIO + TEST_RATIO
+val_to_test_ratio = TEST_RATIO / test_temp_ratio
+
+imgs_train, imgs_temp, labels_train, labels_temp = train_test_split(
+    expanded_imgs, expanded_labels,
+    test_size=test_temp_ratio,
+    random_state=RANDOM_STATE,
+    stratify=expanded_labels
+)
+
+imgs_val, imgs_test, labels_val, labels_test = train_test_split(
+    imgs_temp, labels_temp,
+    test_size=val_to_test_ratio,
+    random_state=RANDOM_STATE,
+    stratify=labels_temp
+)
+
+print(f"[INFO] Train={len(imgs_train)}, Val={len(imgs_val)}, Test={len(imgs_test)}")
+
+# ----------------------------------------------------
+# PROCESAMIENTO Y GUARDADO FINAL
+# ----------------------------------------------------
+for cat in categorias:
+    procesar_y_guardar([img for img, lbl in zip(imgs_train, labels_train) if lbl == cat], "train", cat)
+    procesar_y_guardar([img for img, lbl in zip(imgs_val, labels_val) if lbl == cat], "val", cat)
+    procesar_y_guardar([img for img, lbl in zip(imgs_test, labels_test) if lbl == cat], "test", cat)
+
+print("[OK] Imágenes procesadas y guardadas correctamente dentro de dataset_limpio.")
+
+# ----------------------------------------------------
+# GENERADORES CON DATA AUGMENTATION
 # ----------------------------------------------------
 train_aug = ImageDataGenerator(
-    rescale=1.0 / 255,
-    rotation_range=40,
-    width_shift_range=0.3,
-    height_shift_range=0.3,
-    shear_range=0.25,
-    zoom_range=[0.7, 1.3],
-    brightness_range=[0.5, 1.5],
-    channel_shift_range=25.0,
+    preprocessing_function=preprocess_fn,
+    rotation_range=35,
+    width_shift_range=0.20,
+    height_shift_range=0.20,
+    shear_range=0.20,
+    zoom_range=[0.8, 1.2],
+    brightness_range=[0.7, 1.3],
+    channel_shift_range=20.0,
     horizontal_flip=True,
-    vertical_flip=True,
-    fill_mode="reflect"
+    fill_mode="nearest"
 )
 
-val_aug = ImageDataGenerator(rescale=1.0 / 255)
+val_test_aug = ImageDataGenerator(preprocessing_function=preprocess_fn)
 
-# ----------------------------------------------------
-# PROCESAR Y GUARDAR IMÁGENES
-# ----------------------------------------------------
-def procesar_y_guardar(lista_imgs, split, estado):
-    for idx, img_path in enumerate(lista_imgs):
-        try:
-            with Image.open(img_path) as img:
-                img = limpiar_imagen(img)
-
-                destino = os.path.join(OUTPUT_DIR, split, estado, f"{estado}_{idx}.jpg")
-                img.save(destino, quality=95)
-
-                # Augmentación offline (solo para train)
-                if split == "train" and AUGMENT_MULTIPLIER > 0:
-                    base_array = np.array(img) / 255.0
-                    for i in range(AUGMENT_MULTIPLIER):
-                        gen_img = train_aug.random_transform(base_array)
-                        gen_img = Image.fromarray((gen_img * 255).astype(np.uint8))
-                        gen_path = os.path.join(OUTPUT_DIR, split, estado, f"{estado}_{idx}_aug{i}.jpg")
-                        gen_img.save(gen_path, quality=90)
-
-        except (UnidentifiedImageError, OSError, PermissionError):
-            print(f"[ERROR] Imagen inválida o bloqueada: {img_path}")
-        except Exception as e:
-            print(f"[ERROR] {img_path}: {e}")
-
-# ----------------------------------------------------
-# PROCESO PRINCIPAL
-# ----------------------------------------------------
-print(f"\nIniciando preparación de dataset desde: {BASE_DIR}\n")
-
-categorias = [c for c in os.listdir(BASE_DIR) if os.path.isdir(os.path.join(BASE_DIR, c))]
-if not categorias:
-    raise Exception(f"No se encontraron carpetas en {BASE_DIR}")
-
-conteos = {c: len([f for f in os.listdir(os.path.join(BASE_DIR, c)) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]) for c in categorias}
-max_count = max(conteos.values())
-
-for estado in categorias:
-    print(f"[INFO] Procesando categoría: {estado} ({conteos[estado]} imágenes originales)")
-
-    estado_path = os.path.join(BASE_DIR, estado)
-    imagenes = [
-        os.path.join(estado_path, f)
-        for f in os.listdir(estado_path)
-        if f.lower().endswith(('.jpg', '.jpeg', '.png'))
-    ]
-
-    if not imagenes:
-        print(f"[ADVERTENCIA] No se encontraron imágenes en {estado_path}")
-        continue
-
-    # Balanceo de clases
-    if len(imagenes) < max_count:
-        repeticiones = (max_count // len(imagenes)) + 1
-        imagenes = (imagenes * repeticiones)[:max_count]
-
-    # División del dataset
-    imgs_train, imgs_temp = train_test_split(imagenes, test_size=(VAL_RATIO + TEST_RATIO), random_state=42)
-    imgs_val, imgs_test = train_test_split(imgs_temp, test_size=TEST_RATIO / (VAL_RATIO + TEST_RATIO), random_state=42)
-
-    procesar_y_guardar(imgs_train, "train", estado)
-    procesar_y_guardar(imgs_val, "val", estado)
-    procesar_y_guardar(imgs_test, "test", estado)
-
-print("\nDataset limpio, balanceado y aumentado correctamente.\n")
-
-# ----------------------------------------------------
-# GENERADORES DE DATOS PARA KERAS
-# ----------------------------------------------------
-train_generator = train_aug.flow_from_directory(
+train_gen = train_aug.flow_from_directory(
     os.path.join(OUTPUT_DIR, "train"),
     target_size=IMG_SIZE,
-    batch_size=32,
+    batch_size=BATCH_SIZE,
     class_mode="categorical"
 )
 
-val_generator = val_aug.flow_from_directory(
+val_gen = val_test_aug.flow_from_directory(
     os.path.join(OUTPUT_DIR, "val"),
     target_size=IMG_SIZE,
-    batch_size=32,
-    class_mode="categorical"
+    batch_size=BATCH_SIZE,
+    class_mode="categorical",
+    shuffle=False
+)
+
+test_gen = val_test_aug.flow_from_directory(
+    os.path.join(OUTPUT_DIR, "test"),
+    target_size=IMG_SIZE,
+    batch_size=BATCH_SIZE,
+    class_mode="categorical",
+    shuffle=False
 )
 
 # ----------------------------------------------------
-# CALCULAR PESOS DE CLASE
+# CÁLCULO DE PESOS DE CLASE
 # ----------------------------------------------------
-labels = train_generator.classes
-class_weights = compute_class_weight(
+labels = train_gen.classes
+class_weights_arr = compute_class_weight(
     class_weight="balanced",
     classes=np.unique(labels),
     y=labels
 )
-class_weights = dict(enumerate(class_weights))
+class_weights = dict(enumerate(class_weights_arr))
 
-print("\nPesos de clase calculados (usa esto en modelo_ia.py):")
-for k, v in class_weights.items():
-    print(f"  Clase {k}: {v:.4f}")
+print("\n[OK] Pesos de clase calculados:")
+idx_to_class = {v: k for k, v in train_gen.class_indices.items()}
+for i, w in class_weights.items():
+    print(f"  {idx_to_class[i]}: {w:.4f}")
 
 # ----------------------------------------------------
 # RESUMEN FINAL
 # ----------------------------------------------------
-print("\nRESUMEN DEL DATASET PREPARADO:")
-print(f" - Categorías: {len(categorias)}")
-print(f" - Train: {train_generator.samples} imágenes")
-print(f" - Val:   {val_generator.samples} imágenes")
-print(f" - Tamaño estándar: {IMG_SIZE}")
-print(f" - Aumento offline: x{AUGMENT_MULTIPLIER + 1} total")
-print("\nDataset listo para entrenamiento con MobileNetV2 o EfficientNet.\n")
-time.sleep(2)
+print("\nRESUMEN FINAL DEL DATASET:")
+print(f" * Categorías: {len(categorias)} -> {categorias}")
+print(f" * Train: {train_gen.samples}")
+print(f" * Val:   {val_gen.samples}")
+print(f" * Test:  {test_gen.samples}")
+print(f" * Tamaño: {IMG_SIZE}")
+print("\nDataset listo para entrenamiento con MobileNetV2.")

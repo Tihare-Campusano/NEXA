@@ -1,86 +1,149 @@
+# -*- coding: utf-8 -*-
+"""
+test_modelo_ia.py
+---------------------------------------
+Script de prueba para el modelo de clasificación entrenado con MobileNetV2.
+Verifica que el modelo funcione correctamente, aplica umbral de confianza y 
+genera salida JSON para integrar con una app o API.
+"""
+
 import os
 import tensorflow as tf
 import numpy as np
+import json
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing import image
 
-# --- Configuración ---
-IMG_SIZE = (224, 224) 
-MODEL_PATH = r"C:\Users\cornu\OneDrive\Escritorio\NEXA\inventario-app\modelo_ia\modelo_final.h5"  # Asegúrate de usar el nombre correcto del archivo de tu modelo guardado
-IMAGE_TO_PREDICT = r"C:\Users\cornu\OneDrive\Escritorio\NEXA\inventario-app\modelo_ia\test.jpeg" # Nombre del archivo de la imagen que adjuntaste
-LABELS_PATH = r"C:\Users\cornu\OneDrive\Escritorio\NEXA\inventario-app\modelo_ia\labels.txt" # El archivo de etiquetas guardado por tu script
+# --- Configuración general ---
+IMG_SIZE = (224, 224)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Usamos la función de preprocesado de MobileNetV2, CRUCIAL!
+MODEL_PATH = r"C:\Users\cornu\OneDrive\Escritorio\NEXA\inventario-app\modelo_ia\modelo_final.h5"
+LABELS_PATH = r"C:\Users\cornu\OneDrive\Escritorio\NEXA\inventario-app\modelo_ia\labels.txt"
+IMAGE_TO_PREDICT = r"C:\Users\cornu\OneDrive\Escritorio\NEXA\inventario-app\modelo_ia\test.jpeg"
+
+CONFIDENCE_THRESHOLD = 0.80  # 80% de confianza mínima
+OUTPUT_JSON = os.path.join(BASE_DIR, "resultado_test.json")
+
 preprocess_fn = tf.keras.applications.mobilenet_v2.preprocess_input
 
+
+# --- Funciones auxiliares ---
 def get_labels(path):
-    """Carga las etiquetas de un archivo (una por línea)."""
+    """Carga las etiquetas desde un archivo de texto (una por línea)."""
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
             return [line.strip() for line in f.readlines()]
     return None
 
+
 def preprocess_image(img_path):
     """Carga y preprocesa una imagen para el modelo."""
-    # 1. Cargar y redimensionar la imagen al tamaño esperado (224x224)
-    img = image.load_img(img_path, target_size=IMG_SIZE)
-    # 2. Convertir a Array de numpy (forma: [Alto, Ancho, Canales])
+    try:
+        img = image.load_img(img_path, target_size=IMG_SIZE)
+    except Exception as e:
+        raise ValueError(f"Error al abrir la imagen: {e}")
     img_array = image.img_to_array(img)
-    # 3. Expandir dimensiones para formar un batch (forma: [1, Alto, Ancho, Canales])
     img_array = np.expand_dims(img_array, axis=0)
-    # 4. Aplicar la normalización de MobileNetV2: [0, 255] -> [-1, 1]
     return preprocess_fn(img_array)
 
-def predict_single_image(model_path, img_path, labels_path):
-    """Carga el modelo y predice una sola imagen."""
-    
-    print(f"Cargando modelo desde: {model_path}")
+
+def predict_single_image(model_path, img_path, labels_path, threshold):
+    """Carga el modelo y predice una sola imagen, retornando un diccionario JSON."""
+
+    print(f"\n[DIAGNÓSTICO] Archivo a predecir: {os.path.basename(img_path)}")
+
     if not os.path.exists(model_path):
-        print("ERROR: Archivo del modelo no encontrado. Asegúrate de que el entrenamiento se haya completado y guardado correctamente.")
-        return
-        
-    # Cargar el modelo (debe ser el modelo completo con la estructura correcta)
-    # Nota: Si el modelo usa capas personalizadas, habría que pasarlas
+        return {'status': 'error', 'message': 'Archivo del modelo no encontrado.'}
+
     try:
-        model = load_model(model_path)
+        model = load_model(model_path, compile=False)
     except Exception as e:
-        print(f"ERROR al cargar el modelo: {e}")
-        print("Asegúrate de que TensorFlow y Keras estén configurados correctamente.")
-        return
+        return {'status': 'error', 'message': f"Error al cargar el modelo: {e}"}
 
-    print(f"Cargando y preprocesando imagen: {img_path}")
     if not os.path.exists(img_path):
-        print(f"ERROR: Archivo de imagen '{img_path}' no encontrado.")
-        return
+        return {'status': 'error', 'message': f"Archivo de imagen '{os.path.basename(img_path)}' no encontrado."}
 
-    # Preprocesar la imagen
-    processed_image = preprocess_image(img_path)
-    
-    # Realizar la predicción
+    try:
+        processed_image = preprocess_image(img_path)
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}
+
     print("Realizando predicción...")
     predictions = model.predict(processed_image)
-    
-    # Obtener el índice de la clase con mayor probabilidad
-    predicted_class_index = np.argmax(predictions[0])
-    
-    # Obtener las etiquetas para interpretar el resultado
-    labels = get_labels(labels_path)
-    
-    # --- Resultados ---
-    print("\n--- Resultado de la Predicción ---")
-    print(f"Puntuaciones (Softmax): {predictions[0]}")
-    print(f"Índice de Clase Predicha: {predicted_class_index}")
-    
-    if labels and len(labels) > predicted_class_index:
-        predicted_label = labels[predicted_class_index]
-        confidence = predictions[0][predicted_class_index] * 100
-        
-        print(f"Etiqueta Predicha: **{predicted_label}**")
-        print(f"Confianza: **{confidence:.2f}%**")
-    elif labels:
-        print("Advertencia: El índice predicho está fuera del rango de las etiquetas guardadas.")
-    else:
-        print(f"ERROR: No se pudieron cargar las etiquetas desde '{labels_path}'.")
 
+    labels = get_labels(labels_path)
+    if not labels:
+        return {'status': 'error', 'message': f"No se pudieron cargar las etiquetas desde '{labels_path}'."}
+
+    if len(labels) != predictions.shape[1]:
+        return {'status': 'error', 'message': f"Desajuste entre etiquetas ({len(labels)}) y salidas del modelo ({predictions.shape[1]})."}
+
+    probabilities = predictions[0]
+    predicted_class_index = np.argmax(probabilities)
+    confidence = probabilities[predicted_class_index]
+
+    # Formatear probabilidades completas
+    confidence_scores = {labels[i]: f"{float(probabilities[i]) * 100:.2f}%" for i in range(len(labels))}
+
+    # Mostrar Top-3 predicciones
+    top_indices = np.argsort(probabilities)[::-1][:3]
+    top_predictions = {labels[i]: f"{probabilities[i] * 100:.2f}%" for i in top_indices}
+    print("\nTop-3 predicciones más probables:")
+    for lbl, conf in top_predictions.items():
+        print(f"  - {lbl}: {conf}")
+
+    if confidence < threshold:
+        predicted_label = "INCIERTO"
+        detail = f"Confianza baja (< {threshold * 100:.0f}%). Se recomienda más entrenamiento o imagen más clara."
+    else:
+        predicted_label = labels[predicted_class_index]
+        detail = f"Predicción exitosa (Confianza >= {threshold * 100:.0f}%)."
+
+    result = {
+        'status': 'success',
+        'predicted_label': predicted_label,
+        'confidence_score': f"{confidence * 100:.2f}%",
+        'threshold_met': bool(confidence >= threshold),
+        'detail': detail,
+        'all_scores': confidence_scores,
+        'top3_predictions': top_predictions
+    }
+
+    return result
+
+
+def test_multiple_images(folder_path):
+    """Permite probar varias imágenes en una carpeta."""
+    files = [f for f in os.listdir(folder_path) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+    if not files:
+        print(f"No se encontraron imágenes válidas en {folder_path}.")
+        return
+    for file in files:
+        path = os.path.join(folder_path, file)
+        result = predict_single_image(MODEL_PATH, path, LABELS_PATH, CONFIDENCE_THRESHOLD)
+        print(f"\n[{file}] → {result.get('predicted_label')} ({result.get('confidence_score')})")
+
+
+# --- Ejecución principal ---
 if __name__ == "__main__":
-    predict_single_image(MODEL_PATH, IMAGE_TO_PREDICT, LABELS_PATH)
+
+    print("--- INICIO DE PRUEBA DEL MODELO ---")
+    prediction_result = predict_single_image(MODEL_PATH, IMAGE_TO_PREDICT, LABELS_PATH, CONFIDENCE_THRESHOLD)
+
+    print("\n--- RESULTADO JSON SIMULADO ---")
+    print(json.dumps(prediction_result, indent=4, ensure_ascii=False))
+
+    # Guardar resultado JSON en archivo
+    with open(OUTPUT_JSON, "w", encoding="utf-8") as f:
+        json.dump(prediction_result, f, indent=4, ensure_ascii=False)
+
+    print(f"\nResultado guardado en: {OUTPUT_JSON}")
+
+    print("\n--- CONCLUSIÓN ---")
+    if prediction_result['status'] == 'success':
+        print(f"ÉXITO: Predicción completada correctamente.")
+        print(f"Etiqueta final: {prediction_result['predicted_label']}")
+        print(f"Confianza: {prediction_result['confidence_score']}")
+    else:
+        print(f"ERROR: {prediction_result['message']}")
