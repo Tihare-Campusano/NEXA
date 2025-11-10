@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-// 🚨 Importar withRouter y RouteComponentProps
-import { withRouter, RouteComponentProps } from "react-router-dom"; 
+import { withRouter, RouteComponentProps } from "react-router-dom";
 import { IonIcon } from "@ionic/react";
 import { copyOutline } from "ionicons/icons";
 import "./table-editor.css";
@@ -22,11 +21,8 @@ type Props = {
     productos?: Producto[];
 };
 
-// 🚨 Definir el nuevo tipo de props que incluye las de RouteComponentProps
 type ProductosTableProps = Props & RouteComponentProps;
 
-
-// 🚨 Eliminar useHistory y recibir 'history' directamente en las props
 function ProductosTable({ productos: productosProp, history }: ProductosTableProps) {
     const [productos, setProductos] = useState<Producto[]>([]);
     const [loading, setLoading] = useState(true);
@@ -34,48 +30,49 @@ function ProductosTable({ productos: productosProp, history }: ProductosTablePro
     const [pageSize] = useState(10);
     const [total, setTotal] = useState(0);
     const [copiedId, setCopiedId] = useState<number | null>(null);
-    // const history = useHistory(); // ❌ ELIMINADO: Ya no es necesario aquí.
+
+    // Detectar si estamos en modo buscador
+    const modoBusqueda = !!productosProp;
 
     useEffect(() => {
+        // 🔹 Si recibimos productos desde props (ej: búsqueda), usamos esos
         if (productosProp) {
             setProductos(productosProp);
             setLoading(false);
             return;
         }
 
+        // 🔹 Si no hay props, cargamos los productos desde Supabase (solo nombre, id, codigo_barras)
         const fetchProductos = async () => {
             setLoading(true);
-            // Obtener total
-            const { count: totalCount } = await supabase
-                .from("productos")
-                .select("id", { count: 'exact', head: true });
-            if (typeof totalCount === 'number') setTotal(totalCount);
-
-            const from = (page - 1) * pageSize;
-            const to = from + pageSize - 1;
 
             const { data, error } = await supabase
                 .from("productos")
-                // Traemos ambas por compatibilidad y normalizamos abajo
-                .select("id, codigo_barras, sku, nombre")
-                .order("id", { ascending: false })
-                .range(from, to);
+                .select(`
+        id,
+        nombre,
+        codigo_barras
+      `)
+                .order("id", { ascending: false });
 
             if (error) {
                 console.error("Error al cargar productos:", error.message);
             } else {
-                const normalizados: Producto[] = (data || []).map((p: any) => ({
+                const productosSimplificados: Producto[] = data.map((p: any) => ({
                     id: p.id,
                     nombre: p.nombre,
-                    codigo_barras: p.codigo_barras ?? p.sku ?? null,
+                    codigo_barras: p.codigo_barras ?? "-",
                 }));
-                setProductos(normalizados);
+
+                setProductos(productosSimplificados);
             }
+
             setLoading(false);
         };
 
         fetchProductos();
-    }, [productosProp, page, pageSize]);
+    }, [productosProp]);
+
 
     if (loading) return <p>Cargando productos...</p>;
 
@@ -112,13 +109,29 @@ function ProductosTable({ productos: productosProp, history }: ProductosTablePro
                                                     onClick={() => {
                                                         navigator.clipboard.writeText(prod.codigo_barras as string);
                                                         setCopiedId(prod.id);
-                                                        setTimeout(() => setCopiedId((prev) => (prev === prod.id ? null : prev)), 2000);
+                                                        setTimeout(
+                                                            () => setCopiedId((prev) => (prev === prod.id ? null : prev)),
+                                                            2000
+                                                        );
                                                     }}
                                                     title="Copiar código"
-                                                    style={{ marginLeft: 8, cursor: 'pointer', fontSize: 18, color: '#555' }}
+                                                    style={{
+                                                        marginLeft: 8,
+                                                        cursor: "pointer",
+                                                        fontSize: 18,
+                                                        color: "#555",
+                                                    }}
                                                 />
                                                 {copiedId === prod.id && (
-                                                    <span style={{ marginLeft: 6, fontSize: 12, color: '#10b981' }}>¡Copiado!</span>
+                                                    <span
+                                                        style={{
+                                                            marginLeft: 6,
+                                                            fontSize: 12,
+                                                            color: "#10b981",
+                                                        }}
+                                                    >
+                                                        ¡Copiado!
+                                                    </span>
                                                 )}
                                             </>
                                         )}
@@ -127,7 +140,6 @@ function ProductosTable({ productos: productosProp, history }: ProductosTablePro
                                     <td>
                                         <button
                                             className="btn-ver"
-                                            // ✅ Uso de history.push() inyectado para la ruta correcta
                                             onClick={() => history.push(`/tabs/product/${prod.id}`)}
                                         >
                                             Ver producto
@@ -144,9 +156,17 @@ function ProductosTable({ productos: productosProp, history }: ProductosTablePro
                         )}
                     </tbody>
                 </table>
+
                 {/* Paginación simple */}
-                {total > pageSize && (
-                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 12 }}>
+                {!modoBusqueda && total > pageSize && (
+                    <div
+                        style={{
+                            display: "flex",
+                            gap: 12,
+                            alignItems: "center",
+                            marginTop: 12,
+                        }}
+                    >
                         <button
                             className="btn-ver"
                             onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -159,7 +179,11 @@ function ProductosTable({ productos: productosProp, history }: ProductosTablePro
                         </span>
                         <button
                             className="btn-ver"
-                            onClick={() => setPage((p) => (p < Math.ceil(total / pageSize) ? p + 1 : p))}
+                            onClick={() =>
+                                setPage((p) =>
+                                    p < Math.ceil(total / pageSize) ? p + 1 : p
+                                )
+                            }
                             disabled={page >= Math.ceil(total / pageSize)}
                         >
                             Siguiente
@@ -171,6 +195,5 @@ function ProductosTable({ productos: productosProp, history }: ProductosTablePro
     );
 }
 
-// 🚨 Exportar el componente envuelto en withRouter con nombre
 const ProductosTableWithRouter = withRouter(ProductosTable);
 export default ProductosTableWithRouter;

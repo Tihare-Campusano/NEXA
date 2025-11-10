@@ -10,9 +10,8 @@ import {
 import { useHistory } from 'react-router-dom';
 import { logoGoogle } from 'ionicons/icons';
 import { Camera } from '@capacitor/camera';
-import { Filesystem } from '@capacitor/filesystem';
-import { Geolocation } from '@capacitor/geolocation';
 import { Capacitor } from '@capacitor/core';
+import { Filesystem, PermissionStatus } from '@capacitor/filesystem';
 
 import LoginForm from '../../components/login/login-form';
 import { supabase } from '../../supabaseClient';
@@ -52,26 +51,46 @@ const Login: React.FC = () => {
     }
   };
 
-  // --- Solicitar permisos esenciales ---
-  const requestPermissions = async (): Promise<boolean> => {
+  // --- Pedir permiso de almacenamiento/descarga sin abrir galería ---
+  const requestStoragePermission = async (): Promise<boolean> => {
     try {
-      // Cámara
-      const camPerm = await Camera.requestPermissions();
-      if (camPerm.camera !== 'granted') return false;
-
-      // Archivos (solo Android)
       if (Capacitor.getPlatform() === 'android') {
-        const fsPerm = await Filesystem.requestPermissions();
-        if (!fsPerm.publicStorage) return false;
+        const status: PermissionStatus = await Filesystem.requestPermissions();
+        if (!status.publicStorage) {
+          alert(
+            'Debes permitir el acceso a archivos/descargas para continuar.'
+          );
+          return false;
+        }
       }
 
-      // Ubicación
-      const geoPerm = await Geolocation.requestPermissions();
-      if (geoPerm.location !== 'granted') return false;
+      // En iOS normalmente no se requiere permiso para guardar archivos locales
+      return true;
+    } catch (err) {
+      console.error('Error solicitando permiso de almacenamiento:', err);
+      alert('Error al solicitar permisos de almacenamiento.');
+      return false;
+    }
+  };
+
+  // --- Solicitar permisos de Cámara y Almacenamiento
+  const requestPermissions = async (): Promise<boolean> => {
+    try {
+      // 1️⃣ Cámara
+      const camPerm = await Camera.requestPermissions();
+      if (camPerm.camera !== 'granted') {
+        alert('Debes otorgar permiso de Cámara.');
+        return false;
+      }
+
+      // 2️⃣ Almacenamiento/Descarga de archivos
+      const storageGranted = await requestStoragePermission();
+      if (!storageGranted) return false;
 
       return true;
-    } catch (error) {
-      console.error('❌ Error solicitando permisos:', error);
+    } catch (err) {
+      console.error('Error solicitando permisos:', err);
+      alert('Error al solicitar permisos.');
       return false;
     }
   };
@@ -97,12 +116,9 @@ const Login: React.FC = () => {
 
       await ensureProfile(data.user.id);
 
-      // Solicitar permisos antes de entrar
+      // 🔑 Solicitar permisos ANTES de navegar al home
       const granted = await requestPermissions();
-      if (!granted) {
-        toast('Debes conceder cámara, almacenamiento y ubicación para continuar');
-        return;
-      }
+      if (!granted) return; // El alert ya fue mostrado
 
       history.replace('/tabs/home');
     } catch (err: any) {

@@ -70,6 +70,18 @@ const App: React.FC = () => {
       </IonApp>
     </ThemeProvider>
   );
+    return (
+        <IonApp>
+            <IonReactRouter>
+                <IonRouterOutlet>
+                    {/* Rutas Públicas (ahora todas son accesibles directamente) */}
+                    <Route exact path="/" render={() => <Redirect to="/login" />} />
+                    <Route exact path="/login" component={Login} />
+                    <Route path="/tabs" render={() => <TabsLayout />} />
+                </IonRouterOutlet>
+            </IonReactRouter>
+        </IonApp>
+    );
 };
 
 /* Componente para el Layout de las Rutas con Tabs */

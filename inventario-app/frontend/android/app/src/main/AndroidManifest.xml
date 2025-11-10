@@ -35,14 +35,14 @@
         </provider>
     </application>
 
-    <!-- Permissions -->
+    <!-- Permisos generales -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Permiso de cámara -->
     <uses-permission android:name="android.permission.CAMERA" />
-    <!-- Permiso para almacenamiento (leer y escribir en dispositivo) -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <!-- Opcional: Ubicación -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- Android 12 y anteriores -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/> 
+
+    <!-- Android 13+ -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
 </manifest>
