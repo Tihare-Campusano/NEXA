@@ -12,6 +12,8 @@ import {
 } from "@ionic/react";
 import { IonReactRouter } from "@ionic/react-router";
 import { home, barChart, create, list, person } from "ionicons/icons";
+import { StatusBar, Style } from "@capacitor/status-bar";
+
 
 /* CSS de Ionic */
 import "@ionic/react/css/core.css";
@@ -27,9 +29,8 @@ import "@ionic/react/css/display.css";
 import "@ionic/react/css/palettes/dark.system.css";
 import "./theme/variables.css";
 
-setupIonicReact({
-  animated: false, // 👈 sin animaciones = sin parpadeos al cambiar de página
-});
+setupIonicReact({ animated: false });
+
 import "@ionic/react/css/palettes/dark.system.css";
 
 /* Páginas de Autenticación */
@@ -54,6 +55,10 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 setupIonicReact();
 
 const App: React.FC = () => {
+  StatusBar.setOverlaysWebView({ overlay: false });
+  StatusBar.setStyle({ style: Style.Dark });  // texto claro (para barra oscura)
+  StatusBar.setStyle({ style: Style.Light }); // texto oscuro (para barra clara)
+
   return (
     /* 🟢 Envolvemos toda la app dentro del ThemeProvider */
     <ThemeProvider>

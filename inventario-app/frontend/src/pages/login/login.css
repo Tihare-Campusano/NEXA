@@ -32,6 +32,7 @@
     /* Ajusta el tamaño de tu logo */
     height: auto;
     margin: 0 auto 1rem auto;
+    margin-top: 10px;
 }
 
 /* 2. El Título "Bienvenido" */
