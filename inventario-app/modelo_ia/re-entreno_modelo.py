@@ -1,118 +1,138 @@
+# -*- coding: utf-8 -*-
+"""
+re-entreno_modelo.py
+---------------------------------------
+Script para realizar Fine-Tuning (ajuste fino) sobre el modelo existente 
+(.h5) con un nuevo conjunto de datos para mejorar la precisión y confianza,
+incluyendo la conversión final a formato TFLite.
+"""
+
 import os
-import shutil
-from google_images_download import googleimagesdownload
+import tensorflow as tf
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.optimizers import Adam
+import numpy as np
 
-# --- Configuración de Rutas ---
+# --- Configuración de Rutas y Parámetros ---
 
+# Directorio base (donde está este script)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Directorio de DESCARGA temporal (para el scraping)
-OUTPUT_DIR_TEMPORAL = "dataset_descargado_temp"
-DOWNLOAD_PATH = os.path.join(BASE_DIR, OUTPUT_DIR_TEMPORAL)
+# Rutas de Archivos
+MODELO_ACTUAL_PATH = os.path.join(BASE_DIR, "modelo_final.h5")
+MODELO_NUEVO_PATH = os.path.join(BASE_DIR, "modelo_final_v2.h5") 
+MODELO_TFLITE_PATH = os.path.join(BASE_DIR, "modelo_final_v2.tflite") # Nueva ruta para TFLite
 
-# Directorio FINAL para el re-entrenamiento (como lo necesita el otro script)
-OUTPUT_DIR_FINAL = "nuevos_datos_entrenamiento"
-FINAL_PATH = os.path.join(BASE_DIR, OUTPUT_DIR_FINAL)
+# Directorio con las nuevas imágenes para re-entrenamiento
+DATA_DIR = os.path.join(BASE_DIR, "nuevos_datos_entrenamiento") 
 
-# --- Configuración de Descarga ---
+# Parámetros del modelo original
+IMG_SIZE = (224, 224)
+BATCH_SIZE = 32 # Tamaño de lote para procesamiento de datos
+LR_FINETUNE = 1e-5  # Tasa de aprendizaje muy baja para Fine-Tuning (0.00001)
+EPOCHS = 50         # Número de épocas de re-entrenamiento
 
-CLASSES = {
-    "nuevo": "producto nuevo sin abrir, empaque sellado",
-    "usado": "producto usado en buen estado, sin daños graves",
-    "mal_estado": "producto roto, caja dañada, producto defectuoso",
-}
+# --- 1. Carga y Preparación de Datos ---
 
-# Parámetros de descarga aumentados
-LIMIT_PER_CLASS = 300  # Máximo a intentar descargar por clase
-IMAGE_SIZE = "medium"  # Preferir calidad media/alta
+print("--- 1. Preparando Datos ---")
 
-# --- 1. Función de Descarga ---
+if not os.path.exists(DATA_DIR):
+    print(f"ERROR: Directorio de datos no encontrado: {DATA_DIR}")
+    print("Asegúrate de crear la carpeta y organizar tus imágenes dentro de subcarpetas (ej: /nuevo, /usado).")
+    exit()
 
-def download_images(classes, limit, output_dir, size):
-    """Descarga imágenes para cada clase."""
-    if os.path.exists(output_dir):
-        shutil.rmtree(output_dir) # Eliminar descargas anteriores si existen
-    os.makedirs(output_dir)
-    print(f"Directorio de descarga temporal creado: {output_dir}")
+# Generador de datos para cargar y aumentar imágenes
+# MobileNetV2 usa rango de [-1, 1], manejado por preprocess_input
+datagen = ImageDataGenerator(
+    preprocessing_function=tf.keras.applications.mobilenet_v2.preprocess_input,
+    validation_split=0.2, # 20% de los datos serán para validación
+    rotation_range=20,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    shear_range=0.2,
+    zoom_range=0.2,
+    horizontal_flip=True
+)
+
+# Cargar datos de entrenamiento
+train_generator = datagen.flow_from_directory(
+    DATA_DIR,
+    target_size=IMG_SIZE,
+    batch_size=BATCH_SIZE,
+    class_mode='categorical',
+    subset='training'
+)
+
+# Cargar datos de validación
+validation_generator = datagen.flow_from_directory(
+    DATA_DIR,
+    target_size=IMG_SIZE,
+    batch_size=BATCH_SIZE,
+    class_mode='categorical',
+    subset='validation'
+)
+
+NUM_CLASSES = train_generator.num_classes
+print(f"Clases detectadas: {NUM_CLASSES}. Etiquetas: {list(train_generator.class_indices.keys())}")
+
+
+# --- 2. Carga del Modelo Existente y Configuración para Fine-Tuning ---
+
+print("\n--- 2. Cargando Modelo Existente ---")
+
+if not os.path.exists(MODELO_ACTUAL_PATH):
+    print(f"ERROR: Modelo inicial no encontrado en: {MODELO_ACTUAL_PATH}")
+    exit()
     
-    response = googleimagesdownload.googleimagesdownload()
+# Cargar el modelo sin compilar, ya que vamos a cambiar el optimizador y LR
+modelo = load_model(MODELO_ACTUAL_PATH, compile=False)
+
+# Recompilar con una tasa de aprendizaje (Learning Rate) muy baja
+modelo.compile(
+    optimizer=Adam(learning_rate=LR_FINETUNE), 
+    loss='categorical_crossentropy', 
+    metrics=['accuracy']
+)
+
+print(f"Modelo cargado y configurado con Learning Rate: {LR_FINETUNE}")
+
+
+# --- 3. Re-entrenamiento (Fine-Tuning) ---
+
+print(f"\n--- 3. Iniciando Re-entrenamiento por {EPOCHS} épocas ---")
+
+history = modelo.fit(
+    train_generator,
+    steps_per_epoch=train_generator.samples // BATCH_SIZE,
+    epochs=EPOCHS,
+    validation_data=validation_generator,
+    validation_steps=validation_generator.samples // BATCH_SIZE
+)
+
+# --- 4. Guardar el Nuevo Modelo y Convertir a TFLite ---
+
+print(f"\n--- 4. Finalizando, Guardando y Convirtiendo ---")
+
+# 4.1. Guardar el modelo re-entrenado en formato Keras (.h5)
+modelo.save(MODELO_NUEVO_PATH)
+print(f"ÉXITO: Nuevo modelo guardado en formato Keras: {MODELO_NUEVO_PATH}")
+
+# 4.2. Conversión a TFLite
+try:
+    print("\nIniciando conversión a TFLite...")
     
-    for class_name, keywords in classes.items():
-        print(f"\n[Buscando] Clase: {class_name}...")
+    # Crea el convertidor Keras
+    converter = tf.lite.TFLiteConverter.from_keras_model(modelo)
+    
+    # Realiza la conversión
+    tflite_model = converter.convert()
+    
+    # Guarda el modelo TFLite en un archivo binario
+    with open(MODELO_TFLITE_PATH, 'wb') as f:
+        f.write(tflite_model)
         
-        arguments = {
-            "keywords": keywords,
-            "limit": limit,
-            "output_directory": output_dir,
-            "label": class_name, 
-            "size": size,
-            "print_urls": False,
-            "silent_mode": True
-        }
-        
-        try:
-            response.download(arguments)
-            print(f"Descarga de '{class_name}' completada.")
-        except Exception as e:
-            print(f"Error al descargar imágenes para {class_name}: {e}")
-
-# --- 2. Función de Limpieza y Movimiento Automático ---
-
-def clean_and_move_dataset(temp_dir, final_dir, classes):
-    """Elimina archivos rotos/inútiles y mueve los datos limpios a la carpeta final."""
+    print(f"ÉXITO: Modelo convertido y guardado como: {MODELO_TFLITE_PATH}")
     
-    if os.path.exists(final_dir):
-        shutil.rmtree(final_dir) # Eliminar carpeta final anterior
-    os.makedirs(final_dir)
-    print(f"\n[Limpieza] Iniciando limpieza y traslado a: {final_dir}")
-    
-    valid_extensions = ('.jpg', '.jpeg', '.png')
-    total_cleaned = 0
-    total_moved = 0
-
-    for class_name in classes.keys():
-        temp_class_path = os.path.join(temp_dir, class_name)
-        final_class_path = os.path.join(final_dir, class_name)
-        
-        if not os.path.exists(temp_class_path):
-            continue
-            
-        os.makedirs(final_class_path, exist_ok=True)
-        
-        for filename in os.listdir(temp_class_path):
-            file_path = os.path.join(temp_class_path, filename)
-            
-            # FILTRO 1: Ignorar archivos no imagen y archivos de tamaño cero
-            if filename.lower().endswith(valid_extensions) and os.path.getsize(file_path) > 0:
-                shutil.move(file_path, os.path.join(final_class_path, filename))
-                total_moved += 1
-            else:
-                os.remove(file_path) # Eliminar archivos inútiles o vacíos
-                total_cleaned += 1
-                
-        # Eliminar carpeta temporal vacía
-        shutil.rmtree(temp_class_path)
-
-    # Eliminar directorio temporal si queda vacío
-    if os.path.exists(temp_dir):
-        shutil.rmtree(temp_dir)
-        
-    print(f"Archivos basura eliminados: {total_cleaned}")
-    print(f"Archivos limpios trasladados: {total_moved}")
-    print("El directorio temporal ha sido eliminado.")
-
-
-# --- Ejecución Principal ---
-
-if __name__ == "__main__":
-    
-    # 1. Descarga de imágenes
-    download_images(CLASSES, LIMIT_PER_CLASS, DOWNLOAD_PATH, IMAGE_SIZE)
-    
-    # 2. Limpieza automática de archivos y movimiento
-    clean_and_move_dataset(DOWNLOAD_PATH, FINAL_PATH, CLASSES)
-    
-    print("\n--- ¡PROCESO AUTOMÁTICO TERMINADO! ---")
-    print("La carpeta 'nuevos_datos_entrenamiento' contiene los archivos limpios.")
-    print("Paso Final: REVISA MANUALMENTE la carpeta para eliminar IMÁGENES AMBIGUAS o de MALA CALIDAD.")
-    print("Luego, puedes ejecutar 're-entreno_modelo.py'.")
+except Exception as e:
+    print(f"ERROR: Falló la conversión a TFLite. Asegúrate de que tu versión de TensorFlow es compatible. Detalle: {e}")
