@@ -3,7 +3,7 @@
 import legacy from '@vitejs/plugin-legacy'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
-import path from 'path'
+import path from 'path' // path ya no es estrictamente necesario si eliminas el alias
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -11,17 +11,10 @@ export default defineConfig({
     react(),
     legacy(),
   ],
-  assetsInclude: ['**/*.tflite'],
+  // assetsInclude: ['**/*.tflite'], // ELIMINADO
   base: './',
-  resolve: {
-    alias: {
-      // Reemplaza todo @tensorflow/tfjs-tflite con el mock
-      '@tensorflow/tfjs-tflite': path.resolve(__dirname, 'src/mocks/tflite_web_api_client.js'),
-    },
-  },
-  optimizeDeps: {
-    include: ['@tensorflow/tfjs-tflite'],
-  },
+  // resolve: { ... }, // SECCIÓN ELIMINADA/REDUCIDA
+  // optimizeDeps: { ... }, // SECCIÓN ELIMINADA
   test: {
     globals: true,
     environment: 'jsdom',
