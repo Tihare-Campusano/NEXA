@@ -2,33 +2,35 @@
 """
 test_modelo_ia.py
 ---------------------------------------
-Script de prueba para el modelo de clasificación entrenado con MobileNetV2.
-Verifica que el modelo funcione correctamente, aplica umbral de confianza y 
-genera salida JSON para integrar con una app o API.
+Script de prueba para el modelo de clasificación entrenado con MobileNetV2
+utilizando el formato optimizado TFLite.
 """
 
 import os
 import tensorflow as tf
 import numpy as np
 import json
-from tensorflow.keras.models import load_model
+# Se elimina 'from tensorflow.keras.models import load_model'
 from tensorflow.keras.preprocessing import image
 
 # --- Configuración general ---
 IMG_SIZE = (224, 224)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-MODEL_PATH = r"C:\Users\cornu\OneDrive\Escritorio\NEXA\inventario-app\modelo_ia\modelo_final.h5"
-LABELS_PATH = r"C:\Users\cornu\OneDrive\Escritorio\NEXA\inventario-app\modelo_ia\labels.txt"
-IMAGE_TO_PREDICT = r"C:\Users\cornu\OneDrive\Escritorio\NEXA\inventario-app\modelo_ia\test.jpeg"
+# *** CAMBIO 1: RUTAS RELATIVAS Y TFLITE ***
+# Se asume que estos archivos están en el mismo directorio que el script
+MODEL_PATH = os.path.join(BASE_DIR, "modelo_final.tflite")
+LABELS_PATH = os.path.join(BASE_DIR, "labels.txt")
+IMAGE_TO_PREDICT = os.path.join(BASE_DIR, "test.jpeg") # Asegúrate de que esta imagen exista
 
-CONFIDENCE_THRESHOLD = 0.80  # 80% de confianza mínima
+CONFIDENCE_THRESHOLD = 0.80     # 80% de confianza mínima
 OUTPUT_JSON = os.path.join(BASE_DIR, "resultado_test.json")
 
+# MobileNetV2 preprocesa a un rango de [-1, 1]
 preprocess_fn = tf.keras.applications.mobilenet_v2.preprocess_input
 
 
-# --- Funciones auxiliares ---
+# --- Funciones auxiliares (Mantienen su funcionalidad original) ---
 def get_labels(path):
     """Carga las etiquetas desde un archivo de texto (una por línea)."""
     if os.path.exists(path):
@@ -38,29 +40,43 @@ def get_labels(path):
 
 
 def preprocess_image(img_path):
-    """Carga y preprocesa una imagen para el modelo."""
+    """Carga y preprocesa una imagen para el modelo (como Numpy array)."""
     try:
         img = image.load_img(img_path, target_size=IMG_SIZE)
     except Exception as e:
         raise ValueError(f"Error al abrir la imagen: {e}")
+    
     img_array = image.img_to_array(img)
-    img_array = np.expand_dims(img_array, axis=0)
-    return preprocess_fn(img_array)
+    # TFLite espera un tensor 4D (batch, altura, ancho, canales)
+    img_array = np.expand_dims(img_array, axis=0) 
+    
+    # Preprocesamiento específico de MobileNetV2
+    processed_image = preprocess_fn(img_array)
+    
+    # Aseguramos el tipo de dato que espera TFLite, generalmente float32
+    return processed_image.astype(np.float32)
 
 
+# *** CAMBIO 2: LÓGICA DE PREDICCIÓN CON TFLITE ***
 def predict_single_image(model_path, img_path, labels_path, threshold):
-    """Carga el modelo y predice una sola imagen, retornando un diccionario JSON."""
+    """Carga el modelo TFLite y predice una sola imagen, retornando un diccionario JSON."""
 
     print(f"\n[DIAGNÓSTICO] Archivo a predecir: {os.path.basename(img_path)}")
 
     if not os.path.exists(model_path):
-        return {'status': 'error', 'message': 'Archivo del modelo no encontrado.'}
+        return {'status': 'error', 'message': 'Archivo del modelo TFLite no encontrado.'}
 
+    # Inicializar el intérprete de TFLite
     try:
-        model = load_model(model_path, compile=False)
+        interpreter = tf.lite.Interpreter(model_path=model_path)
+        interpreter.allocate_tensors()
     except Exception as e:
-        return {'status': 'error', 'message': f"Error al cargar el modelo: {e}"}
+        return {'status': 'error', 'message': f"Error al cargar el intérprete TFLite: {e}"}
 
+    # Obtener detalles del input y output del modelo
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
+    
     if not os.path.exists(img_path):
         return {'status': 'error', 'message': f"Archivo de imagen '{os.path.basename(img_path)}' no encontrado."}
 
@@ -69,14 +85,23 @@ def predict_single_image(model_path, img_path, labels_path, threshold):
     except Exception as e:
         return {'status': 'error', 'message': str(e)}
 
-    print("Realizando predicción...")
-    predictions = model.predict(processed_image)
+    # Asignar la entrada al tensor TFLite
+    interpreter.set_tensor(input_details[0]['index'], processed_image)
+
+    print("Realizando predicción TFLite...")
+    # Correr la inferencia
+    interpreter.invoke()
+    
+    # Obtener el resultado
+    output_data = interpreter.get_tensor(output_details[0]['index'])
+    predictions = output_data
 
     labels = get_labels(labels_path)
     if not labels:
         return {'status': 'error', 'message': f"No se pudieron cargar las etiquetas desde '{labels_path}'."}
 
-    if len(labels) != predictions.shape[1]:
+    # La salida de TFLite es un array de Numpy, usualmente 1xN
+    if len(labels) != predictions.shape[1]: 
         return {'status': 'error', 'message': f"Desajuste entre etiquetas ({len(labels)}) y salidas del modelo ({predictions.shape[1]})."}
 
     probabilities = predictions[0]
@@ -91,7 +116,7 @@ def predict_single_image(model_path, img_path, labels_path, threshold):
     top_predictions = {labels[i]: f"{probabilities[i] * 100:.2f}%" for i in top_indices}
     print("\nTop-3 predicciones más probables:")
     for lbl, conf in top_predictions.items():
-        print(f"  - {lbl}: {conf}")
+        print(f"  - {lbl}: {conf}")
 
     if confidence < threshold:
         predicted_label = "INCIERTO"
@@ -112,20 +137,7 @@ def predict_single_image(model_path, img_path, labels_path, threshold):
 
     return result
 
-
-def test_multiple_images(folder_path):
-    """Permite probar varias imágenes en una carpeta."""
-    files = [f for f in os.listdir(folder_path) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
-    if not files:
-        print(f"No se encontraron imágenes válidas en {folder_path}.")
-        return
-    for file in files:
-        path = os.path.join(folder_path, file)
-        result = predict_single_image(MODEL_PATH, path, LABELS_PATH, CONFIDENCE_THRESHOLD)
-        print(f"\n[{file}] → {result.get('predicted_label')} ({result.get('confidence_score')})")
-
-
-# --- Ejecución principal ---
+# --- Ejecución principal (Se mantiene igual) ---
 if __name__ == "__main__":
 
     print("--- INICIO DE PRUEBA DEL MODELO ---")
