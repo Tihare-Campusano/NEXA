@@ -43,6 +43,7 @@ export default function FormularioRegistro() {
     categoria_id: "",
     compatibilidad: "",
     observaciones: "",
+    // Mantenemos 'stock' en el estado local, pero mapeamos a 'unidad' en DB
     stock: "",
     disponibilidad: "",
     estado: "",
@@ -56,6 +57,7 @@ export default function FormularioRegistro() {
   // --- Efectos ---
   useEffect(() => {
     if (fromIA) {
+      // Cuando se vuelve de la IA, el campo 'stock' del form contiene el valor de 'unidad' (inventario)
       setForm((prev) => ({ ...prev, ...fromIA }));
       setModoGuardar(true);
     }
@@ -93,10 +95,12 @@ export default function FormularioRegistro() {
     }
     history.push({
       pathname: "/tabs/registro/ia",
+      // Pasamos todos los datos capturados
       state: { formData: form },
     });
   };
 
+  // --- FUNCIÓN DE GUARDADO FINAL (CORREGIDA) ---
   const handleGuardar = async () => {
     setLoading(true);
 
@@ -106,23 +110,33 @@ export default function FormularioRegistro() {
       .eq("codigo_barras", form.codigo)
       .maybeSingle();
 
+    // ✅ Mapeo de datos para la base de datos (usando 'unidad' y valores por defecto)
     const dataProducto = {
       codigo_barras: form.codigo,
-      nombre: form.nombre,
-      marca: form.marca,
-      modelo: form.modelo,
+
+      // 🛑 Campos de metadatos (Asegurar que no sean NULL, si son NOT NULL en DB)
+      nombre: form.nombre || "N/A",
+      marca: form.marca || "N/A",
+      modelo: form.modelo || "N/A",
       categoria_id: form.categoria_id ? parseInt(form.categoria_id, 10) : null,
-      compatibilidad: form.compatibilidad,
-      observaciones: form.observaciones,
-      estado: form.estadoIA || form.estado,
+      compatibilidad: form.compatibilidad || null,
+      observaciones: form.observaciones || null,
+
+      // ✅ Campos de Stock e IA (Mapeo de 'stock' local a 'unidad' en DB)
+      unidad: form.stock ? parseInt(form.stock, 10) : 0, // <-- Columna correcta para inventario
+      disponibilidad: form.disponibilidad || "Sin stock",
+      estado: form.estadoIA || form.estado || "No Clasificado",
       imagen_url: form.imagen_url || null,
+
       activo: true,
     };
 
     let error;
     if (existente) {
+      // Si existe, actualiza (asumiendo que la unidad ya fue incrementada por el backend)
       ({ error } = await supabase.from("productos").update(dataProducto).eq("id", existente.id));
     } else {
+      // Si es nuevo, inserta la fila COMPLETA con los valores por defecto (solución a 23514)
       ({ error } = await supabase.from("productos").insert([dataProducto]));
     }
 
@@ -186,6 +200,7 @@ export default function FormularioRegistro() {
         {loading && (
           <div className="spinner-container">
             <IonSpinner name="crescent" />
+            {/* El spinner se muestra mientras el backend procesa */}
           </div>
         )}
 

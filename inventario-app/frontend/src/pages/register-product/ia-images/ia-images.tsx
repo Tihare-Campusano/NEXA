@@ -23,8 +23,13 @@ const API_CLASSIFY_URL = "http://localhost:8000/api/clasificar-producto";
 interface FormData {
     codigo: string; 
     nombre: string;
-    stock: string; // Este campo ahora refleja el stock del backend
-    disponibilidad?: string; // Nuevo campo para guardar la disponibilidad que viene del backend/se calcula en él.
+    marca: string;      // 🛑 Añadido para enviar al Backend
+    modelo: string;     // 🛑 Añadido para enviar al Backend
+    categoria_id: string; // 🛑 Añadido para enviar al Backend
+    compatibilidad: string; // 🛑 Añadido para enviar al Backend
+    observaciones: string;  // 🛑 Añadido para enviar al Backend
+    stock: string; 
+    disponibilidad?: string; 
     estado_ia?: string;
     [key: string]: any;
 }
@@ -41,7 +46,6 @@ interface BackendResponse {
 
 /**
  * Función para obtener las dimensiones (ancho y alto) de una imagen Base64.
- * Esto corrige el error de TypeScript 2339.
  */
 const getImageDimensionsFromBase64 = (base64String: string): Promise<{ width: number, height: number }> => {
     return new Promise((resolve, reject) => {
@@ -55,17 +59,12 @@ const getImageDimensionsFromBase64 = (base64String: string): Promise<{ width: nu
         img.onerror = (e) => {
             reject(new Error("Error al cargar la imagen para obtener dimensiones."));
         };
-        // Reconstruye la URL completa del data URI
         img.src = `data:image/jpeg;base64,${base64String}`;
     });
 };
 
 /**
- * Calcula la disponibilidad según las reglas de negocio. (Se mantiene en el frontend SOLO 
- * si el backend no la devuelve, pero si la devuelve como en tu backend de Python, es mejor
- * depender de ese resultado para evitar duplicidad de lógica.)
- * NOTA: Esta función se mantiene aquí pero YA NO SE USA en callBackendAPIAndSave
- * porque el backend (app_ia.py) ya la calcula y actualiza la BD.
+ * Calcula la disponibilidad según las reglas de negocio.
  */
 const calcularDisponibilidad = (cantidad: number): string => {
     if (cantidad <= 0) return "Sin stock";
@@ -88,11 +87,11 @@ const IAImage: React.FC = () => {
     const [formData, setFormData] = useState<FormData>(initialFormData);
     const [image, setImage] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
-    const [estadoIA, setEstadoIA] = useState<string | null>(formData.estado_ia || null); // Inicializar con el estado si existe
+    const [estadoIA, setEstadoIA] = useState<string | null>(formData.estado_ia || null); 
     const [showLoadingOverlay, setShowLoadingOverlay] = useState(false);
     const [statusText, setStatusText] = useState<string>("Listo para tomar la foto.");
     
-    const isServiceReady = true; // Asumimos que el backend está siempre disponible
+    const isServiceReady = true; 
 
     // 💾 Función central: Llama a la API de Python para clasificar y guardar
     const callBackendAPIAndSave = async (imageBase64: string, width: number, height: number) => {
@@ -108,12 +107,26 @@ const IAImage: React.FC = () => {
         try {
             const userEmail = "correo_usuario@app.com"; // Obtener de la sesión de usuario
             
+            // 🛑 CONSTRUYENDO LA PETICIÓN CON TODOS LOS DATOS DEL FORMULARIO
             const requestData = {
                 image_base64: imageBase64,
                 codigo_barras: formData.codigo,
                 user_email: userEmail,
                 ancho: width,
                 alto: height,
+                
+                // ✅ ENVIAMOS CAMPOS METADATOS NECESARIOS PARA EL INSERT DEL BACKEND
+                nombre: formData.nombre,
+                marca: formData.marca,
+                modelo: formData.modelo,
+                categoria_id: formData.categoria_id,
+                compatibilidad: formData.compatibilidad,
+                observaciones: formData.observaciones, 
+
+                // Enviamos stock actual del formulario para asegurar consistencia
+                stock: formData.stock, 
+                disponibilidad: formData.disponibilidad,
+                estado: formData.estado,
             };
             
             // 2. Llamada HTTP a la API de Python
@@ -133,16 +146,14 @@ const IAImage: React.FC = () => {
                 // 3. Actualizar estado local
                 setEstadoIA(predictedStatus); 
 
-                // 4. Preparar datos actualizados para navegación (stock y disponibilidad vienen del backend)
-                // Usamos la misma función de cálculo para la disponibilidad solo como fallback/para consistencia local, 
-                // pero el valor principal es el que actualizó el backend.
+                // 4. Preparar datos actualizados para navegación 
                 const newDisponibilidad = calcularDisponibilidad(result.stock_actual); 
                 
                 const updatedForm = {
                     ...formData,
                     estado_ia: predictedStatus,
-                    stock: result.stock_actual.toString(), // Stock actualizado por el backend
-                    disponibilidad: newDisponibilidad, // Disponibilidad calculada a partir del stock del backend
+                    stock: result.stock_actual.toString(), 
+                    disponibilidad: newDisponibilidad, 
                 };
                 
                 // 5. Actualizar el estado de la página actual antes de navegar.
@@ -152,6 +163,7 @@ const IAImage: React.FC = () => {
                 history.push("/tabs/registro/ia", { formData: updatedForm });
 
             } else {
+                // El error 400 o 500 del backend caerá aquí
                 const errorMsg = result.message || "Error desconocido en el servidor.";
                 throw new Error(`Error en el servicio de IA/DB: ${errorMsg}`);
             }
@@ -209,7 +221,6 @@ const IAImage: React.FC = () => {
     
     // Función de continuación (solo navega, la lógica de guardado y stock/disponibilidad ya se hizo)
     const continuar = () => {
-        
         history.push("/tabs/registro/ia", { formData: formData });
     };
 
