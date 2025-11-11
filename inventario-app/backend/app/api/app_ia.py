@@ -14,18 +14,24 @@ import asyncio
 IMG_SIZE = (224, 224)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Rutas del modelo y etiquetas 
-MODEL_PATH = os.path.join(BASE_DIR, "modelo_final_v3.tflite")
-LABELS_PATH = os.path.join(BASE_DIR, "labels.txt")
+# 🛑 CORRECCIÓN CRÍTICA DE RUTAS: 
+# Navegamos desde /backend/app/api (BASE_DIR) dos niveles arriba (.. / ..)
+# para llegar al directorio /backend, y luego entramos a /modelo_ia.
+MODEL_DIR = os.path.join(BASE_DIR, "..", "..", "modelo_ia") 
+
+MODEL_PATH = os.path.join(MODEL_DIR, "modelo_final_v3.tflite")
+LABELS_PATH = os.path.join(MODEL_DIR, "labels.txt")
 
 CONFIDENCE_THRESHOLD = 0.80
 
 # Cargar credenciales e inicializar Supabase
 try:
     from credenciales import SUPABASE_URL, SUPABASE_ANON_KEY
+    # Asegúrate de que credenciales.py está en la misma carpeta que este script
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 except ImportError:
     print("Error: No se encontró 'credenciales.py'. Verifica la configuración.")
+    # En un servidor real, esto debería ser un logging, no un exit()
     exit()
 except Exception as e:
     print(f"Error al inicializar cliente Supabase: {e}")
@@ -51,7 +57,7 @@ def preprocess_image(image_data: bytes, target_size=IMG_SIZE):
         raise ValueError(f"Error al cargar la imagen desde bytes: {e}")
     
     img_array = image.img_to_array(img)
-    img_array = np.expand_dims(img_array, axis=0) 
+    img_array = np.expand_dims(img_array, axis=0)  # TFLite espera tensor 4D (Batch)
     processed_image = preprocess_fn(img_array)
     
     return processed_image.astype(np.float32)
@@ -72,7 +78,7 @@ def predict_from_bytes(model_path, image_data: bytes, labels_path, threshold):
     """Ejecuta la inferencia TFLite en la imagen recibida."""
     
     if not os.path.exists(model_path):
-        return {'status': 'error', 'message': 'Archivo del modelo TFLite no encontrado.'}
+        return {'status': 'error', 'message': f'Archivo del modelo TFLite no encontrado en la ruta: {model_path}'}
 
     try:
         interpreter = tf.lite.Interpreter(model_path=model_path)
@@ -146,7 +152,6 @@ async def registrar_producto_y_imagen(image_base64: str, codigo_barras: str, use
     
     # 3. Subida de la imagen al Storage (Bucket 'imagenes')
     try:
-        # Asegúrate de que el bucket 'imagenes' tiene la política de RLS adecuada
         supabase.storage.from_("imagenes").upload(
             file=image_bytes, 
             path=file_name,
@@ -221,37 +226,3 @@ async def registrar_producto_y_imagen(image_base64: str, codigo_barras: str, use
         print(f"[ERROR DB] Falló la inserción de la imagen: {response_img.status_code}")
         return {'status': 'error', 'message': f"Error al insertar en tabla 'imagenes': {response_img.status_code}"}
 
-
-# --- 5. USO DE EJEMPLO PARA PRUEBAS LOCALES ---
-
-async def main():
-    """Función de prueba de la implementación (requiere una imagen de prueba)."""
-    try:
-        # Simulación de lectura de un archivo de prueba
-        with open(os.path.join(BASE_DIR, "test.jpeg"), "rb") as f:
-            image_bytes_test = f.read()
-            image_base64_test = base64.b64encode(image_bytes_test).decode('utf-8')
-    except FileNotFoundError:
-        print("\n**ADVERTENCIA: Archivo 'test.jpeg' no encontrado. La prueba no se ejecutará.**")
-        return
-
-    codigo_barras_test = "8410000000010" 
-    user_email_test = "usuario@ejemplo.com"
-    ancho_test = 1080
-    alto_test = 1920
-
-    print("\n--- INICIO DE PRUEBA LOCAL ---")
-    resultado_final = await registrar_producto_y_imagen(
-        image_base64=image_base64_test, 
-        codigo_barras=codigo_barras_test, 
-        user_email=user_email_test, 
-        alto=alto_test, 
-        ancho=ancho_test
-    )
-    
-    print("\n--- RESULTADO FINAL DE REGISTRO ---")
-    print(json.dumps(resultado_final, indent=4, ensure_ascii=False))
-
-
-if __name__ == "__main__":
-    asyncio.run(main())

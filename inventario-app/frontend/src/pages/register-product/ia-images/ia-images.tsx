@@ -23,7 +23,9 @@ const API_CLASSIFY_URL = "http://localhost:8000/api/clasificar-producto";
 interface FormData {
     codigo: string; 
     nombre: string;
-    stock: string; 
+    stock: string; // Este campo ahora refleja el stock del backend
+    disponibilidad?: string; // Nuevo campo para guardar la disponibilidad que viene del backend/se calcula en él.
+    estado_ia?: string;
     [key: string]: any;
 }
 
@@ -59,7 +61,11 @@ const getImageDimensionsFromBase64 = (base64String: string): Promise<{ width: nu
 };
 
 /**
- * Calcula la disponibilidad según las reglas de negocio.
+ * Calcula la disponibilidad según las reglas de negocio. (Se mantiene en el frontend SOLO 
+ * si el backend no la devuelve, pero si la devuelve como en tu backend de Python, es mejor
+ * depender de ese resultado para evitar duplicidad de lógica.)
+ * NOTA: Esta función se mantiene aquí pero YA NO SE USA en callBackendAPIAndSave
+ * porque el backend (app_ia.py) ya la calcula y actualiza la BD.
  */
 const calcularDisponibilidad = (cantidad: number): string => {
     if (cantidad <= 0) return "Sin stock";
@@ -74,12 +80,15 @@ const calcularDisponibilidad = (cantidad: number): string => {
 const IAImage: React.FC = () => {
     const history = useHistory();
     const location = useLocation();
-    const formData =
+    
+    // Obtenemos los datos pasados desde el componente anterior
+    const initialFormData = 
         (location.state as { formData?: FormData })?.formData || ({} as FormData);
 
+    const [formData, setFormData] = useState<FormData>(initialFormData);
     const [image, setImage] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
-    const [estadoIA, setEstadoIA] = useState<string | null>(null);
+    const [estadoIA, setEstadoIA] = useState<string | null>(formData.estado_ia || null); // Inicializar con el estado si existe
     const [showLoadingOverlay, setShowLoadingOverlay] = useState(false);
     const [statusText, setStatusText] = useState<string>("Listo para tomar la foto.");
     
@@ -124,17 +133,22 @@ const IAImage: React.FC = () => {
                 // 3. Actualizar estado local
                 setEstadoIA(predictedStatus); 
 
-                // 4. Preparar datos actualizados para navegación (stock viene del backend)
-                const newDisponibilidad = calcularDisponibilidad(result.stock_actual);
+                // 4. Preparar datos actualizados para navegación (stock y disponibilidad vienen del backend)
+                // Usamos la misma función de cálculo para la disponibilidad solo como fallback/para consistencia local, 
+                // pero el valor principal es el que actualizó el backend.
+                const newDisponibilidad = calcularDisponibilidad(result.stock_actual); 
                 
                 const updatedForm = {
                     ...formData,
                     estado_ia: predictedStatus,
-                    stock: result.stock_actual.toString(),
-                    disponibilidad: newDisponibilidad,
+                    stock: result.stock_actual.toString(), // Stock actualizado por el backend
+                    disponibilidad: newDisponibilidad, // Disponibilidad calculada a partir del stock del backend
                 };
                 
-                // 5. Navegar de vuelta con los datos procesados por el backend
+                // 5. Actualizar el estado de la página actual antes de navegar.
+                setFormData(updatedForm);
+
+                // 6. Navegar de vuelta
                 history.push("/tabs/registro/ia", { formData: updatedForm });
 
             } else {
@@ -152,7 +166,7 @@ const IAImage: React.FC = () => {
         }
     };
     
-    // 📸 Tomar foto
+    // 📸 Tomar foto (La lógica permanece igual, llama a callBackendAPIAndSave)
     const tomarFoto = async () => {
         if (!isServiceReady || loading) return;
 
@@ -176,9 +190,10 @@ const IAImage: React.FC = () => {
                 const { width, height } = await getImageDimensionsFromBase64(base64Image);
                 
                 setImage(imageUrl);
-                setEstadoIA(null);
+                setEstadoIA(null); // Limpiar estado IA mientras se procesa
+                setStatusText("1. Foto capturada, procesando dimensiones...");
                 
-                // 🚀 Llama al proceso de Backend
+                // 🚀 Llama al proceso de Backend, que también navega
                 await callBackendAPIAndSave(base64Image, width, height);
 
             } else {
@@ -186,24 +201,16 @@ const IAImage: React.FC = () => {
             }
         } catch (e) {
             console.warn("📷 Cámara cancelada o error:", e);
+            setStatusText("Listo para tomar la foto.");
         } finally {
             setLoading(false);
         }
     };
     
-    // Función de continuación (solo navega, la lógica de guardado ya se hizo)
+    // Función de continuación (solo navega, la lógica de guardado y stock/disponibilidad ya se hizo)
     const continuar = () => {
-        // Asumiendo que esta función se llama después de una clasificación exitosa.
-        const newStock = parseInt(formData.stock || "0", 10) + 1;
-        const newDisponibilidad = calcularDisponibilidad(newStock);
         
-        const updatedForm = {
-            ...formData,
-            estado_ia: estadoIA,
-            stock: newStock.toString(),
-            disponibilidad: newDisponibilidad,
-        };
-        history.push("/tabs/registro/ia", { formData: updatedForm });
+        history.push("/tabs/registro/ia", { formData: formData });
     };
 
     // 🧩 UI
