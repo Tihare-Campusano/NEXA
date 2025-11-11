@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState } from "react";
 import {
     IonPage,
     IonContent,
@@ -12,32 +12,64 @@ import {
     CameraResultType,
     CameraSource,
     CameraDirection,
-}
- from "@capacitor/camera";
+} from "@capacitor/camera";
 import { useHistory, useLocation } from "react-router-dom";
-import { createClient } from "@supabase/supabase-js";
-import * as tf from "@tensorflow/tfjs";
-import * as tflite from "@tensorflow/tfjs-tflite";
-import "@tensorflow/tfjs-backend-webgl";
-import "@tensorflow/tfjs-backend-wasm";
 
-const MODEL_URL = "/modelo_final.tflite";
+// 🛑 URL de la API de tu Backend de Python (ej. FastAPI o Función Serverless)
+// ¡DEBES REEMPLAZAR ESTA URL con la dirección donde montaste tu app_ia.py!
+const API_CLASSIFY_URL = "http://localhost:8000/api/clasificar-producto"; 
 
-// 🧩 Inicializar Supabase UNA sola vez
-let supabase: any;
-if (!supabase) {
-    supabase = createClient(
-        import.meta.env.VITE_SUPABASE_URL as string,
-        import.meta.env.VITE_SUPABASE_ANON_KEY as string
-    );
-}
-
+// --- Interfaces ---
 interface FormData {
-    codigo: string;
+    codigo: string; 
     nombre: string;
-    stock: string;
+    stock: string; 
     [key: string]: any;
 }
+
+interface BackendResponse {
+    status: 'success' | 'error';
+    message: string;
+    producto_id: number;
+    estado_clasificado: string; 
+    stock_actual: number;
+}
+
+// --- Funciones Auxiliares ---
+
+/**
+ * Función para obtener las dimensiones (ancho y alto) de una imagen Base64.
+ * Esto corrige el error de TypeScript 2339.
+ */
+const getImageDimensionsFromBase64 = (base64String: string): Promise<{ width: number, height: number }> => {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            resolve({
+                width: img.naturalWidth || img.width,
+                height: img.naturalHeight || img.height,
+            });
+        };
+        img.onerror = (e) => {
+            reject(new Error("Error al cargar la imagen para obtener dimensiones."));
+        };
+        // Reconstruye la URL completa del data URI
+        img.src = `data:image/jpeg;base64,${base64String}`;
+    });
+};
+
+/**
+ * Calcula la disponibilidad según las reglas de negocio.
+ */
+const calcularDisponibilidad = (cantidad: number): string => {
+    if (cantidad <= 0) return "Sin stock";
+    if (cantidad <= 4) return "Baja disponibilidad";
+    if (cantidad <= 10) return "Disponibilidad media";
+    return "Alta disponibilidad";
+};
+
+
+// --- Componente Principal ---
 
 const IAImage: React.FC = () => {
     const history = useHistory();
@@ -48,51 +80,86 @@ const IAImage: React.FC = () => {
     const [image, setImage] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [estadoIA, setEstadoIA] = useState<string | null>(null);
-    const [modeloLite, setModeloLite] = useState<tflite.TFLiteModel | null>(null);
-    const [labels, setLabels] = useState<string[]>([]);
     const [showLoadingOverlay, setShowLoadingOverlay] = useState(false);
+    const [statusText, setStatusText] = useState<string>("Listo para tomar la foto.");
+    
+    const isServiceReady = true; // Asumimos que el backend está siempre disponible
 
-    // 🚀 Cargar modelo TFLite + labels.txt
-    useEffect(() => {
-        const loadModelAndLabels = async () => {
-            setShowLoadingOverlay(true);
-            try {
-                // Configuración de Backend
-                await tf.setBackend("webgl").catch(() => tf.setBackend("wasm"));
-                await tf.ready();
-                console.log("✅ Backend TensorFlow listo:", tf.getBackend());
-
-                // Carga del modelo
-                const model = await tflite.loadTFLiteModel(MODEL_URL);
-                setModeloLite(model);
-                console.log("✅ Modelo TFLite cargado correctamente:", model);
-
-                // Cargar labels.txt
-                const res = await fetch("/labels.txt");
-                const text = await res.text();
-                const labelsArr = text.trim().split("\n");
-                setLabels(labelsArr);
-                console.log("✅ Labels cargadas:", labelsArr);
-            } catch (err) {
-                console.error("❌ Error cargando modelo o labels:", err);
-                alert("Error cargando el modelo o labels. Verifica que estén en /public.");
-            } finally {
-                setShowLoadingOverlay(false);
-            }
-        };
-
-        loadModelAndLabels();
-    }, []);
-
-    // 📸 Tomar foto
-    const tomarFoto = async () => {
-        if (!modeloLite) {
-            alert("El modelo aún no está listo.");
+    // 💾 Función central: Llama a la API de Python para clasificar y guardar
+    const callBackendAPIAndSave = async (imageBase64: string, width: number, height: number) => {
+        if (!formData.codigo) {
+            alert("El código de producto no está disponible.");
             return;
         }
 
+        setShowLoadingOverlay(true);
+        setLoading(true);
+        setStatusText("2. Enviando imagen al servidor de IA...");
+
+        try {
+            const userEmail = "correo_usuario@app.com"; // Obtener de la sesión de usuario
+            
+            const requestData = {
+                image_base64: imageBase64,
+                codigo_barras: formData.codigo,
+                user_email: userEmail,
+                ancho: width,
+                alto: height,
+            };
+            
+            // 2. Llamada HTTP a la API de Python
+            const response = await fetch(API_CLASSIFY_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(requestData),
+            });
+
+            const result: BackendResponse = await response.json();
+
+            if (response.ok && result.status === 'success') {
+                setStatusText("✅ Clasificación y Stock actualizados.");
+                
+                const predictedStatus = result.estado_clasificado.toLowerCase();
+                
+                // 3. Actualizar estado local
+                setEstadoIA(predictedStatus); 
+
+                // 4. Preparar datos actualizados para navegación (stock viene del backend)
+                const newDisponibilidad = calcularDisponibilidad(result.stock_actual);
+                
+                const updatedForm = {
+                    ...formData,
+                    estado_ia: predictedStatus,
+                    stock: result.stock_actual.toString(),
+                    disponibilidad: newDisponibilidad,
+                };
+                
+                // 5. Navegar de vuelta con los datos procesados por el backend
+                history.push("/tabs/registro/ia", { formData: updatedForm });
+
+            } else {
+                const errorMsg = result.message || "Error desconocido en el servidor.";
+                throw new Error(`Error en el servicio de IA/DB: ${errorMsg}`);
+            }
+
+        } catch (error: any) {
+            console.error("❌ Error en la comunicación con el Backend:", error);
+            setStatusText(`❌ Error fatal: ${error.message}`);
+            alert(`No se pudo guardar la información. Verifique la conexión con el servidor. Detalle: ${error.message}`);
+        } finally {
+            setLoading(false);
+            setShowLoadingOverlay(false);
+        }
+    };
+    
+    // 📸 Tomar foto
+    const tomarFoto = async () => {
+        if (!isServiceReady || loading) return;
+
         try {
             setLoading(true);
+            
+            // 1. Capturar la imagen en Base64
             const foto = await Camera.getPhoto({
                 quality: 85,
                 allowEditing: false,
@@ -102,8 +169,18 @@ const IAImage: React.FC = () => {
             });
 
             if (foto.base64String) {
-                setImage(`data:image/jpeg;base64,${foto.base64String}`);
+                const base64Image = foto.base64String;
+                const imageUrl = `data:image/jpeg;base64,${base64Image}`;
+                
+                // 🛑 CORRECCIÓN: Obtener las dimensiones del Base64
+                const { width, height } = await getImageDimensionsFromBase64(base64Image);
+                
+                setImage(imageUrl);
                 setEstadoIA(null);
+                
+                // 🚀 Llama al proceso de Backend
+                await callBackendAPIAndSave(base64Image, width, height);
+
             } else {
                 alert("No se pudo capturar la imagen.");
             }
@@ -113,170 +190,20 @@ const IAImage: React.FC = () => {
             setLoading(false);
         }
     };
-
-    // 🧠 Predicción con el modelo
-    const predecirEstadoLite = useCallback(async () => {
-        if (!modeloLite || !image || labels.length === 0) return;
-
-        setShowLoadingOverlay(true);
-        setLoading(true);
-
-        let inputTensor: tf.Tensor | null = null;
-        let outputTensor: tf.Tensor | null = null; // Declaración para limpieza en finally
-
-        try {
-            const img = new Image();
-            img.src = image;
-
-            // Esperar a que la imagen se cargue en el elemento HTML
-            await new Promise<void>((resolve, reject) => {
-                img.onload = () => {
-                    console.log("✅ Imagen cargada en elemento HTML. Dimensiones:", img.width, "x", img.height);
-                    resolve();
-                };
-                img.onerror = (e) => {
-                    console.error("❌ Error al cargar la imagen en elemento HTML", e);
-                    reject(new Error("Error al cargar la imagen para el análisis."));
-                };
-            });
-            
-            // Preprocesar imagen [-1,1] para MobileNetV2
-            inputTensor = tf.tidy(() =>
-                tf.browser
-                    .fromPixels(img)
-                    .resizeBilinear([224, 224])
-                    .toFloat()
-                    .div(tf.scalar(127.5))
-                    .sub(tf.scalar(1))
-                    .expandDims(0)
-            );
-            console.log("✅ Tensor de entrada creado. Shape:", inputTensor.shape);
-
-            let resultado: string | null = null;
-            let scores: number[] = [];
-
-            // Opción 1: Usar classify() si está disponible (tflite/tfjs-models)
-            if (typeof (modeloLite as any).classify === "function") {
-                console.log("Intentando usar classify()...");
-                const output = await (modeloLite as any).classify(inputTensor);
-                if (output && output.length > 0) {
-                    const best = Array.isArray(output) ? output[0] : output;
-                    resultado = best.className || best.label || "Desconocido";
-                    scores = best.probabilities || best.scores || [];
-                    console.log("Resultado de classify:", resultado, scores);
-                }
-            }
-
-            // Opción 2: Fallback a predict() si classify no funcionó
-            if (!resultado && typeof (modeloLite as any).predict === "function") {
-                console.log("Recurriendo a predict()...");
-                // Asignamos el resultado de predict al outputTensor
-                outputTensor = (modeloLite as any).predict(inputTensor) as tf.Tensor;
-                
-                if (outputTensor) {
-                    // Verificamos la forma (debería ser [1, N_CLASES])
-                    console.log("Tensor de salida Shape:", outputTensor.shape);
-                    
-                    scores = Array.from(outputTensor.dataSync());
-                    // NO HACEMOS dispose aquí, lo hacemos en el finally
-                    
-                    if (scores.length === labels.length) {
-                        const maxIndex = scores.indexOf(Math.max(...scores));
-                        resultado = labels[maxIndex] || "Desconocido (Índice fuera de rango)";
-                        console.log(`Resultado de predict: ${resultado}. Índice: ${maxIndex}/${labels.length}`);
-                    } else {
-                         console.error(`❌ El modelo predice ${scores.length} clases, pero hay ${labels.length} labels.`);
-                         throw new Error(`Desajuste: Clases del modelo (${scores.length}) != Labels (${labels.length}).`);
-                    }
-                } else {
-                    // Mensaje de error mejorado para el fallo de predict()
-                    throw new Error("El modelo TFLite retornó un tensor de salida nulo. Revise la compatibilidad del modelo.");
-                }
-            }
-            
-            if (!resultado) {
-                throw new Error("No se pudo determinar la clase después de ambos intentos.");
-            }
-
-            setEstadoIA(resultado);
-            console.log("✅ Estado IA detectado final:", resultado);
-
-        } catch (error) {
-            console.error("❌ Error en la predicción:", error);
-            // Mostrar el mensaje de error original
-            alert(`No se pudo analizar la imagen. Verifica que el modelo y labels estén correctos. Detalle: ${(error as Error).message}`);
-        } finally {
-            // Limpieza fundamental: liberar memoria de todos los tensores
-            if (inputTensor) tf.dispose(inputTensor);
-            if (outputTensor) tf.dispose(outputTensor); // Limpieza del tensor de salida
-            setLoading(false);
-            setShowLoadingOverlay(false);
-        }
-    }, [modeloLite, image, labels]);
-
-    useEffect(() => {
-        if (image && modeloLite && labels.length > 0) predecirEstadoLite();
-    }, [image, modeloLite, labels, predecirEstadoLite]);
-
-    // 📦 Calcular disponibilidad
-    const calcularDisponibilidad = (cantidad: number): string => {
-        if (cantidad <= 0) return "Sin stock";
-        if (cantidad <= 4) return "Baja disponibilidad";
-        if (cantidad <= 10) return "Disponibilidad media";
-        return "Alta disponibilidad";
-    };
-
-    // 💾 Guardar resultado
-    const guardarYVolver = async () => {
-        if (!image || !estadoIA || !formData.codigo) {
-            alert("Falta información para guardar.");
-            return;
-        }
-
-        setLoading(true);
-        setShowLoadingOverlay(true);
-
-        try {
-            // Obtiene el blob de la imagen
-            const blob = await (await fetch(image)).blob();
-            const fileName = `productos/${formData.codigo}_${Date.now()}.png`;
-
-            // 1. Subir la imagen a Supabase Storage
-            const { error: uploadError } = await supabase.storage
-                .from("imagenes-productos")
-                .upload(fileName, blob, { cacheControl: "3600", upsert: false });
-
-            if (uploadError) throw uploadError;
-
-            // 2. Obtener la URL pública
-            const { data: publicUrlData } = supabase.storage
-                .from("imagenes-productos")
-                .getPublicUrl(fileName);
-
-            // 3. Calcular nuevo stock y disponibilidad
-            const currentStock = parseInt(formData.stock || "0", 10);
-            const newStock = currentStock + 1;
-            const newDisponibilidad = calcularDisponibilidad(newStock);
-
-            // 4. Preparar datos actualizados
-            const updatedForm = {
-                ...formData,
-                imagen_url: publicUrlData.publicUrl,
-                estado_ia: estadoIA,
-                stock: newStock.toString(),
-                disponibilidad: newDisponibilidad,
-            };
-
-            console.log("✅ Datos listos para enviar:", updatedForm);
-            // 5. Navegar de vuelta con los datos
-            history.push("/tabs/registro/ia", { formData: updatedForm });
-        } catch (error: any) {
-            console.error("❌ Error guardando:", error);
-            alert("Error guardando los datos: " + error.message);
-        } finally {
-            setLoading(false);
-            setShowLoadingOverlay(false);
-        }
+    
+    // Función de continuación (solo navega, la lógica de guardado ya se hizo)
+    const continuar = () => {
+        // Asumiendo que esta función se llama después de una clasificación exitosa.
+        const newStock = parseInt(formData.stock || "0", 10) + 1;
+        const newDisponibilidad = calcularDisponibilidad(newStock);
+        
+        const updatedForm = {
+            ...formData,
+            estado_ia: estadoIA,
+            stock: newStock.toString(),
+            disponibilidad: newDisponibilidad,
+        };
+        history.push("/tabs/registro/ia", { formData: updatedForm });
     };
 
     // 🧩 UI
@@ -289,19 +216,23 @@ const IAImage: React.FC = () => {
                     </p>
                 </IonText>
 
-                <IonText color={modeloLite ? "success" : "warning"}>
+                <IonText color={isServiceReady ? "success" : "warning"}>
                     <p style={{ textAlign: "center" }}>
-                        {modeloLite ? "✅ IA lista para usar" : "⏳ Cargando modelo..."}
+                        {isServiceReady ? "✅ Servicio de IA listo" : "❌ Conexión al servicio de IA fallida."}
                     </p>
                 </IonText>
 
                 <IonButton
                     expand="block"
-                    onClick={tomarFoto}
-                    disabled={loading || !modeloLite}
+                    onClick={tomarFoto} 
+                    disabled={loading || !isServiceReady}
                 >
-                    📸 Tomar Foto
+                    📸 Tomar Foto y Analizar
                 </IonButton>
+                
+                <p style={{ textAlign: "center", marginTop: "0.5rem", color: '#007bff' }}>
+                    {statusText}
+                </p>
 
                 {image && (
                     <>
@@ -311,14 +242,13 @@ const IAImage: React.FC = () => {
                             style={{
                                 marginTop: "1rem",
                                 borderRadius: "8px",
-                                border:
-                                    estadoIA === null
-                                        ? "3px solid gray"
-                                        : estadoIA === "nuevo"
-                                        ? "3px solid green"
-                                        : estadoIA === "usado"
-                                        ? "3px solid orange"
-                                        : "3px solid red",
+                                border: estadoIA === null 
+                                    ? "3px solid gray" 
+                                    : estadoIA === "nuevo"
+                                    ? "3px solid green"
+                                    : estadoIA === "usado"
+                                    ? "3px solid orange"
+                                    : "3px solid red",
                             }}
                         />
 
@@ -332,16 +262,16 @@ const IAImage: React.FC = () => {
                                 <IonButton
                                     color="success"
                                     expand="block"
-                                    onClick={guardarYVolver}
+                                    onClick={continuar} 
                                     disabled={loading}
                                 >
-                                    💾 Guardar y Actualizar Stock
+                                    ✅ Continuar
                                 </IonButton>
                             </div>
                         ) : (
                             <IonText color="primary">
                                 <p style={{ textAlign: "center", marginTop: "1rem" }}>
-                                    Analizando imagen...
+                                    {loading ? "Analizando imagen en el servidor..." : "Imagen lista."}
                                 </p>
                             </IonText>
                         )}
@@ -350,11 +280,7 @@ const IAImage: React.FC = () => {
 
                 <IonLoading
                     isOpen={showLoadingOverlay}
-                    message={
-                        loading
-                            ? "Analizando imagen..."
-                            : "Cargando modelo de inteligencia artificial..."
-                    }
+                    message={statusText}
                     duration={0}
                 />
             </IonContent>
