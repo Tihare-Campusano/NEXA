@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-preparar_dataset_mejorado_full_v2.py
+preparar_dataset_mejorado_full_v3.py
 ----------------------------------------------------
 Prepara un dataset BALANCEADO y AMPLIADO (train/val/test) para CNNs.
-Genera augmentations internamente sin dejar archivos temporales.
+*** VERSIÓN OPTIMIZADA CON DEDUPLICACIÓN Y TARGET DE BALANCEO REDUCIDO ***
 """
 
 import os
@@ -15,9 +15,16 @@ from sklearn.model_selection import train_test_split
 from sklearn.utils.class_weight import compute_class_weight
 from tensorflow.keras.preprocessing.image import ImageDataGenerator, img_to_array, array_to_img
 import tensorflow as tf
+# Librería necesaria para deduplicación perceptual
+try:
+    import imagehash
+except ImportError:
+    print("ADVERTENCIA: La librería 'imagehash' no está instalada.")
+    print("Ejecuta: pip install imagehash")
+    imagehash = None
 
 # ----------------------------------------------------
-# CONFIGURACIÓN GENERAL
+# CONFIGURACIÓN GENERAL (AJUSTADA) 🔧
 # ----------------------------------------------------
 BASE_DIR = "inventario-app/modelo_ia/dataset_inicial"
 OUTPUT_DIR = "inventario-app/modelo_ia/dataset_limpio"
@@ -26,7 +33,8 @@ VAL_RATIO = 0.15
 TEST_RATIO = 0.15
 RANDOM_STATE = 42
 BATCH_SIZE = 32
-TARGET_PER_CLASS = 20000  # objetivo mínimo por clase
+# AJUSTE CRÍTICO: Reducido de 20000 a 8000 para limitar el sobreajuste sintético
+TARGET_PER_CLASS = 8000  
 
 preprocess_fn = tf.keras.applications.mobilenet_v2.preprocess_input
 
@@ -54,13 +62,43 @@ print("[OK] Estructura creada correctamente.")
 # ----------------------------------------------------
 def limpiar_imagen(img: Image.Image) -> Image.Image:
     img = img.convert("RGB")
+    # Usar ImageOps.fit es mejor para mantener la proporción sin deformar
     img = ImageOps.fit(img, IMG_SIZE, Image.Resampling.LANCZOS)
     return img
 
-def es_imagen_plana(img: Image.Image, umbral_varianza=10):
+def es_imagen_plana(img: Image.Image, umbral_varianza=15): # Umbral elevado a 15 (opcional)
+    """Detecta imágenes casi uniformes (negras, blancas o de un solo color)."""
     img_gray = img.convert("L")
     varianza = np.var(np.array(img_gray))
     return varianza < umbral_varianza
+
+def deduplicar_imagenes(images, labels):
+    """Elimina imágenes duplicadas o casi idénticas usando pHash."""
+    if not imagehash:
+        return images, labels
+    
+    hashes = set()
+    unique_images = []
+    unique_labels = []
+    
+    print("\n[LIMPIEZA] Aplicando deduplicación perceptual...")
+
+    for ruta, label in zip(images, labels):
+        try:
+            with Image.open(ruta) as img:
+                # Usar pHash con un tamaño de 8x8
+                h = imagehash.phash(img, hash_size=8) 
+                
+                if h not in hashes:
+                    hashes.add(h)
+                    unique_images.append(ruta)
+                    unique_labels.append(label)
+        except Exception:
+            # Ignorar archivos corruptos durante la deduplicación
+            continue
+            
+    print(f"  [INFO] Duplicados eliminados: {len(images) - len(unique_images)}.")
+    return unique_images, unique_labels
 
 def procesar_y_guardar(img_paths, split, clase):
     """Guarda imágenes procesadas en su carpeta final."""
@@ -91,6 +129,7 @@ def generar_augmented_images(img_paths, clase, n_target):
         return []
 
     valid_imgs = np.array(valid_imgs)
+    # Generador de Augmentation para el oversampling (más agresivo que el de entrenamiento)
     aug_gen = ImageDataGenerator(
         rotation_range=25,
         width_shift_range=0.15,
@@ -104,11 +143,12 @@ def generar_augmented_images(img_paths, clase, n_target):
 
     generated_paths = []
     total_needed = max(0, n_target - len(valid_imgs))
-    print(f"  -> {clase}: generando {total_needed} imágenes sintéticas...")
+    print(f"  -> {clase}: generando {total_needed} imágenes sintéticas...")
 
     i = 0
     for batch in aug_gen.flow(valid_imgs, batch_size=1):
         img_aug = array_to_img(batch[0])
+        # NOTA: Las imágenes aumentadas se guardan temporalmente en BASE_DIR/clase
         destino = os.path.join(BASE_DIR, clase, f"{clase}_aug_{i:05d}.jpg")
         img_aug.save(destino, quality=95)
         generated_paths.append(destino)
@@ -119,9 +159,9 @@ def generar_augmented_images(img_paths, clase, n_target):
     return generated_paths
 
 # ----------------------------------------------------
-# CARGA Y BALANCEO CON AUGMENTATION
+# CARGA, LIMPIEZA Y BALANCEO
 # ----------------------------------------------------
-print("\n[CARGA] Leyendo imágenes y aplicando expansión balanceada...")
+print("\n[CARGA] Leyendo imágenes del dataset inicial...")
 
 all_images, all_labels = [], []
 for cat in categorias:
@@ -131,12 +171,18 @@ for cat in categorias:
             if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
     all_images.extend(imgs)
     all_labels.extend([cat] * len(imgs))
+    
+# --- PASO CRÍTICO DE DEDUPLICACIÓN ---
+all_images, all_labels = deduplicar_imagenes(all_images, all_labels)
+# -------------------------------------
 
 expanded_imgs, expanded_labels = [], []
 for cat in categorias:
     imgs_cat = [img for img, lbl in zip(all_images, all_labels) if lbl == cat]
-    print(f"Procesando clase '{cat}' con {len(imgs_cat)} imágenes originales...")
+    
+    print(f"Procesando clase '{cat}' con {len(imgs_cat)} imágenes originales limpias...")
 
+    # Balanceo por oversampling si es necesario
     if len(imgs_cat) < TARGET_PER_CLASS:
         generated = generar_augmented_images(imgs_cat, cat, TARGET_PER_CLASS)
         imgs_cat.extend(generated)
@@ -144,7 +190,7 @@ for cat in categorias:
     expanded_imgs.extend(imgs_cat)
     expanded_labels.extend([cat] * len(imgs_cat))
 
-print("[OK] Dataset expandido balanceado correctamente.")
+print("\n[OK] Dataset expandido balanceado correctamente.")
 
 # ----------------------------------------------------
 # DIVISIÓN ESTRATIFICADA
@@ -171,6 +217,8 @@ print(f"[INFO] Train={len(imgs_train)}, Val={len(imgs_val)}, Test={len(imgs_test
 # ----------------------------------------------------
 # PROCESAMIENTO Y GUARDADO FINAL
 # ----------------------------------------------------
+print("\n[GUARDADO] Procesando y guardando sets de datos...")
+
 for cat in categorias:
     procesar_y_guardar([img for img, lbl in zip(imgs_train, labels_train) if lbl == cat], "train", cat)
     procesar_y_guardar([img for img, lbl in zip(imgs_val, labels_val) if lbl == cat], "val", cat)
@@ -179,7 +227,7 @@ for cat in categorias:
 print("[OK] Imágenes procesadas y guardadas correctamente dentro de dataset_limpio.")
 
 # ----------------------------------------------------
-# GENERADORES CON DATA AUGMENTATION
+# GENERADORES CON DATA AUGMENTATION (Para Entrenamiento)
 # ----------------------------------------------------
 train_aug = ImageDataGenerator(
     preprocessing_function=preprocess_fn,
@@ -233,7 +281,7 @@ class_weights = dict(enumerate(class_weights_arr))
 print("\n[OK] Pesos de clase calculados:")
 idx_to_class = {v: k for k, v in train_gen.class_indices.items()}
 for i, w in class_weights.items():
-    print(f"  {idx_to_class[i]}: {w:.4f}")
+    print(f"  {idx_to_class[i]}: {w:.4f}")
 
 # ----------------------------------------------------
 # RESUMEN FINAL
@@ -241,7 +289,7 @@ for i, w in class_weights.items():
 print("\nRESUMEN FINAL DEL DATASET:")
 print(f" * Categorías: {len(categorias)} -> {categorias}")
 print(f" * Train: {train_gen.samples}")
-print(f" * Val:   {val_gen.samples}")
-print(f" * Test:  {test_gen.samples}")
+print(f" * Val:   {val_gen.samples}")
+print(f" * Test:  {test_gen.samples}")
 print(f" * Tamaño: {IMG_SIZE}")
 print("\nDataset listo para entrenamiento con MobileNetV2.")
