@@ -19,7 +19,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # *** CAMBIO 1: RUTAS RELATIVAS Y TFLITE ***
 # Se asume que estos archivos están en el mismo directorio que el script
-MODEL_PATH = os.path.join(BASE_DIR, "modelo_final_v2.tflite")
+MODEL_PATH = os.path.join(BASE_DIR, "modelo_final_v3.tflite")
 LABELS_PATH = os.path.join(BASE_DIR, "labels.txt")
 IMAGE_TO_PREDICT = os.path.join(BASE_DIR, "test.jpeg") # Asegúrate de que esta imagen exista
 

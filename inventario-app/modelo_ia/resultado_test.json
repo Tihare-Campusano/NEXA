@@ -1,17 +1,17 @@
 {
     "status": "success",
-    "predicted_label": "INCIERTO",
-    "confidence_score": "58.85%",
-    "threshold_met": false,
-    "detail": "Confianza baja (< 80%). Se recomienda más entrenamiento o imagen más clara.",
+    "predicted_label": "mal_estado",
+    "confidence_score": "95.21%",
+    "threshold_met": true,
+    "detail": "Predicción exitosa (Confianza >= 80%).",
     "all_scores": {
-        "mal_estado": "32.71%",
-        "nuevo": "8.44%",
-        "usado": "58.85%"
+        "mal_estado": "95.21%",
+        "nuevo": "1.27%",
+        "usado": "3.52%"
     },
     "top3_predictions": {
-        "usado": "58.85%",
-        "mal_estado": "32.71%",
-        "nuevo": "8.44%"
+        "mal_estado": "95.21%",
+        "usado": "3.52%",
+        "nuevo": "1.27%"
     }
 }

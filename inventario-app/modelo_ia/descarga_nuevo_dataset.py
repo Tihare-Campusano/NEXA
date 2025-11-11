@@ -14,7 +14,7 @@ FINAL_PATH = os.path.join(BASE_DIR, OUTPUT_DIR_FINAL)
 # --- Configuración de Descarga (LÍMITE Y QUERIES AMPLIADAS) ---
 
 # Parámetros de descarga
-LIMIT_PER_CLASS_MAX = 500  # Máximo total a intentar descargar por clase
+LIMIT_PER_CLASS_MAX = 700  # Máximo total a intentar descargar por clase
 PAUSA_ENTRE_QUERIES = 2.5  # Pausa para evitar el bloqueo de IP
 
 CLASSES = {
@@ -65,8 +65,8 @@ def download_images_icrawler(classes_queries, total_limit, final_dir):
     for class_name, queries in classes_queries.items():
         storage_path = os.path.join(final_dir, class_name)
         
-        # Objetivo de 50 imágenes por query para asegurar un buen resultado (50 * ~30 queries = 1500 descargas, que compensa fallos)
-        limit_per_query_target = 50 
+        # Objetivo de 50 imágenes por query para asegurar un buen resultado
+        limit_per_query_target = 50  
         
         print(f"\n[Buscando] Clase: {class_name}. Límite por query: {limit_per_query_target}. Objetivo total: {total_limit}")
         
@@ -80,7 +80,7 @@ def download_images_icrawler(classes_queries, total_limit, final_dir):
             crawler.crawl(keyword=query, max_num=limit_per_query_target, min_size=(150, 150))
             
             # PAUSA CRÍTICA para evitar el bloqueo
-            time.sleep(PAUSA_ENTRE_QUERIES) 
+            time.sleep(PAUSA_ENTRE_QUERIES)  
             
         print(f"Descarga de '{class_name}' completada.")
 

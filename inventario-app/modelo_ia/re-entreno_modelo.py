@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-re-entreno_modelo.py
+re-entreno_modelo_N3.py
 ---------------------------------------
-Script para realizar Fine-Tuning (ajuste fino) sobre el modelo existente 
-(.h5) con un nuevo conjunto de datos para mejorar la precisión y confianza,
-incluyendo la conversión final a formato TFLite.
+Script para realizar el TERCER Fine-Tuning (ajuste fino) sobre el modelo V2, 
+utilizando datos curados para mejorar la precisión al 80% o más.
 """
 
 import os
@@ -19,10 +18,10 @@ import numpy as np
 # Directorio base (donde está este script)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Rutas de Archivos
-MODELO_ACTUAL_PATH = os.path.join(BASE_DIR, "modelo_final.h5")
-MODELO_NUEVO_PATH = os.path.join(BASE_DIR, "modelo_final_v2.h5") 
-MODELO_TFLITE_PATH = os.path.join(BASE_DIR, "modelo_final_v2.tflite") # Nueva ruta para TFLite
+# Rutas de Archivos (Actualizadas para N3)
+MODELO_ACTUAL_PATH = os.path.join(BASE_DIR, "modelo_final_v2.h5") # <-- Carga el resultado del N2
+MODELO_NUEVO_PATH = os.path.join(BASE_DIR, "modelo_final_v3.h5")  # <-- Nuevo nombre V3
+MODELO_TFLITE_PATH = os.path.join(BASE_DIR, "modelo_final_v3.tflite") # <-- Nuevo nombre TFLite V3
 
 # Directorio con las nuevas imágenes para re-entrenamiento
 DATA_DIR = os.path.join(BASE_DIR, "nuevos_datos_entrenamiento") 
@@ -31,7 +30,7 @@ DATA_DIR = os.path.join(BASE_DIR, "nuevos_datos_entrenamiento")
 IMG_SIZE = (224, 224)
 BATCH_SIZE = 32 # Tamaño de lote para procesamiento de datos
 LR_FINETUNE = 1e-5  # Tasa de aprendizaje muy baja para Fine-Tuning (0.00001)
-EPOCHS = 50         # Número de épocas de re-entrenamiento
+EPOCHS = 100         # Número de épocas de re-entrenamiento (Alto, para el salto final)
 
 # --- 1. Carga y Preparación de Datos ---
 
@@ -43,7 +42,6 @@ if not os.path.exists(DATA_DIR):
     exit()
 
 # Generador de datos para cargar y aumentar imágenes
-# MobileNetV2 usa rango de [-1, 1], manejado por preprocess_input
 datagen = ImageDataGenerator(
     preprocessing_function=tf.keras.applications.mobilenet_v2.preprocess_input,
     validation_split=0.2, # 20% de los datos serán para validación
@@ -81,11 +79,13 @@ print(f"Clases detectadas: {NUM_CLASSES}. Etiquetas: {list(train_generator.class
 
 print("\n--- 2. Cargando Modelo Existente ---")
 
+# Importante: Ahora carga el modelo_final_v2.h5
 if not os.path.exists(MODELO_ACTUAL_PATH):
-    print(f"ERROR: Modelo inicial no encontrado en: {MODELO_ACTUAL_PATH}")
+    print(f"ERROR: Modelo inicial (V2) no encontrado en: {MODELO_ACTUAL_PATH}")
+    print("Asegúrate de renombrar el resultado de tu entrenamiento anterior a 'modelo_final_v2.h5'")
     exit()
     
-# Cargar el modelo sin compilar, ya que vamos a cambiar el optimizador y LR
+# Cargar el modelo sin compilar
 modelo = load_model(MODELO_ACTUAL_PATH, compile=False)
 
 # Recompilar con una tasa de aprendizaje (Learning Rate) muy baja
@@ -100,7 +100,7 @@ print(f"Modelo cargado y configurado con Learning Rate: {LR_FINETUNE}")
 
 # --- 3. Re-entrenamiento (Fine-Tuning) ---
 
-print(f"\n--- 3. Iniciando Re-entrenamiento por {EPOCHS} épocas ---")
+print(f"\n--- 3. Iniciando TERCER Re-entrenamiento por {EPOCHS} épocas ---")
 
 history = modelo.fit(
     train_generator,
@@ -112,7 +112,7 @@ history = modelo.fit(
 
 # --- 4. Guardar el Nuevo Modelo y Convertir a TFLite ---
 
-print(f"\n--- 4. Finalizando, Guardando y Convirtiendo ---")
+print(f"\n--- 4. Finalizando, Guardando y Convirtiendo (Generando V3) ---")
 
 # 4.1. Guardar el modelo re-entrenado en formato Keras (.h5)
 modelo.save(MODELO_NUEVO_PATH)
@@ -122,17 +122,13 @@ print(f"ÉXITO: Nuevo modelo guardado en formato Keras: {MODELO_NUEVO_PATH}")
 try:
     print("\nIniciando conversión a TFLite...")
     
-    # Crea el convertidor Keras
     converter = tf.lite.TFLiteConverter.from_keras_model(modelo)
-    
-    # Realiza la conversión
     tflite_model = converter.convert()
     
-    # Guarda el modelo TFLite en un archivo binario
     with open(MODELO_TFLITE_PATH, 'wb') as f:
         f.write(tflite_model)
         
     print(f"ÉXITO: Modelo convertido y guardado como: {MODELO_TFLITE_PATH}")
     
 except Exception as e:
-    print(f"ERROR: Falló la conversión a TFLite. Asegúrate de que tu versión de TensorFlow es compatible. Detalle: {e}")
+    print(f"ERROR: Falló la conversión a TFLite. Detalle: {e}")
