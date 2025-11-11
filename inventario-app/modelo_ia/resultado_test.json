@@ -1,4 +1,17 @@
 {
-    "status": "error",
-    "message": "No se pudieron cargar las etiquetas desde 'c:\\Users\\campu\\OneDrive\\Escritorio\\NEXA\\inventario-app\\modelo_ia\\labels.txt'."
+    "status": "success",
+    "predicted_label": "INCIERTO",
+    "confidence_score": "40.85%",
+    "threshold_met": false,
+    "detail": "Confianza baja (< 80%). Se recomienda más entrenamiento o imagen más clara.",
+    "all_scores": {
+        "mal_estado": "40.85%",
+        "nuevo": "19.01%",
+        "usado": "40.14%"
+    },
+    "top3_predictions": {
+        "mal_estado": "40.85%",
+        "usado": "40.14%",
+        "nuevo": "19.01%"
+    }
 }
