@@ -18,6 +18,7 @@ origins = [
     "http://localhost:3000",
     "http://localhost:8100", 
     # Añadir URL de producción aquí
+    "https://inventario-ia-api-887072391939.us-central1.run.app"
 ]
 
 app.add_middleware(
