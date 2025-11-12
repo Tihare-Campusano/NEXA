@@ -7,7 +7,7 @@ from typing import Optional # 🛑 NECESARIO para campos que pueden ser None
 
 # Importa la función principal de tu script de IA
 # Asegúrate de que app_ia.py esté en la misma carpeta o sea accesible.
-from app_ia import registrar_producto_y_imagen 
+from api.app_ia import registrar_producto_y_imagen
 
 # --- Configuración de FastAPI ---
 app = FastAPI()

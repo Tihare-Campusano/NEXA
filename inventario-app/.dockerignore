@@ -15,4 +15,4 @@ package-lock.json
 .vscode/
 
 # Ignorar archivos del backend que no son necesarios para el servidor final
-backend/requirements.txt # Ya lo copiaste
+# backend/requirements.txt # Ya lo copiaste

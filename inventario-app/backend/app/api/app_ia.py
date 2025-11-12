@@ -3,7 +3,6 @@ import tensorflow as tf
 import numpy as np
 import json
 from tensorflow.keras.preprocessing import image
-# Usamos Union[Client, None] para tipar supabase correctamente
 from supabase import create_client, Client
 from datetime import datetime
 from io import BytesIO
@@ -20,9 +19,9 @@ MODEL_DIR = os.path.join(BASE_DIR, "modelo_ia")
 MODEL_PATH = os.path.join(MODEL_DIR, "modelo_final_v3.tflite")
 LABELS_PATH = os.path.join(MODEL_DIR, "labels.txt")
 
-CONFIDENCE_THRESHOLD = 0.50# Umbral 50%
+CONFIDENCE_THRESHOLD = 0.50 # Umbral 50%
 
-# Inicialización de Supabase: La variable glpobal que debe ser None si falla
+# Inicialización de Supabase: La variable global que debe ser None si falla
 supabase: Union[Client, None] = None 
 
 try:
@@ -30,13 +29,13 @@ try:
     from credenciales import SUPABASE_URL, SUPABASE_ANON_KEY
     supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
     print("[INIT] Cliente Supabase cargado correctamente.")
-    
+
 except ImportError:
-    # Esto ocurre si no se encuentra 'credenciales.py'
+    # Si 'credenciales.py' no existe o la importación falla
     print("FATAL: No se encontró 'credenciales.py'. DB inactiva. El servidor continuará.")
     
 except Exception as e:
-    # Esto ocurre si las claves son incorrectas o hay un error de conexión
+    # Si las claves son incorrectas o hay un error de conexión
     print(f"FATAL: Error al inicializar Supabase: {e}. El servidor continuará.")
 
 

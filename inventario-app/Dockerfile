@@ -1,24 +1,26 @@
-# 1. Imagen base de Python para rendimiento y tamaño
-FROM python:3.11-slim
+# Esta es la imagen base optimizada para FastAPI, que incluye Gunicorn y Uvicorn
+# ya configurados y resuelve los problemas de rutas (PYTHONPATH) que tuvimos.
+FROM tiangolo/uvicorn-gunicorn-fastapi:python3.11
 
-# CORRECCIÓN DE GUNICORN: Asegura que Python encuentre los ejecutables de pip.
-ENV PYTHONPATH=/usr/local/lib/python3.11/site-packages
-
-# 2. Establecer el directorio de trabajo
+# 2. Establecer el directorio de trabajo dentro del contenedor
 WORKDIR /app
 
-# 3. Copiar y instalar las dependencias
-# (Esto fuerza una reinstalación si cambias requirements.txt)
+# 3. Copiar e instalar las dependencias
+# Instala las librerías necesarias para tu aplicación (TensorFlow, Supabase, etc.)
+# Nota: La imagen base ya trae FastAPI, Uvicorn y Gunicorn.
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 4. Copiar los archivos de la aplicación (incluyendo el código corregido)
-# Esto copiará api_server.py, app_ia.py, credenciales.py, y la carpeta modelo_ia
+# 4. Copiar los archivos de la aplicación (código, credenciales y modelos)
+# Esto copia la carpeta 'api' (que contiene api_server.py, app_ia.py, credenciales.py, y modelo_ia)
 COPY backend/app /app
 
-# 5. Comando de Producción Robusto con Gunicorn (Usando 'python -m' como solución robusta)
-# Ejecuta 4 procesos worker, bindeado al puerto 80, con un timeout de 120s.
-CMD ["python", "-m", "gunicorn", "api.api_server:app", "--bind", "0.0.0.0:80", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--timeout", "120"]
+# 5. Configuración de Inicio
+# La imagen base lee estas variables para saber qué archivo Python y qué objeto iniciar.
+# api.api_server es el módulo, y app es el objeto FastAPI.
+ENV MODULE_NAME="api.api_server"
+ENV VARIABLE_NAME="app"
 
 # 6. Exponer el puerto
 EXPOSE 80
+# El comando de inicio (Gunicorn con workers) es manejado internamente por la imagen base.
