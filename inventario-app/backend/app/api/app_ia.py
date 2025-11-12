@@ -120,7 +120,7 @@ def predict_from_bytes(model_path, image_data: bytes, labels_path, threshold):
         'threshold_met': bool(confidence >= threshold),
     }
 
-# --- 4. REGISTRO EN SUPABASE (Ajustado para usar 'stock' como fuente de verdad) ---
+# --- 4. REGISTRO EN SUPABASE (CORREGIDO PARA MANEJO DE NONE) ---
 async def registrar_producto_y_imagen(
     image_base64: str,
     codigo_barras: str,
@@ -133,14 +133,17 @@ async def registrar_producto_y_imagen(
     categoria_id: Optional[str] = None,
     compatibilidad: Optional[str] = None,
     observaciones: Optional[str] = None,
+    # Se eliminan stock, disponibilidad y estado como parámetros de entrada
+    # ya que se calculan o se obtienen de la IA/DB.
 ):
     print(f"\n[INICIO] Procesando producto: {codigo_barras}")
     current_time = datetime.now().isoformat()
 
     if supabase is None:
-        return {'status': 'error', 'message': 'El servicio de base de datos Supabase no está inicializado.'}
+        print("[ERROR CRÍTICO] Supabase no está inicializado.")
+        return {'status': 'error', 'message': 'El servicio de base de datos Supabase no está inicializado. Error de configuración.'}
 
-    # 1️⃣ Decodificar Base64 (Mantenido)
+    # 1️⃣ Decodificar Base64
     try:
         image_bytes = base64.b64decode(image_base64)
     except Exception as e:
@@ -149,7 +152,7 @@ async def registrar_producto_y_imagen(
     file_name = f"{uuid.uuid4()}.jpeg"
     storage_path = f"imagenes/{file_name}"
 
-    # 2️⃣ Clasificar con IA (Mantenido)
+    # 2️⃣ Clasificar con IA
     prediction_result = predict_from_bytes(MODEL_PATH, image_bytes, LABELS_PATH, CONFIDENCE_THRESHOLD)
     if prediction_result['status'] == 'error':
         return {'status': 'error', 'message': prediction_result['message']}
@@ -157,50 +160,51 @@ async def registrar_producto_y_imagen(
     estado_producto = prediction_result['predicted_label'].lower()
     print(f"[IA] Estado clasificado: **{estado_producto}**")
 
-    # 3️⃣ Subir imagen a Supabase Storage (Mantenido)
-    # **NOTA:** Asegúrate de que los permisos de Storage (RLS) permitan la subida.
+    # 3️⃣ Subir imagen a Supabase Storage
     try:
-        response_upload = supabase.storage.from_("imagenes").upload(
+        supabase.storage.from_("imagenes").upload(
             file=image_bytes,
             path=file_name,
             file_options={"content-type": "image/jpeg"}
         )
-        if hasattr(response_upload, 'error') and response_upload.error:
-             # Manejo de error de RLS de Storage
-             return {'status': 'error', 'message': f"Error al subir imagen (Storage RLS): {response_upload.error.message}"}
-
         print(f"[STORAGE] Imagen subida a: {storage_path}")
     except Exception as e:
-        return {'status': 'error', 'message': f"Excepción al subir imagen: {e}"}
+        return {'status': 'error', 'message': f"Error al subir imagen: {e}"}
 
-
-    # 4️⃣ Consultar Producto Existente
+    # 4️⃣ Insertar o actualizar producto en 'productos'
     print("[DB] Consultando producto existente...")
     cat_id_int = int(categoria_id) if categoria_id and str(categoria_id).isdigit() else None
 
     try:
-        # Solo necesitamos el ID del producto
-        response_prod = supabase.table('productos').select('id').eq('codigo_barras', codigo_barras).maybe_single().execute()
+        # Se necesita obtener la 'unidad' actual para calcular el nuevo stock TOTAL.
+        response_prod = supabase.table('productos').select('id, unidad').eq('codigo_barras', codigo_barras).maybe_single().execute()
         response_prod_data = response_prod.data if response_prod and hasattr(response_prod, "data") else None
     except Exception as e:
         return {'status': 'error', 'message': f"Error al consultar producto: {e}"}
 
     producto_id = None
+    new_stock_total = 1 # Por defecto, si es nuevo, el stock total será 1 después de este ingreso.
 
     if response_prod_data:
-        # Producto existente: obtiene el ID.
+        # Producto existente
         producto_id = response_prod_data['id']
-        print(f"[DB] Producto existente ID: {producto_id}")
+        current_stock_total = response_prod_data.get('unidad', 0)
+        new_stock_total = current_stock_total + 1
+        print(f"[DB] Producto existente ID {producto_id}. Stock total previo: {current_stock_total}, Nuevo stock total: {new_stock_total}")
 
-        # **Importante:** Actualizamos el estado del producto en 'productos' con la clasificación IA
-        update_prod_data = {
+        update_data = {
+            'unidad': new_stock_total,
             'estado': estado_producto,
-            'updated_at': current_time
+            'disponibilidad': get_disponibilidad(new_stock_total),
+            'updated_at': current_time # Añadir el campo de actualización
         }
-        supabase.table('productos').update(update_prod_data).eq('id', producto_id).execute()
+
+        response = supabase.table('productos').update(update_data).eq('id', producto_id).execute()
+        if not response or not hasattr(response, "data") or not response.data:
+             return {'status': 'error', 'message': f"Fallo al actualizar producto: {getattr(response.error, 'message', 'Error desconocido')}"}
 
     else:
-        # Producto nuevo: inserta y obtiene el ID.
+        # Producto nuevo
         print("[DB] Producto nuevo. Insertando...")
         insert_data = {
             'codigo_barras': codigo_barras,
@@ -211,92 +215,71 @@ async def registrar_producto_y_imagen(
             'categoria_id': cat_id_int,
             'activo': True,
             'observaciones': observaciones or None,
+            'unidad': new_stock_total, # Stock total inicializado a 1
             'estado': estado_producto,
-            'disponibilidad': 'Baja disponibilidad', # Stock inicial 1
-            'unidad': 1, # Stock total inicializado a 1 (por si se consulta esta tabla)
+            'disponibilidad': get_disponibilidad(new_stock_total),
             'created_at': current_time,
             'updated_at': current_time
         }
 
         response = supabase.table('productos').insert(insert_data).execute()
-        if response.error:
-            return {'status': 'error', 'message': f"Fallo al insertar producto: {response.error.message}"}
+        if not response or not hasattr(response, "data") or not response.data:
+            return {'status': 'error', 'message': f"Fallo al insertar producto: {getattr(response.error, 'message', 'Error desconocido')}"}
 
         producto_id = response.data[0]['id']
         print(f"[DB] Inserción exitosa. Nuevo Producto ID: {producto_id}")
 
+    # 5️⃣ Registrar la entrada en la tabla 'stock' (CORRECCIÓN CRÍTICA)
+    # Esto refleja el movimiento de una unidad.
+    stock_data_to_insert = {
+        'producto_id': producto_id,
+        'cantidad': 1,  # Siempre se registra la entrada de 1 unidad por imagen/escaneo
+        'ultima_actualizacion': current_time,
+        'disponibilidad': True, # Se asume disponible al ingresar
+        'estado': estado_producto, # El estado del stock se basa en la clasificación IA
+        'created_at': current_time,
+        'updated_at': current_time
+    }
+    print(f"[DB] Registrando entrada en tabla 'stock' para Producto ID {producto_id}.")
 
-    # 5️⃣ Gestionar Stock Total en la tabla 'stock' (CORRECCIÓN CRÍTICA)
-    
-    # 5a. Consultar stock actual
     try:
-        response_stock = supabase.table('stock').select('cantidad').eq('producto_id', producto_id).maybe_single().execute()
-        stock_data = response_stock.data if response_stock and hasattr(response_stock, "data") else None
+        response_stock = supabase.table('stock').insert(stock_data_to_insert).execute()
+        if not response_stock or not hasattr(response_stock, "data") or not response_stock.data:
+            error_msg = getattr(response_stock.error, "message", "Error desconocido en inserción de stock")
+            print(f"[ERROR DB] Fallo al insertar en tabla 'stock': {error_msg}")
+            # NOTA: En un entorno de producción, aquí podrías querer revertir el cambio en 'productos'.
+            return {'status': 'error', 'message': f"Error al insertar en tabla 'stock': {error_msg}"}
+        print("[DB] Registro de stock exitoso.")
     except Exception as e:
-        return {'status': 'error', 'message': f"Error al consultar stock: {e}"}
-
-    new_stock_total = 1
-    
-    if stock_data:
-        # Stock existente: Actualizar (Sumar 1)
-        current_stock = stock_data.get('cantidad', 0)
-        new_stock_total = current_stock + 1
-        print(f"[DB] Stock existente. Actualizando cantidad: {current_stock} -> {new_stock_total}")
-
-        update_stock_data = {
-            'cantidad': new_stock_total,
-            'ultima_actualizacion': current_time,
-            'disponibilidad': get_disponibilidad(new_stock_total),
-            'estado': estado_producto,
-            'updated_at': current_time
-        }
-        
-        response = supabase.table('stock').update(update_stock_data).eq('producto_id', producto_id).execute()
-        if response.error:
-            return {'status': 'error', 'message': f"Fallo al actualizar stock: {response.error.message}"}
-
-    else:
-        # Stock nuevo: Insertar (Cantidad 1)
-        print("[DB] No existe registro de stock. Insertando nuevo registro.")
-        insert_stock_data = {
-            'producto_id': producto_id,
-            'cantidad': new_stock_total,
-            'ultima_actualizacion': current_time,
-            'disponibilidad': get_disponibilidad(new_stock_total),
-            'estado': estado_producto,
-            'created_at': current_time,
-            'updated_at': current_time
-        }
-
-        response = supabase.table('stock').insert(insert_stock_data).execute()
-        if response.error:
-            return {'status': 'error', 'message': f"Fallo al insertar stock: {response.error.message}"}
-        
-    # **NOTA:** Si usaste 'unidad' en 'productos', podrías querer actualizarlo aquí también para mantener la coherencia.
-    supabase.table('productos').update({'unidad': new_stock_total, 'disponibilidad': get_disponibilidad(new_stock_total)}).eq('id', producto_id).execute()
+        print(f"[ERROR DB] Excepción al insertar en tabla 'stock': {e}")
+        return {'status': 'error', 'message': f"Excepción al insertar en tabla 'stock': {e}"}
 
 
-    # 6️⃣ Registrar imagen en 'imagenes' (Mantenido, asume que 'producto_id' es ahora int8)
+    # 6️⃣ Registrar imagen en 'imagenes' (Ajuste de campos)
     image_data_to_insert = {
         'producto_id': producto_id,
         'storage_path': storage_path,
+        # hash_archivo se omite ya que no se calcula en el código, pero es un campo en el DER.
         'ancho': ancho,
         'alto': alto,
-        'tomado_en': current_time,
-        'tomado_por': user_email,
+        'tomado_en': current_time, # Usando 'tomado_en' en lugar de 'fecha_captura'
+        'tomado_por': user_email, # Usando 'tomado_por' en lugar de 'correo_captura'
+        # notas, created_at, updated_at se omiten aquí ya que Supabase los puede gestionar o
+        # se pueden añadir si el ORM lo requiere.
     }
-    
-    response_img = supabase.table('imagenes').insert(image_data_to_insert).execute()
+    print(f"[DB] Intentando insertar registro de imagen para Producto ID {producto_id}.")
 
-    if response_img.error:
-        # Asegúrate de que las políticas RLS de la tabla 'imagenes' permitan la inserción
-        return {'status': 'error', 'message': f"Error al insertar en tabla 'imagenes': {response_img.error.message}"}
-    
-    print("[DB] Registro de imagen exitoso.")
-    return {
-        'status': 'success',
-        'message': 'Producto, stock e imagen registrados.',
-        'producto_id': producto_id,
-        'estado_clasificado': estado_producto,
-        'stock_actual': new_stock_total
-    }
+    response_img = supabase.table('imagenes').insert(image_data_to_insert).execute()
+    if response_img and hasattr(response_img, "data") and response_img.data:
+        print("[DB] Registro de imagen exitoso.")
+        return {
+            'status': 'success',
+            'message': 'Producto, registro de stock e imagen registrados.',
+            'producto_id': producto_id,
+            'estado_clasificado': estado_producto,
+            'stock_actual': new_stock_total
+        }
+    else:
+        error_msg = getattr(response_img.error, "message", "Error desconocido en inserción de imagen")
+        print(f"[ERROR DB] Fallo al insertar en tabla 'imagenes': {error_msg}")
+        return {'status': 'error', 'message': f"Error al insertar en tabla 'imagenes': {error_msg}"}
