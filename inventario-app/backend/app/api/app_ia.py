@@ -43,12 +43,14 @@ preprocess_fn = tf.keras.applications.mobilenet_v2.preprocess_input
 
 # --- 2. FUNCIONES AUXILIARES ---
 def get_labels(path):
+    print(f"[DEBUG] Cargando etiquetas desde: {path}") # Log adicional
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
             return [line.strip() for line in f.readlines()]
     return None
 
 def preprocess_image(image_data: bytes, target_size=IMG_SIZE):
+    print(f"[DEBUG] Preprocesando imagen. Tamaño target: {target_size}") # Log adicional
     try:
         img = image.load_img(BytesIO(image_data), target_size=target_size)
     except Exception as e:
@@ -60,6 +62,7 @@ def preprocess_image(image_data: bytes, target_size=IMG_SIZE):
     return processed_image.astype(np.float32)
 
 def get_disponibilidad(cantidad: int) -> str:
+    # No necesita más logs, es simple lógica.
     if cantidad <= 0:
         return "Sin stock"
     if cantidad <= 4:
@@ -70,12 +73,14 @@ def get_disponibilidad(cantidad: int) -> str:
 
 # --- 3. PREDICCIÓN IA ---
 def predict_from_bytes(model_path, image_data: bytes, labels_path, threshold):
+    print(f"[IA DEBUG] Iniciando predicción. Modelo: {model_path}") # Log adicional
     if not os.path.exists(model_path):
         return {'status': 'error', 'message': f'Archivo del modelo no encontrado: {model_path}'}
 
     try:
         interpreter = tf.lite.Interpreter(model_path=model_path)
         interpreter.allocate_tensors()
+        print("[IA DEBUG] Modelo TFLite cargado y tensores asignados.") # Log adicional
     except Exception as e:
         return {'status': 'error', 'message': f"Error al cargar modelo TFLite: {e}"}
 
@@ -104,6 +109,8 @@ def predict_from_bytes(model_path, image_data: bytes, labels_path, threshold):
     predicted_class_index = np.argmax(probabilities)
     confidence = probabilities[predicted_class_index]
     predicted_label = labels[predicted_class_index] if confidence >= threshold else "INCIERTO"
+    
+    print(f"[IA DEBUG] Clase predicha: {predicted_label}, Confianza: {confidence}") # Log adicional
 
     return {
         'status': 'success',
@@ -131,16 +138,22 @@ async def registrar_producto_y_imagen(
     estado: Optional[str] = None
 ):
     print(f"\n[INICIO] Procesando producto: {codigo_barras}")
+    print(f"[INICIO] Dimensiones recibidas: Alto={alto} ({type(alto)}), Ancho={ancho} ({type(ancho)})") # Log de tipo clave
+    print(f"[INICIO] Categoría ID recibida: {categoria_id} ({type(categoria_id)})") # Log de tipo
+
     current_time = datetime.now().isoformat()
     
     # NUEVA VERIFICACIÓN CRÍTICA: Asegurarse de que la DB esté disponible
     if supabase is None:
+        print("[ERROR CRÍTICO] Supabase no está inicializado.") # Log adicional
         return {'status': 'error', 'message': 'El servicio de base de datos Supabase no está inicializado. Error de configuración.'}
     
     # 1️⃣ Decodificar Base64
     try:
         image_bytes = base64.b64decode(image_base64)
+        print(f"[BASE64] Decodificación exitosa. Tamaño de bytes: {len(image_bytes)}") # Log adicional
     except Exception as e:
+        print(f"[ERROR BASE64] Falló la decodificación: {e}") # Log de error
         return {'status': 'error', 'message': f"Error al decodificar Base64: {e}"}
         
     file_name = f"{uuid.uuid4()}.jpeg"
@@ -173,22 +186,28 @@ async def registrar_producto_y_imagen(
         response_prod = supabase.table('productos').select('id, unidad').eq('codigo_barras', codigo_barras).maybe_single().execute()
         print(f"[DEBUG] Respuesta Supabase productos: {response_prod}")
     except Exception as e:
+        print(f"[ERROR DB] Falló la consulta de producto: {e}") # Log de error
         return {'status': 'error', 'message': f"Error al consultar producto: {e}"}
 
     # 🧩 CORREGIDO: Manejo seguro si response_prod es None
     response_prod_data = None
     if response_prod and hasattr(response_prod, "data") and response_prod.data:
         response_prod_data = response_prod.data
+        print(f"[DB] Producto existente encontrado. ID: {response_prod_data.get('id')}") # Log adicional
 
     new_stock_value = 1
     producto_id = None
+    
+    # Conversión segura y log del ID de categoría
     cat_id_int = int(categoria_id) if categoria_id and categoria_id.isdigit() else None 
+    print(f"[DB DEBUG] Categoría ID a insertar (int): {cat_id_int}") # Log adicional
 
     if response_prod_data:
         # Producto existente
         current_stock = response_prod_data['unidad']
         producto_id = response_prod_data['id']
         new_stock_value = current_stock + 1
+        print(f"[DB] Actualizando stock de producto ID {producto_id}. Nuevo stock: {new_stock_value}") # Log adicional
 
         update_data = {
             'unidad': new_stock_value,
@@ -199,6 +218,7 @@ async def registrar_producto_y_imagen(
         response = supabase.table('productos').update(update_data).eq('id', producto_id).execute()
         if not response or not hasattr(response, "data") or not response.data:
             error_msg = getattr(response.error, "message", "Error desconocido en actualización") if hasattr(response, "error") else "Error desconocido"
+            print(f"[ERROR DB] Fallo al actualizar producto: {error_msg}") # Log de error
             return {'status': 'error', 'message': f"Fallo al actualizar producto: {error_msg}"}
 
     else:
@@ -222,9 +242,11 @@ async def registrar_producto_y_imagen(
         response = supabase.table('productos').insert(insert_data).execute()
         if not response or not hasattr(response, "data") or not response.data:
             error_msg = getattr(response.error, "message", "Error desconocido en inserción") if hasattr(response, "error") else "Error desconocido"
+            print(f"[ERROR DB] Fallo al insertar producto: {error_msg}") # Log de error
             return {'status': 'error', 'message': f"Fallo al insertar producto: {error_msg}"}
 
         producto_id = response.data[0]['id']
+        print(f"[DB] Inserción exitosa. Nuevo Producto ID: {producto_id}") # Log adicional
 
     # 5️⃣ Registrar imagen
     image_data_to_insert = {
@@ -235,6 +257,7 @@ async def registrar_producto_y_imagen(
         'fecha_captura': current_time,
         'correo_captura': user_email,
     }
+    print(f"[DB] Intentando insertar registro de imagen para Producto ID {producto_id}. Datos: {image_data_to_insert}") # Log de datos
 
     response_img = supabase.table('imagenes').insert(image_data_to_insert).execute()
     if response_img and hasattr(response_img, "data") and response_img.data:
@@ -247,4 +270,5 @@ async def registrar_producto_y_imagen(
             'stock_actual': new_stock_value
         }
     else:
+        print("[ERROR DB] Fallo al insertar en tabla 'imagenes'.") # Log de error
         return {'status': 'error', 'message': "Error al insertar en tabla 'imagenes'."}
