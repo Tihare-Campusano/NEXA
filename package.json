@@ -18,7 +18,7 @@
     "@capacitor/android": "^7.4.3",
     "@capacitor/app": "7.0.2",
     "@capacitor/camera": "^7.0.2",
-    "@capacitor/core": "^7.4.3",
+    "@capacitor/core": "^7.4.4",
     "@capacitor/filesystem": "^7.1.4",
     "@capacitor/haptics": "7.0.2",
     "@capacitor/keyboard": "7.0.2",
@@ -47,7 +47,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@capacitor/cli": "^7.4.3",
+    "@capacitor/cli": "^7.4.4",
     "@tailwindcss/postcss": "^4.1.13",
     "@testing-library/dom": ">=7.21.4",
     "@testing-library/jest-dom": "^5.16.5",
