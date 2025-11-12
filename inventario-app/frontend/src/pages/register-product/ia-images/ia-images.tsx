@@ -17,7 +17,7 @@ import { useHistory, useLocation } from "react-router-dom";
 
 // 🛑 URL de la API de tu Backend de Python (ej. FastAPI o Función Serverless)
 // ¡DEBES REEMPLAZAR ESTA URL con la dirección donde montaste tu app_ia.py!
-const API_CLASSIFY_URL = "https://inventario-ia-api-887072391939.us-central1.run.app/docs#/default/classify_product_endpoint_api_clasificar_producto_post"; 
+const API_CLASSIFY_URL = "https://inventario-ia-api-887072391939.us-central1.run.app/api/clasificar-producto"; 
 
 // --- Interfaces ---
 interface FormData {
