@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+gunicorn
+tensorflow
+numpy
+supabase-py

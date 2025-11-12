@@ -40,10 +40,9 @@ export default function FormularioRegistro() {
     nombre: "",
     marca: "",
     modelo: "",
-    categoria_id: "",
+    categoria_id: "", // Se mantiene como string para el select
     compatibilidad: "",
     observaciones: "",
-    // Mantenemos 'stock' en el estado local, pero mapeamos a 'unidad' en DB
     stock: "",
     disponibilidad: "",
     estado: "",
@@ -57,18 +56,15 @@ export default function FormularioRegistro() {
   // --- Efectos ---
   useEffect(() => {
     if (fromIA) {
-      // Cuando se vuelve de la IA, el campo 'stock' del form contiene el valor de 'unidad' (inventario)
       setForm((prev) => ({ ...prev, ...fromIA }));
       setModoGuardar(true);
     }
   }, [fromIA]);
 
-  // pegar el código cuando regresamos desde la cámara
   useEffect(() => {
     const scanned = (location.state as any)?.scannedCode as string | undefined;
     if (scanned) {
       setForm((prev) => ({ ...prev, codigo: scanned }));
-      // limpiar el state para que no se repita
       history.replace(history.location.pathname);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -87,20 +83,25 @@ export default function FormularioRegistro() {
     setForm((prev) => ({ ...prev, codigo: value }));
   };
 
-  // --- NAVEGACIÓN A LA PÁGINA DE IA ---
+  // --- NAVEGACIÓN A LA PÁGINA DE IA (handleNext) ---
   const handleNext = () => {
     if (!form.codigo.trim()) {
       alert("Por favor, ingresa un código para el producto antes de continuar.");
       return;
     }
+    // 🛑 VALIDACIÓN CRÍTICA: La clave foránea es NOT NULL en DB
+    if (!form.categoria_id) {
+      alert("¡Advertencia! Debes seleccionar una categoría antes de usar la cámara.");
+      return;
+    }
     history.push({
       pathname: "/tabs/registro/ia",
-      // Pasamos todos los datos capturados
+      // ✅ Pasamos TODOS los datos del formulario al estado de la IA
       state: { formData: form },
     });
   };
 
-  // --- FUNCIÓN DE GUARDADO FINAL (CORREGIDA) ---
+  // --- FUNCIÓN DE GUARDADO FINAL ---
   const handleGuardar = async () => {
     setLoading(true);
 
@@ -110,11 +111,11 @@ export default function FormularioRegistro() {
       .eq("codigo_barras", form.codigo)
       .maybeSingle();
 
-    // ✅ Mapeo de datos para la base de datos (usando 'unidad' y valores por defecto)
+    // ✅ Mapeo de datos para la base de datos (usando 'unidad' y valores seguros)
     const dataProducto = {
       codigo_barras: form.codigo,
 
-      // 🛑 Campos de metadatos (Asegurar que no sean NULL, si son NOT NULL en DB)
+      // 🛑 Campos de metadatos (Deben ser NOT NULLs)
       nombre: form.nombre || "N/A",
       marca: form.marca || "N/A",
       modelo: form.modelo || "N/A",
@@ -122,21 +123,21 @@ export default function FormularioRegistro() {
       compatibilidad: form.compatibilidad || null,
       observaciones: form.observaciones || null,
 
-      // ✅ Campos de Stock e IA (Mapeo de 'stock' local a 'unidad' en DB)
+      // ✅ Campos de Stock e IA
       unidad: form.stock ? parseInt(form.stock, 10) : 0, // <-- Columna correcta para inventario
       disponibilidad: form.disponibilidad || "Sin stock",
       estado: form.estadoIA || form.estado || "No Clasificado",
       imagen_url: form.imagen_url || null,
 
-      activo: true,
+      activo: true, // Asumimos NOT NULL
     };
 
     let error;
     if (existente) {
-      // Si existe, actualiza (asumiendo que la unidad ya fue incrementada por el backend)
+      // Si existe, actualiza
       ({ error } = await supabase.from("productos").update(dataProducto).eq("id", existente.id));
     } else {
-      // Si es nuevo, inserta la fila COMPLETA con los valores por defecto (solución a 23514)
+      // Si es nuevo, insertamos la fila COMPLETA
       ({ error } = await supabase.from("productos").insert([dataProducto]));
     }
 
@@ -146,7 +147,7 @@ export default function FormularioRegistro() {
       alert(`❌ Error al guardar el producto: ${error.message}`);
     } else {
       alert("✅ Producto guardado correctamente.");
-      history.push("/inventario"); // ajusta si corresponde
+      history.push("/inventario");
     }
   };
 
@@ -200,7 +201,6 @@ export default function FormularioRegistro() {
         {loading && (
           <div className="spinner-container">
             <IonSpinner name="crescent" />
-            {/* El spinner se muestra mientras el backend procesa */}
           </div>
         )}
 
