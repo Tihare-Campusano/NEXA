@@ -16,7 +16,6 @@ import {
 import { useHistory, useLocation } from "react-router-dom";
 
 // 🛑 URL de la API de tu Backend de Python (ej. FastAPI o Función Serverless)
-// ¡DEBES REEMPLAZAR ESTA URL con la dirección donde montaste tu app_ia.py!
 const API_CLASSIFY_URL = "https://inventario-ia-api-887072391939.us-central1.run.app/api/clasificar-producto"; 
 
 // --- Interfaces ---
@@ -108,6 +107,8 @@ const IAImage: React.FC = () => {
             const userEmail = "correo_usuario@app.com"; // Obtener de la sesión de usuario
             
             // 🛑 CONSTRUYENDO LA PETICIÓN CON TODOS LOS DATOS DEL FORMULARIO
+            // HE ELIMINADO 'stock', 'disponibilidad' y 'estado' de los datos ENVIADOS
+            // ya que son calculados por el backend y su envío causaba el error.
             const requestData = {
                 image_base64: imageBase64,
                 codigo_barras: formData.codigo,
@@ -123,10 +124,9 @@ const IAImage: React.FC = () => {
                 compatibilidad: formData.compatibilidad,
                 observaciones: formData.observaciones, 
 
-                // Enviamos stock actual del formulario para asegurar consistencia
-                stock: formData.stock, 
-                disponibilidad: formData.disponibilidad,
-                estado: formData.estado,
+                // ❌ ELIMINADO: stock: formData.stock, 
+                // ❌ ELIMINADO: disponibilidad: formData.disponibilidad,
+                // ❌ ELIMINADO: estado: formData.estado,
             };
             
             // 2. Llamada HTTP a la API de Python

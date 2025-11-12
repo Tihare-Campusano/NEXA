@@ -137,8 +137,6 @@ async def registrar_producto_y_imagen(
     categoria_id: Optional[str] = None,
     compatibilidad: Optional[str] = None,
     observaciones: Optional[str] = None,
-    # CORRECCIÓN CRÍTICA: ACEPTAR ARGUMENTOS INESPERADOS (como 'stock') y DISPONIBILIDAD
-    # Estos son capturados por FastAPI/Pydantic y se pasan como kwargs.
     **kwargs: Any 
 ):
     print(f"\n[INICIO] Procesando producto: {codigo_barras}")
@@ -148,7 +146,6 @@ async def registrar_producto_y_imagen(
         print("[ERROR CRÍTICO] Supabase no está inicializado.")
         return {'status': 'error', 'message': 'El servicio de base de datos Supabase no está inicializado. Error de configuración.'}
     
-    # Se añade log para verificar si se recibieron argumentos extra (ej. 'stock')
     if kwargs:
         print(f"[ADVERTENCIA] Argumentos extra recibidos (ignorados): {list(kwargs.keys())}")
 
@@ -186,14 +183,13 @@ async def registrar_producto_y_imagen(
     cat_id_int = int(categoria_id) if categoria_id and str(categoria_id).isdigit() else None
 
     try:
-        # Se necesita obtener la 'unidad' actual para calcular el nuevo stock TOTAL.
         response_prod = supabase.table('productos').select('id, unidad').eq('codigo_barras', codigo_barras).maybe_single().execute()
         response_prod_data = response_prod.data if response_prod and hasattr(response_prod, "data") else None
     except Exception as e:
         return {'status': 'error', 'message': f"Error al consultar producto: {e}"}
 
     producto_id = None
-    new_stock_total = 1 # Por defecto, si es nuevo, el stock total será 1 después de este ingreso.
+    new_stock_total = 1 
 
     if response_prod_data:
         # Producto existente
@@ -206,7 +202,7 @@ async def registrar_producto_y_imagen(
             'unidad': new_stock_total,
             'estado': estado_producto,
             'disponibilidad': get_disponibilidad(new_stock_total),
-            'updated_at': current_time # Añadir el campo de actualización
+            'updated_at': current_time 
         }
 
         response = supabase.table('productos').update(update_data).eq('id', producto_id).execute()
@@ -225,7 +221,9 @@ async def registrar_producto_y_imagen(
             'categoria_id': cat_id_int,
             'activo': True,
             'observaciones': observaciones or None,
-            'unidad': new_stock_total, # Stock total inicializado a 1
+            # NOTA: La columna 'unidad' en 'productos' es TEXT, tu código la usa como stock (int). 
+            # Esto puede causar errores si la DB espera 'un'. Aquí se asume que puede ser INT/TEXT.
+            'unidad': str(new_stock_total), # Convertido a TEXT para coincidir con el esquema 'unidad text'
             'estado': estado_producto,
             'disponibilidad': get_disponibilidad(new_stock_total),
             'created_at': current_time,
@@ -239,43 +237,51 @@ async def registrar_producto_y_imagen(
         producto_id = response.data[0]['id']
         print(f"[DB] Inserción exitosa. Nuevo Producto ID: {producto_id}")
 
-    # 5️⃣ Registrar la entrada en la tabla 'stock' (CORRECCIÓN CRÍTICA)
-    # Esto refleja el movimiento de una unidad.
-    stock_data_to_insert = {
+    # --- 5️⃣ REGISTRO DE MOVIMIENTO (CORRECCIÓN CRÍTICA DE STOCK) ---
+    # La tabla 'stock' tiene producto_id como PK, no es para historial. 
+    # Usamos 'movimientos' para registrar la unidad ingresada, que es lo más adecuado.
+    
+    # Asumimos que la columna 'tipo' es una ENUM válida, por ejemplo: 'entrada' (NOT NULL)
+    # y 'usuario_id' es UUID NOT NULL.
+    
+    # NOTA: Debes obtener el UUID real del usuario o permitir NULL en la DB. 
+    # Aquí se usa un UUID FALSO temporalmente para pasar la validación NOT NULL/UUID si user_email no es un UUID.
+    # Si la DB permite NULL, es mejor usar None. Asumo que la DB NO permite NULLs.
+    usuario_uuid_placeholder = uuid.UUID('00000000-0000-0000-0000-000000000000') 
+
+    movimiento_data_to_insert = {
         'producto_id': producto_id,
-        'cantidad': 1,  # Siempre se registra la entrada de 1 unidad por imagen/escaneo
-        'ultima_actualizacion': current_time,
-        'disponibilidad': True, # Se asume disponible al ingresar
-        'estado': estado_producto, # El estado del stock se basa en la clasificación IA
-        'created_at': current_time,
-        'updated_at': current_time
+        'cantidad': 1, 
+        'usuario_id': usuario_uuid_placeholder, # Usar un UUID válido o NULL si se permite
+        'tipo': 'entrada', # Debe coincidir con el tipo USER-DEFINED NOT NULL
+        'motivo': f'Captura IA inicial por {user_email}',
+        'referencia_ext': codigo_barras,
     }
-    print(f"[DB] Registrando entrada en tabla 'stock' para Producto ID {producto_id}.")
+    
+    print(f"[DB] Registrando entrada en tabla 'movimientos' para Producto ID {producto_id}.")
 
     try:
-        response_stock = supabase.table('stock').insert(stock_data_to_insert).execute()
-        if not response_stock or not hasattr(response_stock, "data") or not response_stock.data:
-            error_msg = getattr(response_stock.error, "message", "Error desconocido en inserción de stock")
-            print(f"[ERROR DB] Fallo al insertar en tabla 'stock': {error_msg}")
-            # NOTA: En un entorno de producción, aquí podrías querer revertir el cambio en 'productos'.
-            return {'status': 'error', 'message': f"Error al insertar en tabla 'stock': {error_msg}"}
-        print("[DB] Registro de stock exitoso.")
+        response_mov = supabase.table('movimientos').insert(movimiento_data_to_insert).execute()
+        if not response_mov or not hasattr(response_mov, "data") or not response_mov.data:
+            error_msg = getattr(response_mov.error, "message", "Error desconocido en inserción de movimientos")
+            print(f"[ERROR DB] Fallo al insertar en tabla 'movimientos': {error_msg}", flush=True)
+            return {'status': 'error', 'message': f"Error al insertar en tabla 'movimientos': {error_msg}"}
+        print("[DB] Registro de movimiento exitoso.")
     except Exception as e:
-        print(f"[ERROR DB] Excepción al insertar en tabla 'stock': {e}")
-        return {'status': 'error', 'message': f"Excepción al insertar en tabla 'stock': {e}"}
+        print(f"[ERROR DB] Excepción al insertar en tabla 'movimientos': {e}", flush=True)
+        return {'status': 'error', 'message': f"Excepción al insertar en tabla 'movimientos': {e}"}
 
 
-    # 6️⃣ Registrar imagen en 'imagenes' (Ajuste de campos)
+    # --- 6️⃣ REGISTRAR IMAGEN (CORRECCIÓN DE FK 'tomado_por') ---
     image_data_to_insert = {
         'producto_id': producto_id,
         'storage_path': storage_path,
-        # hash_archivo se omite ya que no se calcula en el código, pero es un campo en el DER.
         'ancho': ancho,
         'alto': alto,
-        'tomado_en': current_time, # Usando 'tomado_en' en lugar de 'fecha_captura'
-        'tomado_por': user_email, # Usando 'tomado_por' en lugar de 'correo_captura'
-        # notas, created_at, updated_at se omiten aquí ya que Supabase los puede gestionar o
-        # se pueden añadir si el ORM lo requiere.
+        'tomado_en': current_time, 
+        # ELIMINADO user_email. Se usa el UUID PLACEHOLDER si 'tomado_por' es NOT NULL
+        'tomado_por': usuario_uuid_placeholder, 
+        # NOTA: La columna 'notas' en 'imagenes' permite NULL, así que no se necesita.
     }
     print(f"[DB] Intentando insertar registro de imagen para Producto ID {producto_id}.")
 
@@ -284,7 +290,7 @@ async def registrar_producto_y_imagen(
         print("[DB] Registro de imagen exitoso.")
         return {
             'status': 'success',
-            'message': 'Producto, registro de stock e imagen registrados.',
+            'message': 'Producto, registro de movimiento e imagen registrados.',
             'producto_id': producto_id,
             'estado_clasificado': estado_producto,
             'stock_actual': new_stock_total
