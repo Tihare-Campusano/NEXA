@@ -9,7 +9,7 @@ from io import BytesIO
 import base64
 import uuid
 import asyncio
-from typing import Optional, Union 
+from typing import Optional, Union, Any
 
 # --- 1. CONFIGURACIÓN E INICIALIZACIÓN ---
 IMG_SIZE = (224, 224)
@@ -74,7 +74,10 @@ def get_disponibilidad(cantidad: int) -> str:
 # --- 3. PREDICCIÓN IA ---
 def predict_from_bytes(model_path, image_data: bytes, labels_path, threshold):
     print(f"[IA DEBUG] Iniciando predicción. Modelo: {model_path}") # Log adicional
+    
+    # AÑADIDO: Verificación explícita de la ruta (útil para Docker)
     if not os.path.exists(model_path):
+        print(f"[ERROR CRÍTICO RUTA] Archivo del modelo NO ENCONTRADO en: {model_path}", flush=True)
         return {'status': 'error', 'message': f'Archivo del modelo no encontrado: {model_path}'}
 
     try:
@@ -82,6 +85,7 @@ def predict_from_bytes(model_path, image_data: bytes, labels_path, threshold):
         interpreter.allocate_tensors()
         print("[IA DEBUG] Modelo TFLite cargado y tensores asignados.") # Log adicional
     except Exception as e:
+        print(f"[ERROR TFLITE] Fallo al cargar modelo TFLite: {e}", flush=True)
         return {'status': 'error', 'message': f"Error al cargar modelo TFLite: {e}"}
 
     input_details = interpreter.get_input_details()
@@ -133,8 +137,9 @@ async def registrar_producto_y_imagen(
     categoria_id: Optional[str] = None,
     compatibilidad: Optional[str] = None,
     observaciones: Optional[str] = None,
-    # Se eliminan stock, disponibilidad y estado como parámetros de entrada
-    # ya que se calculan o se obtienen de la IA/DB.
+    # CORRECCIÓN CRÍTICA: ACEPTAR ARGUMENTOS INESPERADOS (como 'stock') y DISPONIBILIDAD
+    # Estos son capturados por FastAPI/Pydantic y se pasan como kwargs.
+    **kwargs: Any 
 ):
     print(f"\n[INICIO] Procesando producto: {codigo_barras}")
     current_time = datetime.now().isoformat()
@@ -142,6 +147,11 @@ async def registrar_producto_y_imagen(
     if supabase is None:
         print("[ERROR CRÍTICO] Supabase no está inicializado.")
         return {'status': 'error', 'message': 'El servicio de base de datos Supabase no está inicializado. Error de configuración.'}
+    
+    # Se añade log para verificar si se recibieron argumentos extra (ej. 'stock')
+    if kwargs:
+        print(f"[ADVERTENCIA] Argumentos extra recibidos (ignorados): {list(kwargs.keys())}")
+
 
     # 1️⃣ Decodificar Base64
     try:
