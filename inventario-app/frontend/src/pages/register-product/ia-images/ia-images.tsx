@@ -116,7 +116,7 @@ const IAImage: React.FC = () => {
             setImage(`data:image/jpeg;base64,${base64Image}`);
             setStatusText("Analizando imagen con IA...");
 
-            await callBackendAPI(base64Image, width, height);
+            await callBackendAPI(base64Image);
         } catch (e) {
             console.error("📷 Error al tomar la foto:", e);
             setStatusText("Error o cancelación de la cámara.");
@@ -125,7 +125,7 @@ const IAImage: React.FC = () => {
         }
     };
 
-    const callBackendAPI = async (imageBase64: string, width: number, height: number) => {
+    const callBackendAPI = async (imageBase64: string) => {
         try {
             const requestData = {
                 image_base64: imageBase64,
@@ -136,8 +136,6 @@ const IAImage: React.FC = () => {
                 categoria_id: formData.categoria_id,
                 compatibilidad: formData.compatibilidad,
                 observaciones: formData.observaciones,
-                ancho: width,
-                alto: height,
             };
 
             const response = await fetch(API_CLASSIFY_URL, {
