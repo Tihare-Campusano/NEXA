@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
     IonPage,
     IonContent,
@@ -6,6 +6,8 @@ import {
     IonImg,
     IonText,
     IonLoading,
+    IonModal,
+    IonIcon,
 } from "@ionic/react";
 import {
     Camera,
@@ -14,6 +16,7 @@ import {
     CameraDirection,
 } from "@capacitor/camera";
 import { useHistory, useLocation } from "react-router-dom";
+import { checkmarkCircleOutline } from "ionicons/icons";
 
 const API_CLASSIFY_URL =
     "https://inventario-ia-api-887072391939.us-central1.run.app/api/clasificar-producto";
@@ -27,22 +30,19 @@ interface FormData {
     categoria_id: string;
     compatibilidad: string;
     observaciones: string;
-    stock: string;
+    stock?: string;
     disponibilidad?: string;
     estado_ia?: string;
-    [key: string]: any;
 }
 
 interface BackendResponse {
     status: "success" | "error";
     message: string;
-    producto_id: number;
-    estado_clasificado: string;
-    stock_actual: number;
+    estado_clasificado?: string;
+    stock_actual?: number;
 }
 
-// --- Funciones Auxiliares ---
-
+// --- Utilidades ---
 const getImageDimensionsFromBase64 = (
     base64String: string
 ): Promise<{ width: number; height: number }> => {
@@ -54,9 +54,7 @@ const getImageDimensionsFromBase64 = (
                 height: img.naturalHeight || img.height,
             });
         };
-        img.onerror = () => {
-            reject(new Error("Error al cargar la imagen para obtener dimensiones."));
-        };
+        img.onerror = () => reject(new Error("No se pudo obtener las dimensiones de la imagen."));
         img.src = `data:image/jpeg;base64,${base64String}`;
     });
 };
@@ -69,57 +67,77 @@ const calcularDisponibilidad = (cantidad: number): string => {
 };
 
 // --- Componente Principal ---
-
 const IAImage: React.FC = () => {
     const history = useHistory();
     const location = useLocation();
-
     const initialFormData =
         (location.state as { formData?: FormData })?.formData || ({} as FormData);
 
-    const [formData, setFormData] = useState<FormData>(initialFormData);
+    const [formData] = useState<FormData>(initialFormData);
     const [image, setImage] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
-    const [estadoIA, setEstadoIA] = useState<string | null>(
-        formData.estado_ia || null
-    );
-    const [showLoadingOverlay, setShowLoadingOverlay] = useState(false);
-    const [statusText, setStatusText] = useState<string>(
-        "Listo para tomar la foto."
-    );
+    const [statusText, setStatusText] = useState("Listo para tomar la foto.");
+    const [estadoIA, setEstadoIA] = useState<string | null>(null);
+    const [showModalSuccess, setShowModalSuccess] = useState(false);
 
-    const isServiceReady = true;
-
-    // 💾 Llamada al backend y guardado
-    const callBackendAPIAndSave = async (
-        imageBase64: string,
-        width: number,
-        height: number
-    ) => {
-        if (!formData.codigo) {
-            alert("El código de producto no está disponible.");
-            return;
+    // 🔁 Cierra el modal automáticamente después de 7 segundos
+    useEffect(() => {
+        let timer: ReturnType<typeof setTimeout>;
+        if (showModalSuccess) {
+            timer = setTimeout(() => {
+                handleVolver();
+            }, 7000);
         }
+        return () => clearTimeout(timer);
+    }, [showModalSuccess]);
 
-        setShowLoadingOverlay(true);
-        setLoading(true);
-        setStatusText("2. Enviando imagen al servidor de IA...");
-
+    const tomarFoto = async () => {
         try {
-            const userEmail = "correo_usuario@app.com";
+            setLoading(true);
+            setStatusText("Abriendo cámara...");
 
+            const foto = await Camera.getPhoto({
+                quality: 85,
+                allowEditing: false,
+                resultType: CameraResultType.Base64,
+                source: CameraSource.Camera,
+                direction: CameraDirection.Rear,
+            });
+
+            if (!foto.base64String) {
+                alert("No se pudo capturar la imagen.");
+                setLoading(false);
+                return;
+            }
+
+            const base64Image = foto.base64String;
+            const { width, height } = await getImageDimensionsFromBase64(base64Image);
+
+            setImage(`data:image/jpeg;base64,${base64Image}`);
+            setStatusText("Analizando imagen con IA...");
+
+            await callBackendAPI(base64Image, width, height);
+        } catch (e) {
+            console.error("📷 Error al tomar la foto:", e);
+            setStatusText("Error o cancelación de la cámara.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const callBackendAPI = async (imageBase64: string, width: number, height: number) => {
+        try {
             const requestData = {
                 image_base64: imageBase64,
                 codigo_barras: formData.codigo,
-                user_email: userEmail,
-                ancho: width,
-                alto: height,
                 nombre: formData.nombre,
                 marca: formData.marca,
                 modelo: formData.modelo,
                 categoria_id: formData.categoria_id,
                 compatibilidad: formData.compatibilidad,
                 observaciones: formData.observaciones,
+                ancho: width,
+                alto: height,
             };
 
             const response = await fetch(API_CLASSIFY_URL, {
@@ -131,85 +149,26 @@ const IAImage: React.FC = () => {
             const result: BackendResponse = await response.json();
 
             if (response.ok && result.status === "success") {
-                setStatusText("✅ Clasificación y Stock actualizados.");
+                const estadoDetectado = result.estado_clasificado?.toLowerCase() || "desconocido";
+                const nuevoStock = result.stock_actual || 0;
+                const nuevaDisponibilidad = calcularDisponibilidad(nuevoStock);
 
-                const predictedStatus = result.estado_clasificado.toLowerCase();
-
-                const newDisponibilidad = calcularDisponibilidad(result.stock_actual);
-
-                const updatedForm = {
-                    ...formData,
-                    estado_ia: predictedStatus,
-                    stock: result.stock_actual.toString(),
-                    disponibilidad: newDisponibilidad,
-                };
-
-                // ✅ Actualizamos el estado antes de navegar
-                setEstadoIA(predictedStatus);
-                setFormData(updatedForm);
-
-                // ✅ Esperamos un ciclo para asegurar que React actualice el estado
-                await new Promise((resolve) => setTimeout(resolve, 0));
-
-                // ✅ Luego navegamos
-                history.push("/tabs/registro/ia", { formData: updatedForm });
+                setEstadoIA(estadoDetectado);
+                setStatusText("✅ Datos procesados y almacenados correctamente.");
+                setShowModalSuccess(true);
             } else {
-                const errorMsg = result.message || "Error desconocido en el servidor.";
-                throw new Error(`Error en el servicio de IA/DB: ${errorMsg}`);
+                throw new Error(result.message || "Error en el servidor IA");
             }
         } catch (error: any) {
-            console.error("❌ Error en la comunicación con el Backend:", error);
-            setStatusText(`❌ Error fatal: ${error.message}`);
-            alert(
-                `No se pudo guardar la información. Verifique la conexión con el servidor. Detalle: ${error.message}`
-            );
-        } finally {
-            setLoading(false);
-            setShowLoadingOverlay(false);
+            console.error("❌ Error en el backend:", error);
+            alert(`❌ Error al procesar el producto: ${error.message}`);
+            setStatusText("Ocurrió un error al guardar el producto.");
         }
     };
 
-    const tomarFoto = async () => {
-        if (!isServiceReady || loading) return;
-
-        try {
-            setLoading(true);
-            setStatusText("1. Abriendo cámara...");
-
-            const foto = await Camera.getPhoto({
-                quality: 85,
-                allowEditing: false,
-                resultType: CameraResultType.Base64,
-                source: CameraSource.Camera,
-                direction: CameraDirection.Rear,
-            });
-
-            if (foto.base64String) {
-                const base64Image = foto.base64String;
-                const imageUrl = `data:image/jpeg;base64,${base64Image}`;
-
-                // ✅ Esperar correctamente las dimensiones
-                const { width, height } = await getImageDimensionsFromBase64(base64Image);
-
-                setImage(imageUrl);
-                setEstadoIA(null);
-                setStatusText("1. Foto capturada, procesando...");
-
-                // ✅ Esperamos a que termine todo el proceso antes de continuar
-                await callBackendAPIAndSave(base64Image, width, height);
-            } else {
-                alert("No se pudo capturar la imagen.");
-            }
-        } catch (e) {
-            console.warn("📷 Cámara cancelada o error:", e);
-            setStatusText("Listo para tomar la foto.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const continuar = () => {
-        history.push("/tabs/registro/ia", { formData: formData });
+    const handleVolver = () => {
+        setShowModalSuccess(false);
+        history.push("/tabs/registro"); // Regresa al formulario vacío
     };
 
     return (
@@ -221,19 +180,7 @@ const IAImage: React.FC = () => {
                     </p>
                 </IonText>
 
-                <IonText color={isServiceReady ? "success" : "warning"}>
-                    <p style={{ textAlign: "center" }}>
-                        {isServiceReady
-                            ? "✅ Servicio de IA listo"
-                            : "❌ Conexión al servicio de IA fallida."}
-                    </p>
-                </IonText>
-
-                <IonButton
-                    expand="block"
-                    onClick={tomarFoto}
-                    disabled={loading || !isServiceReady}
-                >
+                <IonButton expand="block" onClick={tomarFoto} disabled={loading}>
                     📸 Tomar Foto y Analizar
                 </IonButton>
 
@@ -248,62 +195,55 @@ const IAImage: React.FC = () => {
                 </p>
 
                 {image && (
-                    <>
-                        <IonImg
-                            src={image}
-                            alt="Foto del producto"
-                            style={{
-                                marginTop: "1rem",
-                                borderRadius: "8px",
-                                border:
-                                    estadoIA === null
-                                        ? "3px solid gray"
-                                        : estadoIA === "nuevo"
-                                        ? "3px solid green"
-                                        : estadoIA === "usado"
-                                        ? "3px solid orange"
-                                        : "3px solid red",
-                            }}
-                        />
-
-                        {estadoIA ? (
-                            <div style={{ marginTop: "1rem" }}>
-                                <IonText color="success">
-                                    <h2 style={{ textAlign: "center" }}>
-                                        Estado detectado: {estadoIA.toUpperCase()}
-                                    </h2>
-                                </IonText>
-                                <IonButton
-                                    color="success"
-                                    expand="block"
-                                    onClick={continuar}
-                                    disabled={loading}
-                                >
-                                    ✅ Continuar
-                                </IonButton>
-                            </div>
-                        ) : (
-                            <IonText color="primary">
-                                <p
-                                    style={{
-                                        textAlign: "center",
-                                        marginTop: "1rem",
-                                    }}
-                                >
-                                    {loading
-                                        ? "Analizando imagen en el servidor..."
-                                        : "Imagen lista."}
-                                </p>
-                            </IonText>
-                        )}
-                    </>
+                    <IonImg
+                        src={image}
+                        alt="Foto del producto"
+                        style={{
+                            marginTop: "1rem",
+                            borderRadius: "8px",
+                            border: estadoIA ? "3px solid green" : "3px solid gray",
+                        }}
+                    />
                 )}
 
-                <IonLoading
-                    isOpen={showLoadingOverlay}
-                    message={statusText}
-                    duration={0}
-                />
+                <IonLoading isOpen={loading} message={"Procesando..."} duration={0} />
+
+                {/* ✅ Modal de éxito con cierre automático a los 7 segundos */}
+                <IonModal isOpen={showModalSuccess} backdropDismiss={false}>
+                    <div
+                        style={{
+                            textAlign: "center",
+                            padding: "2rem",
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            justifyContent: "center",
+                        }}
+                    >
+                        <IonIcon
+                            icon={checkmarkCircleOutline}
+                            color="success"
+                            style={{ fontSize: "4rem", marginBottom: "1rem" }}
+                        />
+                        <IonText color="success">
+                            <h2>Producto registrado correctamente</h2>
+                            <p style={{ color: "#333", marginTop: "0.5rem" }}>
+                                El estado, stock y disponibilidad fueron actualizados con éxito.
+                            </p>
+                            <p style={{ color: "#888", marginTop: "0.5rem" }}>
+                                (Se cerrará automáticamente en 7 segundos)
+                            </p>
+                        </IonText>
+                        <IonButton
+                            color="success"
+                            expand="block"
+                            style={{ marginTop: "1.5rem" }}
+                            onClick={handleVolver}
+                        >
+                            Volver ahora
+                        </IonButton>
+                    </div>
+                </IonModal>
             </IonContent>
         </IonPage>
     );
