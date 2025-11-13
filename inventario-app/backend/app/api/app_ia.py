@@ -22,10 +22,11 @@ supabase: Union[Client, None] = None
 try:
     from credenciales import SUPABASE_URL, SUPABASE_ANON_KEY
     supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
-    print("[INIT] Supabase conectado correctamente.")
+    print("[INIT] ✅ Supabase conectado correctamente.")
 except Exception as e:
-    print(f"[ERROR INIT] No se pudo inicializar Supabase: {e}")
+    print(f"[ERROR INIT] ❌ No se pudo inicializar Supabase: {e}")
     supabase = None
+
 
 # --- 3. FUNCIONES AUXILIARES ---
 def get_labels(path):
@@ -34,11 +35,13 @@ def get_labels(path):
             return [line.strip() for line in f.readlines()]
     return None
 
+
 def preprocess_image(image_data: bytes, target_size=IMG_SIZE):
     img = image.load_img(BytesIO(image_data), target_size=target_size)
     img_array = image.img_to_array(img)
     img_array = np.expand_dims(img_array, axis=0)
     return tf.keras.applications.mobilenet_v2.preprocess_input(img_array).astype(np.float32)
+
 
 def get_disponibilidad(cantidad: int) -> str:
     if cantidad <= 0:
@@ -48,6 +51,7 @@ def get_disponibilidad(cantidad: int) -> str:
     if cantidad <= 10:
         return "Disponibilidad media"
     return "Alta disponibilidad"
+
 
 # --- 4. PREDICCIÓN CON IA ---
 def predict_from_bytes(model_path, image_data: bytes, labels_path, threshold):
@@ -85,8 +89,9 @@ def predict_from_bytes(model_path, image_data: bytes, labels_path, threshold):
         'confidence_score': f"{confidence * 100:.2f}%",
     }
 
+
 # --- 5. REGISTRO EN SUPABASE ---
-async def registrar_producto_y_imagen(
+def registrar_producto_y_imagen(
     image_base64: str,
     codigo_barras: str,
     nombre: Optional[str] = None,
@@ -96,15 +101,19 @@ async def registrar_producto_y_imagen(
     compatibilidad: Optional[str] = None,
     observaciones: Optional[str] = None,
 ):
-    print(f"[START] Procesando producto: {codigo_barras}")
+    print(f"[START] 🚀 Procesando producto con código: {codigo_barras}")
     current_time = datetime.now().isoformat()
 
     if supabase is None:
         return {'status': 'error', 'message': 'Supabase no está inicializado.'}
 
+    if not codigo_barras:
+        return {'status': 'error', 'message': 'El código de barras es obligatorio.'}
+
     # --- 1️⃣ Decodificar imagen ---
     try:
         image_bytes = base64.b64decode(image_base64)
+        print("[IMG] ✅ Imagen decodificada correctamente.")
     except Exception as e:
         return {'status': 'error', 'message': f"Error al decodificar imagen: {e}"}
 
@@ -114,17 +123,17 @@ async def registrar_producto_y_imagen(
         return prediction
 
     estado_producto = prediction['predicted_label'].lower()
-    print(f"[IA] Estado IA: {estado_producto}")
+    print(f"[IA] 🧠 Estado IA detectado: {estado_producto}")
 
     # --- 3️⃣ Subir imagen al bucket 'imagenes' ---
     file_name = f"{uuid.uuid4()}.jpeg"
     try:
         supabase.storage.from_("imagenes").upload(
-            file=image_bytes,
-            path=file_name,
-            file_options={"content-type": "image/jpeg"},
+            file_name,
+            image_bytes,
+            {"content-type": "image/jpeg"}
         )
-        print(f"[STORAGE] Imagen subida correctamente: imagenes/{file_name}")
+        print(f"[STORAGE] ✅ Imagen subida correctamente: imagenes/{file_name}")
     except Exception as e:
         return {'status': 'error', 'message': f"Error al subir imagen: {e}"}
 
@@ -136,12 +145,14 @@ async def registrar_producto_y_imagen(
         return {'status': 'error', 'message': f"Error al consultar producto: {e}"}
 
     stock_nuevo = 1
+    producto_id = None
+
     if data:
         # Producto existente → actualizar stock
         producto_id = data['id']
         stock_actual = int(data.get('stock', 0))
         stock_nuevo = stock_actual + 1
-        print(f"[DB] Producto existente. Nuevo stock: {stock_nuevo}")
+        print(f"[DB] 🟡 Producto existente. Nuevo stock: {stock_nuevo}")
 
         update_data = {
             'stock': stock_nuevo,
@@ -149,10 +160,14 @@ async def registrar_producto_y_imagen(
             'estado': estado_producto,
             'updated_at': current_time,
         }
-        supabase.table('productos').update(update_data).eq('id', producto_id).execute()
+        try:
+            supabase.table('productos').update(update_data).eq('id', producto_id).execute()
+            print("[DB] ✅ Producto actualizado correctamente.")
+        except Exception as e:
+            return {'status': 'error', 'message': f"Error al actualizar producto: {e}"}
     else:
         # Producto nuevo → insertar
-        print("[DB] Insertando producto nuevo...")
+        print("[DB] 🆕 Insertando producto nuevo...")
         insert_data = {
             'codigo_barras': codigo_barras,
             'nombre': nombre or 'Producto sin nombre',
@@ -168,14 +183,21 @@ async def registrar_producto_y_imagen(
             'created_at': current_time,
             'updated_at': current_time,
         }
-        response = supabase.table('productos').insert(insert_data).execute()
-        producto_id = response.data[0]['id']
+        try:
+            response = supabase.table('productos').insert(insert_data).execute()
+            if not response.data:
+                raise Exception("Inserción sin datos devueltos.")
+            producto_id = response.data[0]['id']
+            print("[DB] ✅ Producto insertado correctamente.")
+        except Exception as e:
+            return {'status': 'error', 'message': f"Error al insertar producto: {e}"}
 
     # --- ✅ Resultado final ---
+    print(f"[END] ✅ Producto procesado correctamente. ID: {producto_id}")
     return {
         'status': 'success',
         'message': 'Producto registrado correctamente.',
         'producto_id': producto_id,
-        'estado': estado_producto,
-        'stock': stock_nuevo,
+        'estado_clasificado': estado_producto,
+        'stock_actual': stock_nuevo,
     }

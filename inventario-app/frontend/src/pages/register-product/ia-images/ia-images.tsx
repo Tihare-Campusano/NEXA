@@ -21,7 +21,6 @@ import { checkmarkCircleOutline } from "ionicons/icons";
 const API_CLASSIFY_URL =
     "https://inventario-ia-api-887072391939.us-central1.run.app/api/clasificar-producto";
 
-// --- Interfaces ---
 interface FormData {
     codigo: string;
     nombre: string;
@@ -42,23 +41,6 @@ interface BackendResponse {
     stock_actual?: number;
 }
 
-// --- Utilidades ---
-const getImageDimensionsFromBase64 = (
-    base64String: string
-): Promise<{ width: number; height: number }> => {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => {
-            resolve({
-                width: img.naturalWidth || img.width,
-                height: img.naturalHeight || img.height,
-            });
-        };
-        img.onerror = () => reject(new Error("No se pudo obtener las dimensiones de la imagen."));
-        img.src = `data:image/jpeg;base64,${base64String}`;
-    });
-};
-
 const calcularDisponibilidad = (cantidad: number): string => {
     if (cantidad <= 0) return "Sin stock";
     if (cantidad <= 4) return "Baja disponibilidad";
@@ -66,7 +48,6 @@ const calcularDisponibilidad = (cantidad: number): string => {
     return "Alta disponibilidad";
 };
 
-// --- Componente Principal ---
 const IAImage: React.FC = () => {
     const history = useHistory();
     const location = useLocation();
@@ -84,9 +65,7 @@ const IAImage: React.FC = () => {
     useEffect(() => {
         let timer: ReturnType<typeof setTimeout>;
         if (showModalSuccess) {
-            timer = setTimeout(() => {
-                handleVolver();
-            }, 7000);
+            timer = setTimeout(() => handleVolver(), 7000);
         }
         return () => clearTimeout(timer);
     }, [showModalSuccess]);
@@ -111,8 +90,6 @@ const IAImage: React.FC = () => {
             }
 
             const base64Image = foto.base64String;
-            const { width, height } = await getImageDimensionsFromBase64(base64Image);
-
             setImage(`data:image/jpeg;base64,${base64Image}`);
             setStatusText("Analizando imagen con IA...");
 
@@ -138,6 +115,8 @@ const IAImage: React.FC = () => {
                 observaciones: formData.observaciones,
             };
 
+            console.log("📦 Enviando datos a IA API:", requestData);
+
             const response = await fetch(API_CLASSIFY_URL, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -145,9 +124,11 @@ const IAImage: React.FC = () => {
             });
 
             const result: BackendResponse = await response.json();
+            console.log("🔁 Respuesta del backend:", result);
 
             if (response.ok && result.status === "success") {
-                const estadoDetectado = result.estado_clasificado?.toLowerCase() || "desconocido";
+                const estadoDetectado =
+                    result.estado_clasificado?.toLowerCase() || "desconocido";
                 const nuevoStock = result.stock_actual || 0;
                 const nuevaDisponibilidad = calcularDisponibilidad(nuevoStock);
 
@@ -166,7 +147,7 @@ const IAImage: React.FC = () => {
 
     const handleVolver = () => {
         setShowModalSuccess(false);
-        history.push("/tabs/registro"); // Regresa al formulario vacío
+        history.push("/tabs/registro");
     };
 
     return (
@@ -206,7 +187,6 @@ const IAImage: React.FC = () => {
 
                 <IonLoading isOpen={loading} message={"Procesando..."} duration={0} />
 
-                {/* ✅ Modal de éxito con cierre automático a los 7 segundos */}
                 <IonModal isOpen={showModalSuccess} backdropDismiss={false}>
                     <div
                         style={{
