@@ -14,18 +14,15 @@ const HeaderApp: React.FC<HeaderAppProps> = ({
 }) => (
   <IonHeader>
     <IonToolbar className="app-header">
-      <div
-        className="app-header-content"
-        style={{ justifyContent: "space-between", width: "100%" }}
-      >
-        {/* Lado izquierdo: icono y título */}
-        <div style={{ display: "flex", alignItems: "center" }}>
+      <div className="app-header-content">
+        {/* Centro: icono y título */}
+        <div className="app-header-left">
           {icon && <span className="app-header-icon">{icon}</span>}
           <h1 className="app-header-title">{title}</h1>
         </div>
 
-        {/* Lado derecho: botón para cambiar tema */}
-        <div>
+        {/* Derecha: botón tema */}
+        <div className="app-header-right">
           <ThemeToggle />
         </div>
       </div>
