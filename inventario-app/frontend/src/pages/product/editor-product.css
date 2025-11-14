@@ -1,146 +1,299 @@
+/* Contenedor principal */
 .editor-container {
     padding: 1rem;
+    display: flex;
+    justify-content: center;
 }
 
+/* Card principal */
 .editor-producto-card {
     background: #fff;
-    padding: 1.5rem 2rem;
-    border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
-    margin: 5px auto;
-    max-width: 750px;
+    padding: 1.2rem;
+    border-radius: 10px;
+    box-shadow: 0 8px 28px rgba(17, 24, 39, 0.06);
+    margin: 12px;
+    width: 100%;
+    max-width: 980px;
 }
 
-.editor-body {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.9rem 1.4rem;
+/* Nuevo layout superior: imagen + header */
+.top-row {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    margin-bottom: 14px;
 }
 
-/* importante: permitir que los items del grid colapsen si el contenido es muy largo */
-.editor-body p {
-    margin: 0;
-    font-size: 0.95rem;
-    color: #333;
-    padding: 0.55rem 0.75rem;
-    border-radius: 4px;
-    background: #fafafa;
-    border: 1px solid #eee;
-    transition: background 0.2s;
-    min-width: 0;
-    /* <-- evita que el contenido fuerce overflow del grid */
-    overflow-wrap: anywhere;
-    /* <- para romper palabras largas */
-    word-break: break-word;
+/* Wrap para la imagen */
+.image-wrap {
+    min-width: 160px;
+    max-width: 220px;
+    width: 32%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.editor-body p:hover {
-    background: #f5f7fa;
+/* Imagen del producto */
+.product-image {
+    width: 100%;
+    height: auto;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid #e6e6e6;
+    box-shadow: 0 6px 18px rgba(2, 6, 23, 0.06);
 }
 
-.editor-body strong {
-    color: #111;
-    font-weight: 600;
-    display: block;
+/* Header info (título, código, meta) */
+.header-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Back icon arriba */
+.back-icon {
+    color: #374151;
+    cursor: pointer;
+    font-size: 20px;
     margin-bottom: 6px;
 }
 
-/* Inputs / textarea ocupan todo el ancho de su celda */
+/* Título del producto */
+.product-title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+/* fila del codigo y metadatos */
+.barcode-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* caja del codigo de barras */
+.barcode-box {
+    background: #f8fafc;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid #e6eef7;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+/* valor del codigo */
+.barcode-value {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.barcode-label {
+    font-size: 0.82rem;
+    color: #374151;
+    font-weight: 600;
+    margin-right: 6px;
+}
+
+/* boton copiar */
+.copy-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: #374151;
+    padding: 6px;
+    border-radius: 6px;
+}
+
+.copy-btn:hover {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+/* badge copiado */
+.copied-badge {
+    font-size: 0.78rem;
+    color: #10b981;
+    font-weight: 600;
+    margin-left: 6px;
+}
+
+/* metadata adicional */
+.meta-row {
+    display: flex;
+    gap: 12px;
+    color: #374151;
+    font-size: 0.9rem;
+    margin-left: 6px;
+    align-items: center;
+}
+
+/* Editor body: dos columnas responsive */
+.editor-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 16px;
+    margin-top: 12px;
+}
+
+/* field label */
+.field-label {
+    display: block;
+    margin-top: 10px;
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 6px;
+}
+
+/* Inputs y textarea */
 .editor-body input,
 .editor-body textarea {
-    border: none;
-    background: transparent;
-    border-bottom: 1px solid #ccc;
-    outline: none;
+    border: 1px solid #e6e6e6;
+    padding: 8px 10px;
+    border-radius: 8px;
     width: 100%;
-    font-size: 0.95rem;
-    padding: 6px 2px;
-    resize: vertical;
     box-sizing: border-box;
+    font-size: 0.95rem;
+    background: #fff;
+    outline: none;
 }
 
-/* Mostrar tooltip con texto completo al pasar el mouse */
-.editor-body input[title],
-.editor-body textarea[title] {
-    cursor: text;
-}
-
-/* textarea visual */
 .editor-body textarea {
-    min-height: 64px;
-    white-space: pre-wrap;
+    min-height: 84px;
+    resize: vertical;
 }
 
-/* estados */
+/* Activo / inactivo */
 .activo {
-    color: #28a745;
-    font-weight: bold;
+    color: #16a34a;
+    font-weight: 700;
 }
 
 .inactivo {
     color: #dc3545;
-    font-weight: bold;
+    font-weight: 700;
 }
 
-/* acciones centradas */
+/* Acciones */
 .editor-actions {
-    margin-top: 1.5rem;
+    margin-top: 16px;
     display: flex;
-    justify-content: center;
-    /* CENTRAR botones */
-    gap: 1rem;
+    gap: 12px;
+    justify-content: flex-end;
 }
 
 /* botones */
 .btn-guardar {
-    padding: 0.6rem 1.2rem;
+    padding: 0.6rem 1.1rem;
     background: linear-gradient(135deg, #28a745, #218838);
     color: #fff;
     border: none;
     border-radius: 8px;
     cursor: pointer;
-    transition: transform 0.2s ease, background 0.3s ease;
     font-weight: 600;
 }
 
 .btn-guardar[disabled] {
-    opacity: 0.55;
+    opacity: 0.6;
     cursor: not-allowed;
-    transform: none;
-}
-
-.btn-guardar:hover:enabled {
-    transform: scale(1.03);
-    background: linear-gradient(135deg, #218838, #1e7e34);
 }
 
 .btn-volver {
-    padding: 0.6rem 1.2rem;
-    background: linear-gradient(135deg, #007bff, #0056b3);
+    padding: 0.5rem 0.9rem;
+    background: linear-gradient(135deg, #ef4444, #dc2626);
     color: #fff;
+    border-radius: 8px;
     border: none;
-    border-radius: 10px;
     cursor: pointer;
-    transition: transform 0.2s ease, background 0.3s ease;
-    font-weight: 500;
 }
 
-.btn-volver:hover {
-    transform: scale(1.03);
-    background: linear-gradient(135deg, #0056b3, #004099);
+/* Modal overlay */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1200;
 }
 
-.titulo-centrado {
-    text-align: center;
-    font-size: 1.5rem;
-    color: #333;
-    font-weight: 600;
+/* modal card */
+.modal-card {
+    width: 92%;
+    max-width: 420px;
+    background: #0b1220;
+    color: #ffffff;
+    border-radius: 12px;
+    padding: 16px;
+    position: relative;
 }
 
-/* loader simple, único */
+/* modal close */
+.modal-close {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 18px;
+}
+
+/* modal input */
+.modal-input {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #333333;
+    background: #111111;
+    color: #fff;
+    box-sizing: border-box;
+}
+
+/* title modal */
+.modal-title {
+    color: #fff;
+    margin: 8px 0 12px 0;
+}
+
+/* Loader */
 .loading-container {
     text-align: center;
     margin-top: 2rem;
     font-size: 1.05rem;
     color: #444;
+}
+
+/* Responsive adjustments */
+@media (max-width: 720px) {
+    .top-row {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .image-wrap {
+        width: 100%;
+        max-width: 320px;
+    }
+
+    .header-info {
+        width: 100%;
+        text-align: center;
+        align-items: center;
+    }
+
+    .meta-row {
+        justify-content: center;
+        margin-left: 0;
+    }
+
+    .editor-body {
+        grid-template-columns: 1fr;
+    }
 }
