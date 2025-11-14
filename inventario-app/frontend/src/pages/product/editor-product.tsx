@@ -77,7 +77,7 @@ export default function EditorProducto() {
         const encoded = encodeURIComponent(filename);
         const base = import.meta.env.VITE_SUPABASE_URL as string;
         // URL pública estándar de Supabase storage
-        return `${base}/storage/v1/object/public/images/${encoded}`;
+        return `${base}/storage/v1/object/public/imageness/${encoded}`;
     };
 
     useEffect(() => {
@@ -204,7 +204,7 @@ export default function EditorProducto() {
             `<svg xmlns='http://www.w3.org/2000/svg' width='600' height='400' viewBox='0 0 600 400'>
         <rect width='100%' height='100%' fill='#f3f4f6'/>
         <text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='#9ca3af' font-size='20'>No hay imagen</text>
-      </svg>`
+        </svg>`
         );
 
     // Imagen URL calculada
