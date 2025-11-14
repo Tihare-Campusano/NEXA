@@ -1,7 +1,8 @@
 # /backend/app/api/api_server.py
+import asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Optional
 
 from api.app_ia import registrar_producto_y_imagen
@@ -23,12 +24,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- MODELO LIMPIO ---
+# --- MODELO (limpio, acepta extras) ---
 class ClassificationRequest(BaseModel):
     image_base64: str
     codigo_barras: str
 
-    # Datos opcionales del formulario
     nombre: Optional[str] = None
     marca: Optional[str] = None
     modelo: Optional[str] = None
@@ -37,14 +37,18 @@ class ClassificationRequest(BaseModel):
     observaciones: Optional[str] = None
 
     class Config:
-        extra = "ignore"   # Ignora cualquier campo basura que llegue
+        extra = "allow"   # permitimos campos extras (no rompe si frontend envía más)
 
 # --- ENDPOINT ---
 @app.post("/api/clasificar-producto")
 async def classify_product_endpoint(request: ClassificationRequest):
+    # Opcional: log de lo que llega (útil para debugear)
+    print("[API] Request recibido:", request.model_dump(exclude_none=True))
 
     try:
-        result = await registrar_producto_y_imagen(
+        # Ejecutar la función síncrona en un thread para no bloquear el event-loop
+        result = await asyncio.to_thread(
+            registrar_producto_y_imagen,
             request.image_base64,
             request.codigo_barras,
             request.nombre,
@@ -54,12 +58,14 @@ async def classify_product_endpoint(request: ClassificationRequest):
             request.compatibilidad,
             request.observaciones,
         )
-
     except Exception as e:
-        print("Error backend:", e)
+        print("[API ERROR] Excepción al procesar IA/DB:", repr(e))
+        # Devolvemos detalle para la consola; el frontend verá 500 y el texto
         raise HTTPException(status_code=500, detail=f"Error interno del servidor IA: {e}")
 
-    if result.get("status") == "error":
+    # Si la función devolvió un objeto de error (estatus 'error'), lo transformamos a 400
+    if isinstance(result, dict) and result.get("status") == "error":
+        print("[API] Resultado de app_ia con status=error:", result.get("message"))
         raise HTTPException(status_code=400, detail=result.get("message"))
 
     return result
