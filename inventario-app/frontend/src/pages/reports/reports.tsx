@@ -89,6 +89,8 @@ export default function Reportes() {
         {/* --- Gráficos (Dashboard) --- */}
         <StockChart />
         <br />
+        <br />
+        <br />
         <EstadoProductosChart />
 
         {/* 👇 3. MODAL (con la clase CSS para el estilo) */}
