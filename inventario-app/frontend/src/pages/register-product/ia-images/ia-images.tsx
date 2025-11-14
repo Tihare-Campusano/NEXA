@@ -104,9 +104,15 @@ const IAImage: React.FC = () => {
 
     const callBackendAPI = async (imageBase64: string) => {
         try {
+            // ⛔ Corrección 1: Validar código antes de enviar
+            if (!formData.codigo) {
+                alert("Debes ingresar un código de barras antes de usar la IA.");
+                return;
+            }
+
             const requestData = {
                 image_base64: imageBase64,
-                codigo_barras: formData.codigo,
+                codigo_barras: formData.codigo, // ⬅ correcto
                 nombre: formData.nombre,
                 marca: formData.marca,
                 modelo: formData.modelo,
@@ -123,10 +129,17 @@ const IAImage: React.FC = () => {
                 body: JSON.stringify(requestData),
             });
 
+            // ⛔ Corrección 2: validar ANTES de usar response.json()
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error("❌ Respuesta no OK:", errorText);
+                throw new Error("Error en el servidor IA: " + errorText);
+            }
+
             const result: BackendResponse = await response.json();
             console.log("🔁 Respuesta del backend:", result);
 
-            if (response.ok && result.status === "success") {
+            if (result.status === "success") {
                 const estadoDetectado =
                     result.estado_clasificado?.toLowerCase() || "desconocido";
                 const nuevoStock = result.stock_actual || 0;

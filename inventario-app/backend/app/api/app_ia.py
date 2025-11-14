@@ -9,26 +9,29 @@ import base64
 import uuid
 from typing import Optional, Union
 
-# --- 1. CONFIGURACIÓN ---
+# ------------------------------
+# CONFIG
+# ------------------------------
 IMG_SIZE = (224, 224)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(BASE_DIR, "modelo_ia")
 MODEL_PATH = os.path.join(MODEL_DIR, "modelo_final_v3.tflite")
 LABELS_PATH = os.path.join(MODEL_DIR, "labels.txt")
-CONFIDENCE_THRESHOLD = 0.50  # Umbral mínimo de confianza
+CONFIDENCE_THRESHOLD = 0.50
 
-# --- 2. CONEXIÓN SUPABASE ---
 supabase: Union[Client, None] = None
 try:
     from credenciales import SUPABASE_URL, SUPABASE_ANON_KEY
     supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
-    print("[INIT] ✅ Supabase conectado correctamente.")
+    print("[INIT] Supabase listo.")
 except Exception as e:
-    print(f"[ERROR INIT] ❌ No se pudo inicializar Supabase: {e}")
+    print(f"[ERROR INIT] Supabase no inicializado: {e}")
     supabase = None
 
 
-# --- 3. FUNCIONES AUXILIARES ---
+# ------------------------------
+# UTILS
+# ------------------------------
 def get_labels(path):
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
@@ -53,22 +56,21 @@ def get_disponibilidad(cantidad: int) -> str:
     return "Alta disponibilidad"
 
 
-# --- 4. PREDICCIÓN CON IA ---
+# ------------------------------
+# IA PREDICTION
+# ------------------------------
 def predict_from_bytes(model_path, image_data: bytes, labels_path, threshold):
     if not os.path.exists(model_path):
-        return {'status': 'error', 'message': f'Modelo no encontrado en: {model_path}'}
+        return {'status': 'error', 'message': f'Modelo no encontrado: {model_path}'}
 
-    try:
-        interpreter = tf.lite.Interpreter(model_path=model_path)
-        interpreter.allocate_tensors()
-    except Exception as e:
-        return {'status': 'error', 'message': f"Error al cargar modelo: {e}"}
+    interpreter = tf.lite.Interpreter(model_path=model_path)
+    interpreter.allocate_tensors()
 
+    input_tensor = preprocess_image(image_data)
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
 
-    processed_image = preprocess_image(image_data)
-    interpreter.set_tensor(input_details[0]['index'], processed_image)
+    interpreter.set_tensor(input_details[0]['index'], input_tensor)
     interpreter.invoke()
 
     output_data = interpreter.get_tensor(output_details[0]['index'])
@@ -80,17 +82,20 @@ def predict_from_bytes(model_path, image_data: bytes, labels_path, threshold):
 
     idx = np.argmax(probabilities)
     confidence = probabilities[idx]
+
     label = labels[idx] if confidence >= threshold else "INCIERTO"
 
     return {
         'status': 'success',
         'predicted_label': label,
         'confidence': float(confidence),
-        'confidence_score': f"{confidence * 100:.2f}%",
+        'confidence_score': f"{confidence * 100:.2f}%"
     }
 
 
-# --- 5. REGISTRO EN SUPABASE ---
+# ------------------------------
+# REGISTRO PRODUCTO
+# ------------------------------
 def registrar_producto_y_imagen(
     image_base64: str,
     codigo_barras: str,
@@ -101,103 +106,125 @@ def registrar_producto_y_imagen(
     compatibilidad: Optional[str] = None,
     observaciones: Optional[str] = None,
 ):
-    print(f"[START] 🚀 Procesando producto con código: {codigo_barras}")
+    print(f"[START] Procesando código: {codigo_barras}")
     current_time = datetime.now().isoformat()
 
     if supabase is None:
-        return {'status': 'error', 'message': 'Supabase no está inicializado.'}
+        return {'status': 'error', 'message': 'Supabase no inicializado.'}
 
     if not codigo_barras:
         return {'status': 'error', 'message': 'El código de barras es obligatorio.'}
 
-    # --- 1️⃣ Decodificar imagen ---
+    # --------------------------------
+    # 1) Decodificar imagen
+    # --------------------------------
     try:
         image_bytes = base64.b64decode(image_base64)
-        print("[IMG] ✅ Imagen decodificada correctamente.")
     except Exception as e:
-        return {'status': 'error', 'message': f"Error al decodificar imagen: {e}"}
+        return {'status': 'error', 'message': f"Error decodificar imagen: {e}"}
 
-    # --- 2️⃣ Clasificación IA ---
+    # --------------------------------
+    # 2) Clasificación IA
+    # --------------------------------
     prediction = predict_from_bytes(MODEL_PATH, image_bytes, LABELS_PATH, CONFIDENCE_THRESHOLD)
+
     if prediction['status'] == 'error':
         return prediction
 
-    estado_producto = prediction['predicted_label'].lower()
-    print(f"[IA] 🧠 Estado IA detectado: {estado_producto}")
+    estado_ia = prediction['predicted_label'].lower()
 
-    # --- 3️⃣ Subir imagen al bucket 'imagenes' ---
+    # --------------------------------
+    # 3) Subir imagen al bucket
+    # --------------------------------
     file_name = f"{uuid.uuid4()}.jpeg"
     try:
         supabase.storage.from_("imagenes").upload(
-            file_name,
-            image_bytes,
-            {"content-type": "image/jpeg"}
+            file_name, image_bytes, {"content-type": "image/jpeg"}
         )
-        print(f"[STORAGE] ✅ Imagen subida correctamente: imagenes/{file_name}")
     except Exception as e:
-        return {'status': 'error', 'message': f"Error al subir imagen: {e}"}
+        return {'status': 'error', 'message': f"Error subiendo imagen: {e}"}
 
-    # --- 4️⃣ Buscar o crear producto ---
+    # --------------------------------
+    # 4) Buscar por código de barras
+    # --------------------------------
     try:
-        existing = supabase.table('productos').select('*').eq('codigo_barras', codigo_barras).maybe_single().execute()
-        data = existing.data if existing and hasattr(existing, "data") else None
+        result = supabase.table("productos").select("*").eq("codigo_barras", codigo_barras).maybe_single().execute()
+        producto = result.data
     except Exception as e:
-        return {'status': 'error', 'message': f"Error al consultar producto: {e}"}
+        return {'status': 'error', 'message': f"Error buscando producto: {e}"}
 
-    stock_nuevo = 1
-    producto_id = None
+    # Si existe por código → actualizar stock
+    if producto:
+        stock_nuevo = producto["stock"] + 1
+        supabase.table("productos").update({
+            "stock": stock_nuevo,
+            "disponibilidad": get_disponibilidad(stock_nuevo),
+            "estado": estado_ia,
+            "updated_at": current_time
+        }).eq("id", producto["id"]).execute()
 
-    if data:
-        # Producto existente → actualizar stock
-        producto_id = data['id']
-        stock_actual = int(data.get('stock', 0))
-        stock_nuevo = stock_actual + 1
-        print(f"[DB] 🟡 Producto existente. Nuevo stock: {stock_nuevo}")
-
-        update_data = {
-            'stock': stock_nuevo,
-            'disponibilidad': get_disponibilidad(stock_nuevo),
-            'estado': estado_producto,
-            'updated_at': current_time,
+        return {
+            "status": "success",
+            "message": "Stock actualizado por coincidencia código barras.",
+            "producto_id": producto["id"],
+            "estado_clasificado": estado_ia,
+            "stock_actual": stock_nuevo
         }
-        try:
-            supabase.table('productos').update(update_data).eq('id', producto_id).execute()
-            print("[DB] ✅ Producto actualizado correctamente.")
-        except Exception as e:
-            return {'status': 'error', 'message': f"Error al actualizar producto: {e}"}
-    else:
-        # Producto nuevo → insertar
-        print("[DB] 🆕 Insertando producto nuevo...")
-        insert_data = {
-            'codigo_barras': codigo_barras,
-            'nombre': nombre or 'Producto sin nombre',
-            'marca': marca or 'Desconocida',
-            'modelo': modelo or 'N/A',
-            'compatibilidad': compatibilidad,
-            'categoria_id': int(categoria_id) if categoria_id and str(categoria_id).isdigit() else None,
-            'activo': True,
-            'observaciones': observaciones,
-            'stock': stock_nuevo,
-            'estado': estado_producto,
-            'disponibilidad': get_disponibilidad(stock_nuevo),
-            'created_at': current_time,
-            'updated_at': current_time,
-        }
-        try:
-            response = supabase.table('productos').insert(insert_data).execute()
-            if not response.data:
-                raise Exception("Inserción sin datos devueltos.")
-            producto_id = response.data[0]['id']
-            print("[DB] ✅ Producto insertado correctamente.")
-        except Exception as e:
-            return {'status': 'error', 'message': f"Error al insertar producto: {e}"}
 
-    # --- ✅ Resultado final ---
-    print(f"[END] ✅ Producto procesado correctamente. ID: {producto_id}")
+    # --------------------------------
+    # 5) Buscar coincidencia nombre/marca/modelo
+    # --------------------------------
+    try:
+        result2 = supabase.table("productos").select("*").match({
+            "nombre": nombre,
+            "marca": marca,
+            "modelo": modelo
+        }).maybe_single().execute()
+
+        producto2 = result2.data
+    except:
+        producto2 = None
+
+    # Si coincide → aumentar stock
+    if producto2:
+        stock_nuevo = producto2["stock"] + 1
+        supabase.table("productos").update({
+            "stock": stock_nuevo,
+            "disponibilidad": get_disponibilidad(stock_nuevo),
+            "estado": estado_ia,
+            "updated_at": current_time
+        }).eq("id", producto2["id"]).execute()
+
+        return {
+            "status": "success",
+            "message": "Stock actualizado por coincidencia nombre/marca/modelo.",
+            "producto_id": producto2["id"],
+            "estado_clasificado": estado_ia,
+            "stock_actual": stock_nuevo
+        }
+
+    # --------------------------------
+    # 6) Registrar producto nuevo
+    # --------------------------------
+    nuevo = supabase.table("productos").insert({
+        "codigo_barras": codigo_barras,
+        "nombre": nombre,
+        "marca": marca,
+        "modelo": modelo,
+        "compatibilidad": compatibilidad,
+        "categoria_id": int(categoria_id) if categoria_id and categoria_id.isdigit() else None,
+        "observaciones": observaciones,
+        "stock": 1,
+        "estado": estado_ia,
+        "disponibilidad": get_disponibilidad(1),
+        "created_at": current_time,
+        "updated_at": current_time,
+    }).execute()
+
     return {
-        'status': 'success',
-        'message': 'Producto registrado correctamente.',
-        'producto_id': producto_id,
-        'estado_clasificado': estado_producto,
-        'stock_actual': stock_nuevo,
+        "status": "success",
+        "message": "Producto nuevo registrado.",
+        "producto_id": nuevo.data[0]["id"],
+        "estado_clasificado": estado_ia,
+        "stock_actual": 1
     }
