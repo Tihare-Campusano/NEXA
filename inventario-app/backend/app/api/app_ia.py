@@ -94,7 +94,7 @@ def predict_from_bytes(model_path, image_data: bytes, labels_path, threshold):
 
 
 # ------------------------------
-# REGISTRO PRODUCTO
+# FUNCIÓN PRINCIPAL
 # ------------------------------
 def registrar_producto_y_imagen(
     image_base64: str,
@@ -115,45 +115,53 @@ def registrar_producto_y_imagen(
     if not codigo_barras:
         return {'status': 'error', 'message': 'El código de barras es obligatorio.'}
 
-    # --------------------------------
+    # ------------------------------
     # 1) Decodificar imagen
-    # --------------------------------
+    # ------------------------------
     try:
         image_bytes = base64.b64decode(image_base64)
     except Exception as e:
-        return {'status': 'error', 'message': f"Error decodificar imagen: {e}"}
+        return {'status': 'error', 'message': f"Error decodificando imagen: {e}"}
 
-    # --------------------------------
+    # ------------------------------
     # 2) Clasificación IA
-    # --------------------------------
+    # ------------------------------
     prediction = predict_from_bytes(MODEL_PATH, image_bytes, LABELS_PATH, CONFIDENCE_THRESHOLD)
-
-    if prediction['status'] == 'error':
+    if prediction["status"] == "error":
         return prediction
 
-    estado_ia = prediction['predicted_label'].lower()
+    estado_ia = prediction["predicted_label"].lower()
 
-    # --------------------------------
-    # 3) Subir imagen al bucket
-    # --------------------------------
+    # ------------------------------
+    # 3) Subir imagen al Storage
+    # ------------------------------
     file_name = f"{uuid.uuid4()}.jpeg"
     try:
         supabase.storage.from_("imagenes").upload(
-            file_name, image_bytes, {"content-type": "image/jpeg"}
+            file_name,
+            image_bytes,
+            {"content-type": "image/jpeg"}
         )
     except Exception as e:
         return {'status': 'error', 'message': f"Error subiendo imagen: {e}"}
 
-    # --------------------------------
-    # 4) Buscar por código de barras
-    # --------------------------------
+    # ------------------------------
+    # 4) Buscar por código de barras (corregido)
+    # ------------------------------
     try:
-        result = supabase.table("productos").select("*").eq("codigo_barras", codigo_barras).maybe_single().execute()
-        producto = result.data
+        result = (
+            supabase.table("productos")
+            .select("*")
+            .eq("codigo_barras", codigo_barras)
+            .maybe_single()
+            .execute()
+        )
     except Exception as e:
-        return {'status': 'error', 'message': f"Error buscando producto: {e}"}
+        return {"status": "error", "message": f"Error buscando producto por código: {e}"}
 
-    # Si existe por código → actualizar stock
+    producto = result.data if result and hasattr(result, "data") and isinstance(result.data, dict) else None
+
+    # Si existe → actualizar stock
     if producto:
         stock_nuevo = producto["stock"] + 1
         supabase.table("productos").update({
@@ -165,27 +173,31 @@ def registrar_producto_y_imagen(
 
         return {
             "status": "success",
-            "message": "Stock actualizado por coincidencia código barras.",
+            "message": "Stock actualizado (coincidencia código de barras).",
             "producto_id": producto["id"],
             "estado_clasificado": estado_ia,
             "stock_actual": stock_nuevo
         }
 
-    # --------------------------------
-    # 5) Buscar coincidencia nombre/marca/modelo
-    # --------------------------------
+    # ------------------------------
+    # 5) Buscar coincidencia nombre+marca+modelo
+    # ------------------------------
     try:
-        result2 = supabase.table("productos").select("*").match({
-            "nombre": nombre,
-            "marca": marca,
-            "modelo": modelo
-        }).maybe_single().execute()
-
-        producto2 = result2.data
-    except:
+        result2 = (
+            supabase.table("productos")
+            .select("*")
+            .match({
+                "nombre": nombre,
+                "marca": marca,
+                "modelo": modelo
+            })
+            .maybe_single()
+            .execute()
+        )
+        producto2 = result2.data if result2 and isinstance(result2.data, dict) else None
+    except Exception:
         producto2 = None
 
-    # Si coincide → aumentar stock
     if producto2:
         stock_nuevo = producto2["stock"] + 1
         supabase.table("productos").update({
@@ -197,22 +209,22 @@ def registrar_producto_y_imagen(
 
         return {
             "status": "success",
-            "message": "Stock actualizado por coincidencia nombre/marca/modelo.",
+            "message": "Stock actualizado (coincidencia nombre/marca/modelo).",
             "producto_id": producto2["id"],
             "estado_clasificado": estado_ia,
             "stock_actual": stock_nuevo
         }
 
-    # --------------------------------
+    # ------------------------------
     # 6) Registrar producto nuevo
-    # --------------------------------
+    # ------------------------------
     nuevo = supabase.table("productos").insert({
         "codigo_barras": codigo_barras,
         "nombre": nombre,
         "marca": marca,
         "modelo": modelo,
         "compatibilidad": compatibilidad,
-        "categoria_id": int(categoria_id) if categoria_id and categoria_id.isdigit() else None,
+        "categoria_id": int(categoria_id) if categoria_id and str(categoria_id).isdigit() else None,
         "observaciones": observaciones,
         "stock": 1,
         "estado": estado_ia,
