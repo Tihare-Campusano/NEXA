@@ -22,7 +22,7 @@ export default function Home() {
         <div style={{ padding: "1rem" }}>
           <ProductosSearch onResults={setProductosFiltrados} />
           <br />
-          <ProductosTable productos={productosFiltrados ?? undefined} />
+          <ProductosTable productos={productosFiltrados === null ? undefined : productosFiltrados} />
         </div>
       </IonContent>
     </IonPage>

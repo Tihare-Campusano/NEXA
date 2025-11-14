@@ -1,4 +1,4 @@
-/* Card exterior (sin línea verde) */
+/* Card exterior */
 .productos-card-outer {
     background: #fff;
     border-radius: 10px;
@@ -8,7 +8,7 @@
     box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.2);
 }
 
-/* Card interior (solo para encabezado con línea verde) */
+/* Card interior */
 .productos-card {
     background: #fff;
     border-radius: 8px;
@@ -22,8 +22,7 @@
     display: flex;
     align-items: center;
     padding: 16px 20px;
-    border-left: 4px solid #28a745; /* línea verde */
-    background: #fff;
+    border-left: 4px solid #28a745;
 }
 
 .productos-icon {
@@ -40,12 +39,12 @@
 
 /* Contenedor de tabla */
 .table-container {
-    max-height: 400px; /* o el alto que desees */
+    max-height: 400px;
     overflow-y: auto;
     border: 1px solid #ddd;
     border-radius: 8px;
     background: #fff;
-    position: relative; /* 🧩 necesario para que el thead sticky funcione bien */
+    position: relative;
 }
 
 /* Tabla */
@@ -55,16 +54,15 @@
     font-size: 16px;
 }
 
-/* 🔹 THEAD FIJO Y LIMPIO */
+/* Thead sticky */
 .table-container thead {
     position: sticky;
     top: 0;
-    background-color: #f8f9fa; /* Fondo sólido evita que se vean filas detrás */
-    z-index: 5; /* asegura que quede encima del tbody */
-    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.08); /* sombra suave para separarlo */
+    background-color: #f8f9fa;
+    z-index: 5;
+    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.08);
 }
 
-/* Encabezados de tabla */
 .table-container th {
     padding: 14px 12px;
     text-align: left;
@@ -81,34 +79,10 @@
     font-size: 15px;
 }
 
-/* Hover filas */
+/* Hover */
 .table-container tbody tr:hover {
     background: #f3f4f6;
     transition: background 0.2s;
-}
-
-/* Badges */
-.badge {
-    padding: 5px 12px;
-    border-radius: 12px;
-    font-size: 14px;
-    font-weight: 500;
-    display: inline-block;
-}
-
-.badge.disponible {
-    background: #d4f8d4;
-    color: #2d7a2d;
-}
-
-.badge.agotado {
-    background: #f8d4d4;
-    color: #7a2d2d;
-}
-
-.badge.na {
-    background: #e0e0e0;
-    color: #555;
 }
 
 /* Activo */

@@ -26,47 +26,58 @@ export default function ProductosTable({ productos: productosProp }: Props) {
     const [productos, setProductos] = useState<Producto[]>([]);
     const [loading, setLoading] = useState(true);
 
+    // 🔹 Formateador de fecha
+    function formatearFecha(fechaISO: string) {
+        const date = new Date(fechaISO);
+        return date.toLocaleDateString("es-CL", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+        }) + " " + date.toLocaleTimeString("es-CL", {
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+    }
+
     useEffect(() => {
-        // 🔹 Si recibimos productos desde props (ej: búsqueda), usamos esos
-        if (productosProp) {
+        // 👉 Si el componente recibió productos (de búsqueda)
+        if (productosProp !== undefined && productosProp !== null) {
             setProductos(productosProp);
             setLoading(false);
             return;
         }
 
-        // 🔹 Si no hay props, cargamos todos los productos desde Supabase
+        // 👉 Si productosProp es undefined → cargar desde Supabase
         const fetchProductos = async () => {
             setLoading(true);
 
             const { data, error } = await supabase
                 .from("productos")
                 .select(`
-                    id,
-                    nombre,
-                    activo,
-                    created_at,
-                    stock (
-                    cantidad,
-                    estado,
-                    disponibilidad,
-                    ultima_actualizacion
-                )
+                id,
+                nombre,
+                activo,
+                stock,
+                estado,
+                disponibilidad,
+                created_at
             `)
                 .order("id", { ascending: false });
 
             if (error) {
                 console.error("Error al cargar productos:", error.message);
             } else {
-                const productosConStock: Producto[] = data.map((p: any) => ({
+                const productosFormateados: Producto[] = data.map((p: any) => ({
                     id: p.id,
                     nombre: p.nombre,
                     activo: p.activo,
-                    stock: p.stock?.cantidad ?? 0,
-                    estado: p.stock?.estado ?? "N/A",
-                    disponibilidad: p.stock?.disponibilidad ?? "Baja",
-                    fecha: p.created_at ?? "-",
+                    stock: p.stock ?? 0,
+                    estado: p.estado ?? "N/A",
+                    disponibilidad: p.disponibilidad ?? "N/A",
+                    fecha: p.created_at ? formatearFecha(p.created_at) : "-",
                 }));
-                setProductos(productosConStock);
+
+                setProductos(productosFormateados);
             }
 
             setLoading(false);
@@ -74,15 +85,12 @@ export default function ProductosTable({ productos: productosProp }: Props) {
 
         fetchProductos();
     }, [productosProp]);
-
-    // 🔹 Mostrar mensaje de carga solo al inicio
     if (loading && productos.length === 0) {
         return <p>Cargando productos...</p>;
     }
 
     return (
         <div className="productos-card-outer">
-            {/* Card interna solo para el encabezado */}
             <div className="productos-card">
                 <div className="productos-header">
                     <span className="productos-icon">📦</span>
@@ -90,7 +98,6 @@ export default function ProductosTable({ productos: productosProp }: Props) {
                 </div>
             </div>
 
-            {/* Tabla */}
             <div className="table-container">
                 <table>
                     <thead>
@@ -119,10 +126,7 @@ export default function ProductosTable({ productos: productosProp }: Props) {
                             ))
                         ) : (
                             <tr>
-                                <td
-                                    colSpan={7}
-                                    style={{ textAlign: "center", padding: "10px" }}
-                                >
+                                <td colSpan={7} style={{ textAlign: "center", padding: "10px" }}>
                                     No hay productos
                                 </td>
                             </tr>
