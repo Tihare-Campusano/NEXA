@@ -135,9 +135,12 @@ def registrar_producto_y_imagen(
     # ------------------------------
     # 3) Subir imagen al Storage
     # ------------------------------
+    # 3) Subir imagen al Storage + obtener URL pública
     file_name = f"{uuid.uuid4()}.jpeg"
+    bucket = supabase.storage.from_("imagenes")
+
     try:
-        supabase.storage.from_("imagenes").upload(
+        bucket.upload(
             file_name,
             image_bytes,
             {"content-type": "image/jpeg"}
@@ -145,6 +148,12 @@ def registrar_producto_y_imagen(
     except Exception as e:
         return {'status': 'error', 'message': f"Error subiendo imagen: {e}"}
 
+    # Obtener URL pública
+    try:
+        public_url = bucket.get_public_url(file_name)
+    except Exception as e:
+        return {"status": "error", "message": f"Error obteniendo URL pública: {e}"}
+    
     # ------------------------------
     # 4) Buscar por código de barras (corregido)
     # ------------------------------
@@ -168,7 +177,8 @@ def registrar_producto_y_imagen(
             "stock": stock_nuevo,
             "disponibilidad": get_disponibilidad(stock_nuevo),
             "estado": estado_ia,
-            "updated_at": current_time
+            "updated_at": current_time,
+            "imagen_url": public_url
         }).eq("id", producto["id"]).execute()
 
         return {
@@ -204,7 +214,8 @@ def registrar_producto_y_imagen(
             "stock": stock_nuevo,
             "disponibilidad": get_disponibilidad(stock_nuevo),
             "estado": estado_ia,
-            "updated_at": current_time
+            "updated_at": current_time,
+            "imagen_url": public_url
         }).eq("id", producto2["id"]).execute()
 
         return {
@@ -231,6 +242,7 @@ def registrar_producto_y_imagen(
         "disponibilidad": get_disponibilidad(1),
         "created_at": current_time,
         "updated_at": current_time,
+        "imagen_url": public_url
     }).execute()
 
     return {
@@ -238,5 +250,6 @@ def registrar_producto_y_imagen(
         "message": "Producto nuevo registrado.",
         "producto_id": nuevo.data[0]["id"],
         "estado_clasificado": estado_ia,
-        "stock_actual": 1
+        "stock_actual": 1,
+        "imagen_url": public_url
     }
