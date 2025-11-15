@@ -134,12 +134,18 @@ const Login: React.FC = () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: window.location.origin + '/tabs/home' },
+        options: {
+          // Importante: mandamos al callback, NO directo al home
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
-      if (error) toast(error.message);
+
+      if (error) {
+        toast(error.message);
+        setIsLoading(false); // solo llega acá si hubo error y no redirigió
+      }
     } catch (err: any) {
       toast(err?.message ?? 'Error con Google');
-    } finally {
       setIsLoading(false);
     }
   };
@@ -172,7 +178,7 @@ const Login: React.FC = () => {
             className="google-button"
           >
             <IonIcon icon={logoGoogle} slot="start" />
-            Continuar con Google
+            Iniciar sesión con Google
           </IonButton>
         </div>
       </IonContent>
