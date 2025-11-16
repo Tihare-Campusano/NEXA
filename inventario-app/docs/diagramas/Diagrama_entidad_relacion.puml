@@ -21,6 +21,13 @@ entity Producto {
     sku: text
     nombre: text
     categoria_id: int <<FK>>
+    stock_minimo: numeric
+    observaciones: text
+    activo: bool
+    estado: text
+    disponibilidad: text
+    stock: int
+    imagen_url: text
 }
 
 entity Categoria {
@@ -28,18 +35,6 @@ entity Categoria {
     nombre: text
     parent_id: int <<FK>>
     activo: bool
-}
-
-entity Imagen {
-    *id: int <<PK>>
-    producto_id: int <<FK>>
-    storage_path: text
-    hash_archivo: text
-    ancho: int
-    alto: int
-    tomado_en: timestamp
-    tomado_por: uuid <<FK>>
-    notas: text
 }
 
 entity Movimiento {
@@ -55,14 +50,8 @@ entity Movimiento {
     updated_at: timestamp
 }
 
-entity Stock {
-    *producto_id: int <<PK, FK>>
-    cantidad: int
-}
-
 entity Inspeccion {
     *id: int <<PK>>
-    imagen_id: int <<FK>>
     producto_id: int <<FK>>
     modelo_id: int <<FK>>
     etiqueta: text
@@ -82,12 +71,9 @@ entity ModeloIA {
 
 ' Relaciones
 Usuario ||--o{ Movimiento : realiza
-Producto ||--o{ Imagen : tiene
-Producto ||--|| Stock : posee
 Producto }o--|| Categoria : pertenece
 Producto ||--o{ Movimiento : genera
 Producto ||--o{ Inspeccion : verifica
-Imagen ||--o{ Inspeccion : contiene
 ModeloIA ||--o{ Inspeccion : utiliza
 
 @enduml

@@ -1,57 +1,82 @@
-@startuml Arquitectura_IA
-title 🌐 Arquitectura de la IA - Clasificación de Productos (MobileNetV2)
-left to right direction
-skinparam node {
-    BackgroundColor White
-    BorderColor Black
-    FontColor Black
+@startuml Arquitectura_Inferencia_NEXA
+title <size:24>🚀 Arquitectura de Inferencia de IA en Producción</size>
+skinparam shadowing true
+skinparam dpi 150
+
+' --- Estilos ---
+skinparam actorStyle awesome
+skinparam component {
+    BackgroundColor #F7F9F9
+    BorderColor #2C3E50
+    FontColor #2C3E50
+    RoundCorner 10
+}
+skinparam cloud {
+    BackgroundColor #D4E6F1
+    BorderColor #3498DB
+    FontColor #3498DB
+    Shadowing true
 }
 skinparam database {
-    BackgroundColor LightBlue
-    BorderColor Black
-    FontColor Black
+    BackgroundColor #FDEBD0
+    BorderColor #E67E22
+    FontColor #E67E22
 }
-skinparam folder {
-    BackgroundColor LightYellow
-    BorderColor Black
-    FontColor Black
+skinparam node {
+    BackgroundColor #EAF2F8
+    BorderColor #5DADE2
+    FontColor #5DADE2
+    RoundCorner 15
 }
-skinparam actorStyle awesome
 
+' --- Actores y Frontend ---
 actor "👤 Usuario" as user
+component "📱 App Móvil (Ionic React)" as frontend #FCF3CF
 
-folder "📂 Dataset" as dataset {
-    [Nuevo]
-    [Usado]
-    [Mal estado]
+' =========================================================
+' 1. ENTORNO DE DESPLIEGUE (LA NUBE)
+' =========================================================
+
+cloud "☁️ Google Cloud Run (Servicio REST)" as gcr_env {
+    node "Punto de Acceso Público" as endpoint
+    note right of endpoint: URL HTTPS\nEscalamiento a Cero
 }
 
-node "⚙️ Entrenamiento" as entrenamiento {
-    [Preprocesamiento\n(ImageDataGenerator)]
-    [MobileNetV2\n(Base preentrenada)]
-    [Capas Personalizadas\n(Dense, GAP, Softmax)]
-    [Entrenamiento + Fine-tuning]
+' =========================================================
+' 2. BACKEND Y LÓGICA CORE (Contenedor Docker)
+' =========================================================
+
+node "📦 Contenedor Docker" as docker_env #D5F5E3 {
+    note top: **inventario-ia-api:v1**\n(Base: tiangolo/uvicorn-gunicorn-fastapi)
+    
+    component "💻 API (FastAPI)" as api #EAFAF1
+    component "🧠 Modelo TFLite" as model #FFF3E0
 }
 
-database "💾 Modelo entrenado" as modelo {
-    [modelo_IA.h5]
-    [modelo_IA.tflite]
+database "💾 Base de Datos" as db {
+    [Supabase]
 }
 
-node "📱 App Móvil\n(Ionic React)" as app {
-    [Clasificador de imágenes]
-}
+' =========================================================
+' 3. FLUJO DE INFERENCIA (Relaciones)
+' =========================================================
 
-' --- Relaciones ---
-user --> [Clasificador de imágenes] : 📸 Sube foto
-[Clasificador de imágenes] --> [modelo_IA.tflite] : 🔎 Predicción local (TFLite)
+' A. Solicitud
+user --> frontend : 📸 Enviar Imagen
+frontend --> endpoint : 🌐 Petición de Inferencia (REST)
 
-[modelo_IA.h5] --> [modelo_IA.tflite] : 🔄 Conversión a TensorFlow Lite
+' B. Ejecución en la Nube
+endpoint --> api : 🚀 Inicia Contenedor
+api --> model : 🔎 Carga y Predice
+api --> db : 🔗 Guarda/Consulta Datos
 
-dataset --> [Preprocesamiento\n(ImageDataGenerator)] : 🔧 Limpieza / Augmentation
-[Preprocesamiento\n(ImageDataGenerator)] --> [MobileNetV2\n(Base preentrenada)]
-[MobileNetV2\n(Base preentrenada)] --> [Capas Personalizadas\n(Dense, GAP, Softmax)]
-[Capas Personalizadas\n(Dense, GAP, Softmax)] --> [Entrenamiento + Fine-tuning]
-[Entrenamiento + Fine-tuning] --> [modelo_IA.h5] : ✅ Modelo resultante
+' C. Respuesta
+api --> endpoint : Respuesta de Clasificación
+endpoint --> frontend : Respuesta JSON
+frontend --> user : Muestra Resultado
+
+' Flujo Lógico interno del contenedor (para orden)
+api -[hidden]right-> model
+api -[hidden]right-> db
 
 @enduml
