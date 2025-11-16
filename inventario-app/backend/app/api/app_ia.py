@@ -178,7 +178,7 @@ def registrar_producto_y_imagen(
             "disponibilidad": get_disponibilidad(stock_nuevo),
             "estado": estado_ia,
             "updated_at": current_time,
-            # "imagen_url": public_url
+            "imagen_url": public_url
         }).eq("id", producto["id"]).execute()
 
         return {
@@ -215,7 +215,7 @@ def registrar_producto_y_imagen(
             "disponibilidad": get_disponibilidad(stock_nuevo),
             "estado": estado_ia,
             "updated_at": current_time,
-            # "imagen_url": public_url
+            "imagen_url": public_url
         }).eq("id", producto2["id"]).execute()
 
         return {
@@ -242,7 +242,7 @@ def registrar_producto_y_imagen(
         "disponibilidad": get_disponibilidad(1),
         "created_at": current_time,
         "updated_at": current_time,
-        # "imagen_url": public_url
+        "imagen_url": public_url
     }).execute()
 
     return {
@@ -251,5 +251,5 @@ def registrar_producto_y_imagen(
         "producto_id": nuevo.data[0]["id"],
         "estado_clasificado": estado_ia,
         "stock_actual": 1,
-        # "imagen_url": public_url
+        "imagen_url": public_url
     }
