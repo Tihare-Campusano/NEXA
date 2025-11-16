@@ -1,0 +1,18 @@
+# Carpetas y archivos de Python
+**/__pycache__
+*.pyc
+.pytest_cache
+venv
+*/venv_ia_311/
+
+# Carpetas y archivos de Node.js (Frontend)
+node_modules
+package-lock.json
+
+# Carpetas de desarrollo y configuración de IDE
+.git
+.gitignore
+.vscode/
+
+# Ignorar archivos del backend que no son necesarios para el servidor final
+# backend/requirements.txt # Ya lo copiaste

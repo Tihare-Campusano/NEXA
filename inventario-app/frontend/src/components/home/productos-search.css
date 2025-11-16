@@ -1,27 +1,27 @@
 :root {
     --color-primary: #28a745;
-    /* verde */
     --color-secondary: #ffffff;
-    /* blanco */
     --color-text-primary: #212529;
     --color-text-secondary: #6c757d;
     --color-background: #f8f9fa;
     --color-danger: #dc3545;
 }
 
-/* Caja de búsqueda */
+/* 🔹 Caja del buscador */
 .search-box {
     display: flex;
     align-items: center;
-    background: var(--color-background);
+    background: var(--color-secondary);
     border: 1px solid #dee2e6;
     border-radius: 12px;
     padding: 0.5rem 0.75rem;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
     transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+
+    /* 🔸 Ahora ocupa todo el ancho */
     width: 100%;
-    max-width: 400px;
-    position: relative;
+    max-width: none;
+    box-sizing: border-box;
 }
 
 .search-box:focus-within {

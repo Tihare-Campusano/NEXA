@@ -1,0 +1,17 @@
+{
+    "status": "success",
+    "predicted_label": "mal_estado",
+    "confidence_score": "95.21%",
+    "threshold_met": true,
+    "detail": "Predicción exitosa (Confianza >= 80%).",
+    "all_scores": {
+        "mal_estado": "95.21%",
+        "nuevo": "1.27%",
+        "usado": "3.52%"
+    },
+    "top3_predictions": {
+        "mal_estado": "95.21%",
+        "usado": "3.52%",
+        "nuevo": "1.27%"
+    }
+}

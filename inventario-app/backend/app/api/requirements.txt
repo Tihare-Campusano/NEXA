@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+gunicorn
+tensorflow-cpu==2.16.1
+numpy
+supabase-py

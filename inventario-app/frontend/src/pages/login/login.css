@@ -1,0 +1,117 @@
+/* Importa la fuente 'Inter' (*/
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+/* Estilos para la página de Login */
+.login-page-content {
+    /* Usamos 'Inter' o la fuente del sistema */
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+
+    /* Centramos todo el contenido */
+    --padding-start: 1.5rem;
+    --padding-end: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    height: 100%;
+}
+
+.login-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    max-width: 400px;
+    /* Límite para pantallas grandes */
+    width: 100%;
+    margin: 0 auto;
+}
+
+/* 1. El Logo */
+.login-logo {
+    max-width: 150px;
+    /* Ajusta el tamaño de tu logo */
+    height: auto;
+    margin: 0 auto 1rem auto;
+    margin-top: 10px;
+}
+
+/* 2. El Título "Bienvenido" */
+.login-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: var(--ion-color-dark-shade, #333);
+}
+
+.login-subtitle {
+    font-size: 1rem;
+    color: var(--ion-color-medium-shade);
+    margin-bottom: 2.5rem;
+    /* Más espacio antes del formulario */
+}
+
+
+/* En tu archivo: pages/login/login.css */
+
+.login-input-item {
+    --background: #000;
+    /* 👈 1. Fondo negro */
+    --color: #fff;
+    /* 👈 2. Texto que escribes, en blanco */
+    --placeholder-color: #fff;
+    /* 👈 3. Texto del placeholder, en blanco */
+    --border-radius: 10px;
+    --padding-start: 1rem;
+    --padding-end: 1rem;
+    --border-width: 0px;
+    --highlight-height: 0;
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.login-input-item ion-icon {
+    margin-right: 0.5rem;
+    color: #fff;
+    /* 👈 4. Iconos en blanco */
+}
+
+/* 4. Botones */
+.login-button {
+    --border-radius: 10px;
+    --box-shadow: 0 6px 20px rgba(var(--ion-color-primary-rgb), 0.4);
+    font-weight: 600;
+    height: 48px;
+    margin-top: 1rem;
+}
+
+.google-button {
+    --border-radius: 10px;
+    --border-color: #e0e0e0;
+    --color: var(--ion-color-dark-shade);
+    font-weight: 600;
+    height: 48px;
+}
+
+/* 5. Separador "o" */
+.separator {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    color: var(--ion-color-medium-shade);
+    margin: 1.5rem 0;
+}
+
+.separator::before,
+.separator::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.separator:not(:empty)::before {
+    margin-right: .5em;
+}
+
+.separator:not(:empty)::after {
+    margin-left: .5em;
+}

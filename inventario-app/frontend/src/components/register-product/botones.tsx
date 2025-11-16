@@ -1,6 +1,6 @@
 import { IonButton } from "@ionic/react";
 import { useHistory } from "react-router-dom";
-import "./Botones.css";
+import "./botones.css";
 
 const Botones: React.FC = () => {
     const history = useHistory();
@@ -8,25 +8,18 @@ const Botones: React.FC = () => {
     return (
         <div className="botones-container">
             <IonButton
-                color="primary"
-                expand="block"
-                onClick={() => history.push("/registro")}
-            >
-                Registro manual
-            </IonButton>
-            <IonButton
                 color="secondary"
                 expand="block"
-                onClick={() => history.push("/registro/pistola")}
+                onClick={() => history.push("/tabs/registro/pistola")}
             >
-                Registro con pistola
+                Registro con Pistola
             </IonButton>
             <IonButton
                 color="tertiary"
                 expand="block"
-                onClick={() => history.push("/registro/camera")}
+                onClick={() => history.push("/tabs/registro/camera")}
             >
-                Registro con cámara
+                Registro con Cámara
             </IonButton>
         </div>
     );

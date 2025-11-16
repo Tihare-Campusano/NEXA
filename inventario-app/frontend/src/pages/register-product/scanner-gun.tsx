@@ -1,11 +1,9 @@
-import { IonPage, IonContent, IonButton } from "@ionic/react";
+import { IonPage, IonContent } from "@ionic/react";
 import HeaderApp from "../../components/header_app";
-import { FaClipboard, FaBarcode, FaCamera } from "react-icons/fa";
-import { useHistory } from "react-router-dom";
+import { FaClipboard } from "react-icons/fa";
 import Botones from "../../components/register-product/botones";
 
 export default function RegistroPistola() {
-    const history = useHistory();
 
     return (
         <IonPage>

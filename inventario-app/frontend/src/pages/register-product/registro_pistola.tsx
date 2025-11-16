@@ -1,65 +1,88 @@
-import { IonPage, IonContent, IonButton, IonInput, IonLabel, IonItem } from "@ionic/react";
+import { IonPage, IonContent, IonText } from "@ionic/react";
 import HeaderApp from "../../components/header_app";
-import { useState } from "react";
-import { FaBarcode } from "react-icons/fa";
 import { supabase } from "../../supabaseClient";
+import { useEffect, useRef, useState } from "react";
+import { Capacitor } from "@capacitor/core";
+import { Haptics, ImpactStyle } from "@capacitor/haptics";
 
 export default function RegistroPistola() {
   const [codigo, setCodigo] = useState("");
-  const [mensaje, setMensaje] = useState("");
+  const [mensaje, setMensaje] = useState("Escanee un código...");
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Cuando el usuario escanee o escriba el código
-  const handleScan = async (e: any) => {
-    const valor = e.detail?.value || e.target.value;
-    setCodigo(valor);
+  useEffect(() => {
+    if (inputRef.current) inputRef.current.focus();
 
-    // Si el código tiene longitud suficiente (por ejemplo 8 o más caracteres)
-    if (valor.length > 7) {
-      setMensaje("Buscando producto...");
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Enter") {
+        procesarCodigo(codigo);
+        setCodigo("");
+        return;
+      }
 
-      const { data, error } = await supabase
-        .from("productos")
-        .select("*")
-        .eq("codigo_barras", valor)
-        .single();
+      // Acumula caracteres enviados por la pistola
+      if (e.key.length === 1) {
+        setCodigo((prev) => prev + e.key);
+      }
+    };
 
-      if (error) {
-        setMensaje("❌ No se encontró el producto en la base de datos.");
-      } else {
-        setMensaje(`✅ Producto encontrado: ${data.nombre} (${data.marca})`);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [codigo]);
+
+  const procesarCodigo = async (valor: string) => {
+    if (!valor) return;
+
+    setMensaje("Buscando producto...");
+
+    const { data, error } = await supabase
+      .from("productos")
+      .select("*")
+      .eq("codigo_barras", valor)
+      .single();
+
+    if (error) {
+      setMensaje("❌ No se encontró el producto");
+    } else {
+      setMensaje(`✅ ${data.nombre} (${data.marca})`);
+
+      // Vibración al leer correctamente ✅
+      if (Capacitor.isNativePlatform()) {
+        await Haptics.impact({ style: ImpactStyle.Medium });
       }
     }
-  };
 
-  const limpiar = () => {
-    setCodigo("");
-    setMensaje("");
+    // Asegurar que el input siga en foco tras cada lectura
+    inputRef.current?.focus();
   };
 
   return (
     <IonPage>
-      <HeaderApp icon={<FaBarcode size={28} className="text-blue-400" />} title="Registro con Pistola" />
-      <IonContent>
-        <div style={{ padding: "1rem" }}>
-          <IonItem>
-            <IonLabel position="stacked">Escanea un código de barras</IonLabel>
-            <IonInput
-              autofocus
-              value={codigo}
-              onIonChange={handleScan}
-              placeholder="Apunta con la pistola aquí..."
-            />
-          </IonItem>
+      <HeaderApp title="Registro Pistola USB" />
+      <IonContent
+        className="ion-padding"
+        onClick={() => inputRef.current?.focus()}
+      >
+        {/* Campo oculto para mantener foco del lector */}
+        <input
+          ref={inputRef}
+          autoFocus
+          style={{
+            position: "absolute",
+            opacity: 0,
+            height: 0,
+            width: 0,
+          }}
+        />
 
-          <p style={{ marginTop: "1rem", textAlign: "center" }}>{mensaje}</p>
-
-          <div style={{ textAlign: "center", marginTop: "1rem" }}>
-            <IonButton onClick={limpiar} color="medium">
-              Limpiar
-            </IonButton>
-          </div>
-        </div>
+        <IonText>
+          <h2 style={{ textAlign: "center" }}>{mensaje}</h2>
+        </IonText>
       </IonContent>
     </IonPage>
   );
 }
+

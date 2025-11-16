@@ -1,29 +1,108 @@
 :root {
-    /* Colores principales */
-    --ion-color-primary: #28a745;
-    /* Verde principal */
-    --ion-color-primary-rgb: 40, 167, 69;
-    --ion-color-primary-contrast: #ffffff;
-    --ion-color-primary-contrast-rgb: 255, 255, 255;
-    --ion-color-primary-shade: #218838;
-    --ion-color-primary-tint: #34c759;
+  /* Colores principales */
+  --ion-color-primary: #28a745; /* Verde principal */
+  --ion-color-primary-rgb: 40, 167, 69;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: #218838;
+  --ion-color-primary-tint: #34c759;
 
-    /* Secundario */
-    --ion-color-secondary: #ffffff;
-    --ion-color-secondary-contrast: #000000;
+  /* Secundario */
+  --ion-color-secondary: #ffffff;
+  --ion-color-secondary-contrast: #000000;
 
-    /* Texto */
-    --color-text-primary: #212529;
-    --color-text-secondary: #6c757d;
+  /* Texto */
+  --color-text-primary: #656d75;
+  --color-text-secondary: #6c757d;
 
-    /* Fondo */
-    --color-background: #f8f9fa;
+  /* Fondo */
+  --color-background: #f8f9fa;
 
-    /* Danger (acciones críticas) */
-    --ion-color-danger: #dc3545;
-    --ion-color-danger-contrast: #ffffff;
+  /* Danger */
+  --ion-color-danger: #dc3545;
+  --ion-color-danger-contrast: #ffffff;
 
-    /* Grises */
-    --ion-color-medium: #adb5bd;
-    --ion-color-light: #e9ecef;
+  /* Grises */
+  --ion-color-medium: #adb5bd;
+  --ion-color-light: #e9ecef;
+
+  /* ✅ Definir explícitamente el tema CLARO para Ionic */
+  --ion-background-color: #ffffff;             /* fondo por defecto en claro */
+  --ion-background-color-rgb: 255, 255, 255;
+  --ion-text-color: #000;                    /* texto por defecto en claro */
+  --ion-text-color-rgb: 0, 0, 0;
+
+  /* Si usas cards/toolbar en claro y quieres asegurar tonos */
+  --ion-item-background: #ffffff;
+  --ion-toolbar-background: #ffffff;
+  --ion-card-background: #ffffff;
+
+  /* Google btn en claro */
+  --google-btn-text-color: #000;
+  --google-btn-bg: #fff;
+}
+
+/* ✅ Tema oscuro (UNA sola vez) */
+body.dark {
+  --ion-background-color: #0f1115;
+  --ion-background-color-rgb: 15, 17, 21;
+
+  --ion-text-color: #ffffff;
+  --ion-text-color-rgb: 255, 255, 255;
+
+  --ion-color-step-50: #1b1e24;
+  --ion-color-step-100: #21252b;
+  --ion-color-step-150: #262b32;
+  --ion-color-step-200: #2c3139;
+  --ion-color-step-250: #313740;
+  --ion-color-step-300: #373d47;
+  --ion-color-step-350: #3c434e;
+  --ion-color-step-400: #424955;
+  --ion-color-step-450: #474f5c;
+  --ion-color-step-500: #4d5563;
+
+  /* Tarjetas, toolbars, inputs en oscuro */
+  --ion-item-background: #141821;
+  --ion-toolbar-background: #141821;
+  --ion-card-background: #141821;
+
+  /* Google btn en oscuro */
+  --google-btn-text-color: #fff;
+  --google-btn-bg: #202124;
+}
+
+/* Fondo base del documento: usa el del tema activo */
+html, body, ion-app, ion-content {
+  color: var(--ion-text-color) !important;
+}
+
+/* Fondo coherente con el tema (ya lo tienes, lo dejamos) */
+html, body {
+  background-color: var(--ion-background-color, #000);
+}
+
+/* Inputs: texto y placeholder con el tema */
+ion-input {
+  --color: var(--ion-text-color);
+  --placeholder-color: rgba(var(--ion-text-color-rgb), 0.6);
+}
+
+/* Botones: asegura contraste (ajusta si tienes clases propias) */
+ion-button {
+  --color: var(--ion-text-color);
+}
+
+/* Botón de Google (asegúrate de poner esta clase en tu botón real) */
+.google-button {
+  color: var(--google-btn-text-color) !important;
+  background-color: var(--google-btn-bg) !important;
+  border: 1px solid rgba(0,0,0,0.12);
+}
+body.dark .google-button {
+  border-color: #5f6368;
+}
+
+/* (Opcional) Evitar parpadeo entre páginas */
+ion-page {
+  background: var(--ion-background-color) !important;
 }

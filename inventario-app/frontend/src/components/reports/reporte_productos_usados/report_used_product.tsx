@@ -1,17 +1,23 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
-  IonPage,
   IonHeader,
   IonToolbar,
   IonTitle,
   IonContent,
+  IonButtons,
+  IonButton,
+  IonText,
 } from "@ionic/react";
-import "./report_used_product.css";
+import { supabase } from "../../../supabaseClient";
+
 import jsPDF from "jspdf";
-// @ts-ignore
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
-import { supabase } from "../../../supabaseClient";
+import { Filesystem, Directory } from "@capacitor/filesystem";
+import { Capacitor } from "@capacitor/core";
+import { FileOpener } from "@capacitor-community/file-opener";
+import { Toast } from "@capacitor/toast";
+import "./report_used_product.css";
 
 interface Producto {
   codigo: string;
@@ -21,125 +27,178 @@ interface Producto {
   categoria: string;
 }
 
-const ReportUsedProduct: React.FC = () => {
-  const [productos, setProductos] = useState<Producto[]>([]);
+interface ReportUsedProductProps {
+  onDidDismiss: () => void;
+}
 
-  useEffect(() => {
-    const fetchProductos = async () => {
-      const { data, error } = await supabase
-        .from("productos")
-        .select(`
-          id,
-          sku,
-          nombre,
-          marca,
-          modelo,
-          estado,
-          stock:stock(stock_actual)
-        `)
-        .eq("estado", "Usado");
-
-      if (error) {
-        console.error("Error al obtener productos:", error.message);
-      } else if (data) {
-        const mapped = data.map((p: any) => ({
-          codigo: p.sku,
-          nombre: p.nombre,
-          cantidad: p.stock?.stock_actual || 0,
-          estado: p.estado || "Desconocido",
-          categoria: p.marca || "General",
-        }));
-        setProductos(mapped);
-      }
-    };
-
-    fetchProductos();
-  }, []);
-
-  const exportarPDF = () => {
-    const doc = new jsPDF();
-    doc.text("Reporte de Productos Usados", 14, 15);
-
-    autoTable(doc, {
-      startY: 20,
-      head: [["Código", "Nombre", "Cantidad", "Estado", "Categoría"]],
-      body: productos.map((p) => [
-        p.codigo,
-        p.nombre,
-        p.cantidad,
-        p.estado,
-        p.categoria,
-      ]),
-    });
-
-    const finalY = (doc as any).lastAutoTable?.finalY || 30;
-    doc.text(
-      `Este reporte muestra todos los productos clasificados como "Usados".
-Se recomienda utilizarlos primero antes que los productos nuevos.`,
-      14,
-      finalY + 10
-    );
-
-    doc.save("reporte_productos_usados.pdf");
+const ReportUsedProduct: React.FC<ReportUsedProductProps> = ({ onDidDismiss }) => {
+  const mostrarNotificacion = async (mensaje: string) => {
+    await Toast.show({ text: mensaje, duration: "long" });
   };
 
-  const exportarExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(productos);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Productos Usados");
-    XLSX.writeFile(wb, "reporte_productos_usados.xlsx");
+  const solicitarPermisoDescarga = async (): Promise<boolean> => {
+    if (Capacitor.getPlatform() === "android") {
+      try {
+        const check = await Filesystem.checkPermissions();
+        if (check.publicStorage !== "granted") {
+          const request = await Filesystem.requestPermissions();
+          if (request.publicStorage !== "granted") {
+            mostrarNotificacion("Se requiere permiso de almacenamiento.");
+            return false;
+          }
+        }
+      } catch (err) {
+        console.error("Error permisos:", err);
+        mostrarNotificacion("Error obteniendo permisos");
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const fetchProductos = async (): Promise<Producto[]> => {
+    const { data, error } = await supabase
+      .from("productos")
+      .select(`
+        sku,
+        nombre,
+        estado,
+        categoria:categorias(nombre),
+        stock:stock(stock_actual)
+      `)
+      .eq("estado", "Usado");
+
+    if (error) {
+      console.error("Error al obtener productos:", error.message);
+      throw error;
+    }
+
+    return (data ?? []).map((p: any) => ({
+      codigo: p.sku,
+      nombre: p.nombre,
+      cantidad: p.stock?.stock_actual ?? 0,
+      estado: p.estado || "Desconocido",
+      categoria: p.categoria?.nombre || "Sin categoría",
+    }));
+  };
+
+  const guardarEnDispositivo = async (
+    fileName: string,
+    base64Data: string,
+    mimeType: string
+  ) => {
+    try {
+      const savedFile = await Filesystem.writeFile({
+        path: fileName,
+        data: base64Data,
+        directory: Directory.Documents,
+        recursive: true,
+      });
+
+      await FileOpener.open({
+        filePath: savedFile.uri,
+        contentType: mimeType,
+      });
+    } catch (e) {
+      console.error("Error al guardar archivo", e);
+      mostrarNotificacion("Archivo guardado en Documentos");
+    }
+  };
+
+  const exportarPDF = async () => {
+    const permitido = await solicitarPermisoDescarga();
+    if (!permitido) return;
+    mostrarNotificacion("Generando PDF...");
+
+    try {
+      const productos = await fetchProductos();
+      const doc = new jsPDF();
+      doc.text("Reporte de Productos Usados", 14, 15);
+
+      autoTable(doc, {
+        startY: 20,
+        head: [["Código", "Nombre", "Cantidad", "Estado", "Categoría"]],
+        body: productos.map((p) => [
+          p.codigo,
+          p.nombre,
+          p.cantidad,
+          p.estado,
+          p.categoria,
+        ]),
+      });
+
+      const base64Data = doc.output("datauristring").split(",")[1];
+      const timestamp = Date.now();
+
+      await guardarEnDispositivo(
+        `reporte_productos_usados_${timestamp}.pdf`,
+        base64Data,
+        "application/pdf"
+      );
+
+      mostrarNotificacion("PDF listo ✅");
+    } catch (error) {
+      console.error("Error PDF:", error);
+      mostrarNotificacion("Error al generar PDF ❌");
+    }
+  };
+
+  const exportarExcel = async () => {
+    const permitido = await solicitarPermisoDescarga();
+    if (!permitido) return;
+    mostrarNotificacion("Generando Excel...");
+
+    try {
+      const productos = await fetchProductos();
+      const ws = XLSX.utils.json_to_sheet(productos);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Usados");
+
+      const base64Data = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
+      const timestamp = Date.now();
+
+      await guardarEnDispositivo(
+        `reporte_productos_usados_${timestamp}.xlsx`,
+        base64Data,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+
+      mostrarNotificacion("Excel listo ✅");
+    } catch (error) {
+      console.error("Error Excel:", error);
+      mostrarNotificacion("Error al generar Excel ❌");
+    }
   };
 
   return (
-    <IonPage>
+    <>
       <IonHeader>
         <IonToolbar>
-          <IonTitle>Reporte de Productos Usados</IonTitle>
+          <IonTitle>Productos Usados</IonTitle>
+          <IonButtons slot="end">
+            <IonButton onClick={onDidDismiss}>Cancelar</IonButton>
+          </IonButtons>
         </IonToolbar>
       </IonHeader>
-      <IonContent fullscreen>
-        <div className="reporte-container">
-          <h1>♻️ Reporte de Productos Usados</h1>
-          <table className="tabla-productos">
-            <thead>
-              <tr>
-                <th>Código</th>
-                <th>Nombre</th>
-                <th>Cantidad</th>
-                <th>Estado</th>
-                <th>Categoría</th>
-              </tr>
-            </thead>
-            <tbody>
-              {productos.map((p, i) => (
-                <tr key={i}>
-                  <td>{p.codigo}</td>
-                  <td>{p.nombre}</td>
-                  <td>{p.cantidad}</td>
-                  <td>{p.estado}</td>
-                  <td>{p.categoria}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
 
-          <div className="resumen">
-            <p>
-              Este reporte lista todos los productos que están clasificados como{" "}
-              <b>"Usados"</b>. Se recomienda <b>usarlos primero</b> antes que
-              los productos nuevos.
-            </p>
-          </div>
+      <IonContent className="ion-padding">
+        <IonText>
+          <h3 style={{ textAlign: "center", fontWeight: "bold", marginTop: "1rem" }}>
+            ¿En qué formato deseas descargar el reporte?
+          </h3>
+        </IonText>
 
-          <div className="acciones">
-            <button onClick={exportarPDF}>Exportar PDF</button>
-            <button onClick={exportarExcel}>Exportar Excel</button>
-          </div>
+        <div className="modal-buttons-container">
+          <IonButton expand="block" color="danger" onClick={exportarPDF}>
+            Descargar PDF
+          </IonButton>
+          <IonButton expand="block" color="success" onClick={exportarExcel}>
+            Descargar Excel
+          </IonButton>
         </div>
       </IonContent>
-    </IonPage>
+    </>
   );
 };
 
 export default ReportUsedProduct;
-

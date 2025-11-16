@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useHistory } from "react-router-dom";
 import { createClient } from "@supabase/supabase-js";
 import { FaBoxOpen, FaEdit } from "react-icons/fa";
 import "./editor-product.css";
-import { IonPage, IonContent } from "@ionic/react";
+import { IonPage, IonContent, IonIcon } from "@ionic/react";
+import { arrowBackOutline, copyOutline, closeOutline } from "ionicons/icons";
 import HeaderApp from "../../components/header_app";
 
 // Configuración de Supabase
@@ -14,21 +15,22 @@ const supabase = createClient(
 
 export type Producto = {
     id: number;
-    codigo_barras: string | null;
-    marca: string | null;
-    modelo: string | null;
-    compatibilidad: string | null;
-    sku: string | null;
+    codigo_barras?: string | null;
+    marca?: string | null;
+    modelo?: string | null;
+    compatibilidad?: string | null;
+    sku?: string | null;
     nombre: string;
-    categoria_id: number | null;
-    unidad: string | null;
-    stock_minimo: number | null;
-    observaciones: string | null;
-    activo: boolean;
-    creado_en: string | null;
-    created_at: string | null;
-    updated_at: string | null;
-    categoria?: { nombre: string | null };
+    categoria_id?: number | null;
+    unidad?: string | null;
+    stock_minimo?: number | null;
+    observaciones?: string | null;
+    activo?: boolean;
+    creado_en?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+    categoria?: { nombre?: string | null } | null;
+    stock?: number | null; // por si la tabla tiene stock directo
 };
 
 export default function EditorProducto() {
@@ -40,14 +42,10 @@ export default function EditorProducto() {
     const [editData, setEditData] = useState<Partial<Producto>>({});
     const [changed, setChanged] = useState<boolean>(false);
     const mountedRef = useRef(true);
-
-    const editableFields: (keyof Producto)[] = [
-        "nombre",
-        "marca",
-        "modelo",
-        "compatibilidad",
-        "observaciones",
-    ];
+    const [showRemoveModal, setShowRemoveModal] = useState(false);
+    const [removeQty, setRemoveQty] = useState<string>("");
+    const [copied, setCopied] = useState(false);
+    const [imgError, setImgError] = useState(false);
 
     useEffect(() => {
         mountedRef.current = true;
@@ -55,6 +53,32 @@ export default function EditorProducto() {
             mountedRef.current = false;
         };
     }, []);
+
+    // Formateador para fecha dd/mm/yyyy HH:MM
+    const formatFecha = useCallback((fecha: string | null | undefined) => {
+        if (!fecha) return "N/A";
+        try {
+            const d = new Date(fecha);
+            const day = `${d.getDate()}`.padStart(2, "0");
+            const month = `${d.getMonth() + 1}`.padStart(2, "0");
+            const year = d.getFullYear();
+            const hours = `${d.getHours()}`.padStart(2, "0");
+            const minutes = `${d.getMinutes()}`.padStart(2, "0");
+            return `${day}/${month}/${year} ${hours}:${minutes}`;
+        } catch {
+            return fecha;
+        }
+    }, []);
+
+    // Construye URL pública de la imagen en el bucket "images" usando created_at + .jpeg
+    const buildImageUrl = (createdAt?: string | null) => {
+        if (!createdAt) return null;
+        const filename = `${createdAt}.jpeg`;
+        const encoded = encodeURIComponent(filename);
+        const base = import.meta.env.VITE_SUPABASE_URL as string;
+        // URL pública estándar de Supabase storage
+        return `${base}/storage/v1/object/public/imageness/${encoded}`;
+    };
 
     useEffect(() => {
         if (!id) return;
@@ -71,7 +95,7 @@ export default function EditorProducto() {
             const { data, error } = await supabase
                 .from("productos")
                 .select("*, categoria:categorias(nombre)")
-                .eq("id", id)
+                .eq("id", Number(id))
                 .single();
 
             if (!mountedRef.current || ignore) return;
@@ -80,22 +104,28 @@ export default function EditorProducto() {
                 console.error("Error al obtener producto:", error.message);
                 setProducto(null);
             } else {
-                setProducto(data as Producto);
+                const d = data as Producto;
+                // normalizar codigo_barras (usa codigo_barras o sku)
+                const codigo_barras = (d as any).codigo_barras ?? (d as any).sku ?? null;
+                // si la tabla tiene stock directo en la fila (stock numérico), úsalo; si no existe, intenta p. stock
+                const normalized: Producto = {
+                    ...(d as any),
+                    codigo_barras,
+                    stock: (d as any).stock ?? (d as any).cantidad ?? null,
+                };
+                setProducto(normalized);
+                setImgError(false);
             }
             setLoading(false);
         };
 
         fetchProducto();
-
         return () => {
             ignore = true;
         };
     }, [id]);
 
-    const formatFecha = (fecha: string | null) =>
-        fecha ? new Date(fecha).toLocaleString("es-CL") : "N/A";
-
-    const handleEdit = (field: keyof Producto, value: string) => {
+    const handleEdit = (field: keyof Producto, value: any) => {
         setEditData((prev) => ({ ...prev, [field]: value }));
         setChanged(true);
     };
@@ -105,10 +135,10 @@ export default function EditorProducto() {
 
         const payload: Record<string, any> = {};
         Object.keys(editData).forEach((k) => {
-            payload[k] = (editData as any)[k];
+            (payload as any)[k] = (editData as any)[k];
         });
 
-        const { error } = await supabase.from("productos").update(payload).eq("id", id);
+        const { error } = await supabase.from("productos").update(payload).eq("id", Number(id));
         if (error) {
             console.error("Error al actualizar producto:", error.message);
             alert("Error al guardar cambios");
@@ -120,6 +150,65 @@ export default function EditorProducto() {
         setChanged(false);
         alert("Cambios guardados ✅");
     };
+
+    // Actualiza stock restando directamente en la tabla productos.stock
+    const handleRemoveStock = async () => {
+        if (!producto) return;
+        const qty = Math.max(0, Math.floor(Number(removeQty || 0)));
+        if (qty <= 0) {
+            alert("Ingresa una cantidad válida");
+            return;
+        }
+
+        const actual = Number(producto.stock ?? 0);
+        if (actual <= 0) {
+            alert("Ya no hay más stock disponible");
+            return;
+        }
+        if (qty > actual) {
+            alert("No es posible eliminar esa cantidad; supera el stock disponible");
+            return;
+        }
+
+        const nuevo = Math.max(0, actual - qty);
+        const { error } = await supabase.from("productos").update({ stock: nuevo }).eq("id", Number(producto.id));
+        if (error) {
+            alert("Error al actualizar el stock");
+            return;
+        }
+
+        setProducto((prev) => (prev ? ({ ...prev, stock: nuevo } as Producto) : prev));
+        setShowRemoveModal(false);
+        setRemoveQty("");
+        alert("Stock actualizado ✅");
+    };
+
+    // Handler copiar código de barras
+    const copyCodigo = async () => {
+        const text = String(editData.codigo_barras ?? producto?.codigo_barras ?? producto?.sku ?? "");
+        if (!text) return;
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch {
+            // fallback simple
+            alert("Copiado: " + text);
+        }
+    };
+
+    // Placeholder SVG data URI (pequeña imagen cuando no existe foto)
+    const placeholder =
+        "data:image/svg+xml;utf8," +
+        encodeURIComponent(
+            `<svg xmlns='http://www.w3.org/2000/svg' width='600' height='400' viewBox='0 0 600 400'>
+        <rect width='100%' height='100%' fill='#f3f4f6'/>
+        <text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='#9ca3af' font-size='20'>No hay imagen</text>
+        </svg>`
+        );
+
+    // Imagen URL calculada
+    const imageUrl = buildImageUrl(producto?.created_at);
 
     // Loader
     if (loading) {
@@ -135,7 +224,6 @@ export default function EditorProducto() {
         );
     }
 
-    // Producto no encontrado
     if (!producto) {
         return (
             <IonPage>
@@ -158,65 +246,104 @@ export default function EditorProducto() {
 
             <IonContent fullscreen className="ion-padding">
                 <div className="editor-container">
-                    <div className="editor-producto-card">
+                    <div className="editor-producto-card new-layout">
+                        <div className="top-row">
+                            <div className="image-wrap">
+                                <img
+                                    src={!imgError && imageUrl ? imageUrl : placeholder}
+                                    alt={producto.nombre}
+                                    onError={() => setImgError(true)}
+                                    className="product-image"
+                                />
+                            </div>
+
+                            <div className="header-info">
+                                <div className="back-icon" onClick={() => history.goBack()} title="Volver">
+                                    <IonIcon icon={arrowBackOutline} />
+                                </div>
+
+                                <h2 className="product-title">{producto.nombre}</h2>
+
+                                <div className="barcode-row">
+                                    <div className="barcode-box">
+                                        <span className="barcode-label">Código de Barras</span>
+                                        <div className="barcode-value">
+                                            <code>{String(editData.codigo_barras ?? producto.codigo_barras ?? producto.sku ?? "N/A")}</code>
+                                            {(producto.codigo_barras || producto.sku) && (
+                                                <button className="copy-btn" onClick={copyCodigo} title="Copiar código">
+                                                    <IonIcon icon={copyOutline} />
+                                                </button>
+                                            )}
+                                            {copied && <span className="copied-badge">¡Copiado!</span>}
+                                        </div>
+                                    </div>
+
+                                    <div className="meta-row">
+                                        <div><strong>ID:</strong> {String(producto.id)}</div>
+                                        <div><strong>Stock:</strong> {producto.stock ?? 0}</div>
+                                        <div><strong>Creado:</strong> {formatFecha(producto.created_at)}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="editor-body">
-                            <p><strong>ID:</strong> {String(producto.id)}</p>
-                            <p><strong>Código de Barras:</strong> {producto.codigo_barras ?? "N/A"}</p>
-                            <p>
-                                <strong>Nombre:</strong>
+                            <div>
+                                <label className="field-label">Nombre</label>
                                 <input
-                                    title={String(editData.nombre ?? producto.nombre ?? "")}
                                     value={String(editData.nombre ?? producto.nombre ?? "")}
                                     onChange={(e) => handleEdit("nombre", e.target.value)}
                                 />
-                            </p>
-                            <p>
-                                <strong>Marca:</strong>
+
+                                <label className="field-label">Marca</label>
                                 <input
-                                    title={String(editData.marca ?? producto.marca ?? "")}
                                     value={String(editData.marca ?? producto.marca ?? "")}
                                     onChange={(e) => handleEdit("marca", e.target.value)}
                                 />
-                            </p>
-                            <p>
-                                <strong>Modelo:</strong>
+
+                                <label className="field-label">Modelo</label>
                                 <input
-                                    title={String(editData.modelo ?? producto.modelo ?? "")}
                                     value={String(editData.modelo ?? producto.modelo ?? "")}
                                     onChange={(e) => handleEdit("modelo", e.target.value)}
                                 />
-                            </p>
-                            <p>
-                                <strong>Compatibilidad:</strong>
+
+                                <label className="field-label">Compatibilidad</label>
                                 <textarea
-                                    title={String(editData.compatibilidad ?? producto.compatibilidad ?? "")}
                                     value={String(editData.compatibilidad ?? producto.compatibilidad ?? "")}
                                     onChange={(e) => handleEdit("compatibilidad", e.target.value)}
-                                    style={{ maxHeight: 120, overflowY: "auto" }}
                                 />
-                            </p>
-                            <p><strong>SKU:</strong> {producto.sku ?? "N/A"}</p>
-                            <p><strong>Categoría:</strong> {producto.categoria?.nombre ?? "Sin categoría"}</p>
-                            <p><strong>Unidad:</strong> {producto.unidad ?? "N/A"}</p>
-                            <p><strong>Stock mínimo:</strong> {producto.stock_minimo ?? "N/A"}</p>
-                            <p>
-                                <strong>Observaciones:</strong>
+
+                                <label className="field-label">Observaciones</label>
                                 <textarea
-                                    title={String(editData.observaciones ?? producto.observaciones ?? "")}
                                     value={String(editData.observaciones ?? producto.observaciones ?? "")}
                                     onChange={(e) => handleEdit("observaciones", e.target.value)}
-                                    style={{ maxHeight: 120, overflowY: "auto" }}
                                 />
-                            </p>
-                            <p>
-                                <strong>Activo:</strong>{" "}
-                                {producto.activo ? <span className="activo">✔ Sí</span> : <span className="inactivo">✘ No</span>}
-                            </p>
-                            <p><strong>Creado en:</strong> {formatFecha(producto.creado_en)}</p>
-                            <p><strong>Última actualización:</strong> {formatFecha(producto.updated_at)}</p>
+                            </div>
+
+                            <div>
+                                <p><strong>SKU:</strong> {producto.sku ?? "N/A"}</p>
+                                <p><strong>Categoría:</strong> {producto.categoria?.nombre ?? "Sin categoría"}</p>
+                                <p><strong>Unidad:</strong> {producto.unidad ?? "N/A"}</p>
+                                <p><strong>Stock mínimo:</strong> {producto.stock_minimo ?? "N/A"}</p>
+
+                                <p>
+                                    <strong>Activo:</strong>{" "}
+                                    {producto.activo ? <span className="activo">✔ Sí</span> : <span className="inactivo">✘ No</span>}
+                                </p>
+
+                                <p><strong>Última actualización:</strong> {formatFecha(producto.updated_at)}</p>
+                            </div>
                         </div>
 
-                        <div className="editor-actions">
+                        <div className="editor-actions" style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                            <button
+                                className="btn-volver"
+                                onClick={() => setShowRemoveModal(true)}
+                                title="Eliminar / retirar stock"
+                            >
+                                🗑 Retirar stock
+                            </button>
+
                             <button
                                 className="btn-guardar"
                                 onClick={handleSave}
@@ -225,17 +352,35 @@ export default function EditorProducto() {
                             >
                                 💾 Guardar cambios
                             </button>
-
-                            <button
-                                className="btn-volver"
-                                onClick={() => history.replace("/product")}
-                            >
-                                ⬅ Volver
-                            </button>
                         </div>
                     </div>
                 </div>
             </IonContent>
+
+            {/* Modal para retirar stock */}
+            {showRemoveModal && (
+                <div className="modal-overlay">
+                    <div className="modal-card">
+                        <button className="modal-close" onClick={() => { setShowRemoveModal(false); setRemoveQty(""); }}>
+                            <IonIcon icon={closeOutline} />
+                        </button>
+                        <div style={{ textAlign: 'center', marginTop: 8 }}>
+                            <h3 className="modal-title">¿Cuántos productos deseas retirar?</h3>
+                            <input
+                                type="number"
+                                min={0}
+                                value={removeQty}
+                                onChange={(e) => setRemoveQty(e.target.value)}
+                                placeholder="0"
+                                className="modal-input"
+                            />
+                            <button className="btn-guardar" onClick={handleRemoveStock} style={{ marginTop: 12, width: '100%' }}>
+                                Guardar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </IonPage>
     );
 }

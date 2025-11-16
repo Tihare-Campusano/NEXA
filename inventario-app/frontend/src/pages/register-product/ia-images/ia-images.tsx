@@ -1,249 +1,243 @@
-// --- 1. IMPORTACIONES ---
-// Importamos los componentes de la interfaz de usuario de Ionic (botones, imágenes, spinners, etc.).
+import React, { useState, useEffect } from "react";
 import {
     IonPage,
     IonContent,
     IonButton,
     IonImg,
-    IonSpinner,
     IonText,
     IonLoading,
+    IonModal,
+    IonIcon,
 } from "@ionic/react";
-// Importamos los 'hooks' de React para manejar el estado (useState) y el ciclo de vida (useEffect).
-import { useState, useEffect } from "react";
-// Importamos Capacitor para acceder a funcionalidades nativas como la cámara y detectar la plataforma.
-import { Capacitor } from "@capacitor/core";
-import { Camera, CameraResultType } from "@capacitor/camera";
-// Importamos el cliente de Supabase para conectar con nuestra base de datos y almacenamiento.
-import { createClient } from "@supabase/supabase-js";
-// Importamos hooks de React Router para la navegación y para recibir datos de otras páginas.
+import {
+    Camera,
+    CameraResultType,
+    CameraSource,
+    CameraDirection,
+} from "@capacitor/camera";
 import { useHistory, useLocation } from "react-router-dom";
-// Importamos TensorFlow.js (tf) y la librería para modelos TFLite.
-import * as tf from "@tensorflow/tfjs";
-import * as tflite from "@tensorflow/tfjs-tflite";
-// Importamos los "motores" (backends) de TFJS. Sin esto, la IA no puede hacer cálculos.
-import '@tensorflow/tfjs-backend-webgl';
-import '@tensorflow/tfjs-backend-wasm';
+import { checkmarkCircleOutline } from "ionicons/icons";
 
-// --- 2. CONFIGURACIÓN DE SUPABASE ---
-// Creamos una instancia del cliente de Supabase para poder interactuar con nuestra base de datos.
-const supabase = createClient(
-    import.meta.env.VITE_SUPABASE_URL as string,
-    import.meta.env.VITE_SUPABASE_ANON_KEY as string
-);
+const API_CLASSIFY_URL =
+    "https://inventario-ia-api-887072391939.us-central1.run.app/api/clasificar-producto";
 
-// --- 3. DEFINICIÓN DEL COMPONENTE ---
-export default function IAImagen() {
-    // --- Hooks de Navegación ---
-    const history = useHistory(); // Hook para poder navegar a otras páginas (ej: volver al formulario).
-    const location = useLocation(); // Hook para acceder a los datos pasados desde la página anterior.
-    // Obtenemos los datos del formulario que se enviaron desde la página de registro.
-    const formData = (location.state as any)?.formData || {};
+interface FormData {
+    codigo: string;
+    nombre: string;
+    marca: string;
+    modelo: string;
+    categoria_id: string;
+    compatibilidad: string;
+    observaciones: string;
+    stock?: string;
+    disponibilidad?: string;
+    estado_ia?: string;
+}
 
-    // --- 4. ESTADOS DEL COMPONENTE ---
-    // 'useState' nos permite guardar información que cambia y que redibuja la pantalla cuando se actualiza.
-    const [image, setImage] = useState<string | null>(null); // Guarda la URL de la imagen tomada.
-    const [loading, setLoading] = useState(false); // Controla si una operación está en curso (para deshabilitar botones).
-    const [estadoIA, setEstadoIA] = useState<string | null>(null); // Guarda el resultado de la predicción de la IA (ej: "Nuevo").
-    const [modeloLite, setModeloLite] = useState<tflite.TFLiteModel | null>(null); // Guarda el modelo de IA una vez cargado en memoria.
-    const [showLoadingOverlay, setShowLoadingOverlay] = useState(false); // Controla un indicador de carga de pantalla completa.
+interface BackendResponse {
+    status: "success" | "error";
+    message: string;
+    estado_clasificado?: string;
+    stock_actual?: number;
+}
 
-    // --- 5. CARGA DEL MODELO DE IA ---
-    // 'useEffect' se ejecuta una sola vez cuando el componente se muestra en pantalla.
-    // Es el lugar perfecto para realizar tareas de inicialización.
+const calcularDisponibilidad = (cantidad: number): string => {
+    if (cantidad <= 0) return "Sin stock";
+    if (cantidad <= 4) return "Baja disponibilidad";
+    if (cantidad <= 10) return "Disponibilidad media";
+    return "Alta disponibilidad";
+};
+
+const IAImage: React.FC = () => {
+    const history = useHistory();
+    const location = useLocation();
+    const initialFormData =
+        (location.state as { formData?: FormData })?.formData || ({} as FormData);
+
+    const [formData] = useState<FormData>(initialFormData);
+    const [image, setImage] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [statusText, setStatusText] = useState("Listo para tomar la foto.");
+    const [estadoIA, setEstadoIA] = useState<string | null>(null);
+    const [showModalSuccess, setShowModalSuccess] = useState(false);
+
+    // 🔁 Cierra el modal automáticamente después de 7 segundos
     useEffect(() => {
-        const loadModelLite = async () => {
-            setShowLoadingOverlay(true); // Muestra el indicador de carga.
-            try {
-                // Esperamos a que el motor de TensorFlow.js esté 100% listo. Esto previene errores.
-                await tf.ready();
-                console.log("✅ Backend de TensorFlow listo.");
+        let timer: ReturnType<typeof setTimeout>;
+        if (showModalSuccess) {
+            timer = setTimeout(() => handleVolver(), 7000);
+        }
+        return () => clearTimeout(timer);
+    }, [showModalSuccess]);
 
-                // Cargamos el archivo del modelo desde la carpeta 'public/ml'.
-                const m = await tflite.loadTFLiteModel("../ml/modelo_final.tflite");
-                
-                // Guardamos el modelo cargado en nuestro estado para poder usarlo después.
-                setModeloLite(m);
-                console.log("✅ Modelo TFLite cargado correctamente");
-            } catch (err) {
-                console.error("❌ Error cargando modelo TFLite:", err);
-                alert("Error al cargar el modelo de IA.");
-            }
-            setShowLoadingOverlay(false); // Oculta el indicador de carga.
-        };
-        loadModelLite();
-    }, []); // El array vacío `[]` asegura que esto se ejecute solo una vez.
-
-    // --- 6. FUNCIÓN PARA TOMAR FOTO ---
     const tomarFoto = async () => {
         try {
-            // Detectamos si la app corre en un celular (nativo) o en la web.
-            const isNative = Capacitor.isNativePlatform();
-            
-            // Llamamos al plugin de la cámara.
+            setLoading(true);
+            setStatusText("Abriendo cámara...");
+
             const foto = await Camera.getPhoto({
-                quality: 90,
+                quality: 85,
                 allowEditing: false,
-                // Optimizamos: en celular pedimos la ruta del archivo (Uri) para ahorrar memoria.
-                // En la web, pedimos el DataUrl (texto base64).
-                resultType: isNative ? CameraResultType.Uri : CameraResultType.DataUrl,
+                resultType: CameraResultType.Base64,
+                source: CameraSource.Camera,
+                direction: CameraDirection.Rear,
             });
 
-            // Guardamos la ruta de la imagen en el estado. `webPath` funciona en ambas plataformas.
-            setImage(foto.webPath || foto.dataUrl || null);
-            // Limpiamos cualquier predicción anterior, ya que la foto es nueva.
-            setEstadoIA(null);
-        } catch (error) {
-            // Si el usuario cancela la cámara, se produce un error que capturamos aquí para evitar que la app se rompa.
-            console.log("El usuario canceló la toma de la foto.");
-        }
-    };
-
-    // --- 7. FUNCIÓN PARA PREDECIR CON LA IA ---
-    const predecirEstadoLite = async () => {
-        // No hacer nada si no tenemos un modelo cargado o una imagen para analizar.
-        if (!modeloLite || !image) return;
-
-        setLoading(true);
-        setShowLoadingOverlay(true);
-
-        // Creamos un objeto de imagen en JavaScript para que TensorFlow pueda leerlo.
-        const img = new Image();
-        img.src = image;
-
-        // Esta función se ejecutará cuando la imagen se haya cargado completamente en el navegador/app.
-        // ✅ --- INICIO DEL CÓDIGO ACTUALIZADO --- ✅
-        img.onload = async () => {
-            try {
-                await tf.ready();
-
-                const tensor = tf.browser.fromPixels(img)
-                    .resizeNearestNeighbor([224, 224])
-                    .toFloat().div(tf.scalar(255))
-                    .expandDims(0);
-
-                const output = (await modeloLite.predict(tensor)) as tf.Tensor;
-
-                // --- CORRECCIÓN IMPORTANTE ---
-                // Añadimos una verificación para asegurarnos de que la predicción tuvo éxito.
-                if (!output) {
-                    // Si output es null, lanzamos un error claro y detenemos la ejecución.
-                    throw new Error("La predicción del modelo falló y devolvió un resultado nulo. Esto suele deberse a una operación no soportada en el modelo TFLite para la web.");
-                }
-
-                const scores = (await output.array()) as number[][];
-                const idx = scores[0].indexOf(Math.max(...scores[0]));
-                const etiquetas = ["Mal estado", "Nuevo", "Usado"];
-                const resultado = etiquetas[idx] || "Desconocido";
-
-                setEstadoIA(resultado);
-                alert(`Estado detectado: ${resultado}`);
-
-            } catch (error) {
-                // Ahora, el error que lanzamos arriba será capturado aquí.
-                console.error("Error al predecir:", error);
-                alert("Ocurrió un error al analizar la imagen. Revisa la consola para más detalles.");
-            } finally {
+            if (!foto.base64String) {
+                alert("No se pudo capturar la imagen.");
                 setLoading(false);
-                setShowLoadingOverlay(false);
+                return;
             }
-        };
-        // ✅ --- FIN DEL CÓDIGO ACTUALIZADO --- ✅
-        
-        // Manejador de error por si la imagen no se puede cargar.
-        img.onerror = () => {
-            alert("No se pudo cargar la imagen para analizar.");
-            setLoading(false);
-            setShowLoadingOverlay(false);
-        };
-    };
-    
-    // ✅ NUEVO: Función para calcular la disponibilidad según las reglas especificadas.
-    const calcularDisponibilidad = (cantidad: number): string => {
-        if (cantidad <= 0) return "Sin stock";
-        if (cantidad >= 1 && cantidad <= 4) return "Baja disponibilidad";
-        if (cantidad >= 5 && cantidad <= 10) return "Disponibilidad media";
-        return "Alta disponibilidad"; // Para 11 en adelante
-    };
 
-    // --- 8. FUNCIÓN PARA GUARDAR Y VOLVER AL FORMULARIO ---
-    const guardarYVolver = async () => {
-        // Validaciones para asegurar que tenemos toda la información necesaria.
-        if (!image || !estadoIA || !formData.codigo) {
-            alert("Se necesita una foto, un análisis de IA y un código de producto para continuar.");
-            return;
-        }
+            const base64Image = foto.base64String;
+            setImage(`data:image/jpeg;base64,${base64Image}`);
+            setStatusText("Analizando imagen con IA...");
 
-        setLoading(true);
-        setShowLoadingOverlay(true);
-
-        try {
-            // Convertimos la imagen (sea Uri o DataUrl) a un formato 'blob' que Supabase puede almacenar.
-            const response = await fetch(image);
-            const blob = await response.blob();
-            // Creamos un nombre de archivo único para evitar sobrescribir imágenes.
-            const fileName = `productos/${formData.codigo}_${Date.now()}.png`;
-            // Subimos el archivo 'blob' al bucket 'imagenes-productos' de Supabase Storage.
-            const { error } = await supabase.storage.from("imagenes-productos").upload(fileName, blob);
-            if (error) throw error; // Si hay un error, lo lanzamos para que lo capture el 'catch'.
-
-            // Obtenemos la URL pública de la imagen que acabamos de subir.
-            const { data: publicUrlData } = supabase.storage.from("imagenes-productos").getPublicUrl(fileName);
-
-            // ✅ CORRECCIÓN: Calculamos el nuevo stock y la nueva disponibilidad aquí.
-            const newStock = parseInt(formData.stock || "0", 10) + 1;
-            const newDisponibilidad = calcularDisponibilidad(newStock);
-
-            // Creamos un nuevo objeto con todos los datos del formulario anterior, más los nuevos datos de la IA.
-            const updatedForm = {
-                ...formData,
-                imagen_url: publicUrlData.publicUrl || "", // La URL de la imagen.
-                estadoIA: estadoIA, // El estado detectado.
-                stock: newStock.toString(), // Enviamos el nuevo stock.
-                disponibilidad: newDisponibilidad, // Enviamos la nueva disponibilidad ya calculada.
-            };
-            
-            // Navegamos de vuelta a la página de registro, pasándole el objeto con todos los datos actualizados.
-            history.push("/registro", { formData: updatedForm });
-
-        } catch (error: any) {
-            alert(`Error al subir imagen: ${error.message}`);
+            await callBackendAPI(base64Image);
+        } catch (e) {
+            console.error("📷 Error al tomar la foto:", e);
+            setStatusText("Error o cancelación de la cámara.");
         } finally {
             setLoading(false);
-            setShowLoadingOverlay(false);
         }
     };
 
-    // --- 9. RENDERIZADO DEL COMPONENTE (LO QUE SE VE EN PANTALLA) ---
+    const callBackendAPI = async (imageBase64: string) => {
+        try {
+            // ⛔ Corrección 1: Validar código antes de enviar
+            if (!formData.codigo) {
+                alert("Debes ingresar un código de barras antes de usar la IA.");
+                return;
+            }
+
+            const requestData = {
+                image_base64: imageBase64,
+                codigo_barras: formData.codigo, // ⬅ correcto
+                nombre: formData.nombre,
+                marca: formData.marca,
+                modelo: formData.modelo,
+                categoria_id: formData.categoria_id,
+                compatibilidad: formData.compatibilidad,
+                observaciones: formData.observaciones,
+            };
+
+            console.log("📦 Enviando datos a IA API:", requestData);
+
+            const response = await fetch(API_CLASSIFY_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(requestData),
+            });
+
+            // ⛔ Corrección 2: validar ANTES de usar response.json()
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error("❌ Respuesta no OK:", errorText);
+                throw new Error("Error en el servidor IA: " + errorText);
+            }
+
+            const result: BackendResponse = await response.json();
+            console.log("🔁 Respuesta del backend:", result);
+
+            if (result.status === "success") {
+                const estadoDetectado =
+                    result.estado_clasificado?.toLowerCase() || "desconocido";
+                const nuevoStock = result.stock_actual || 0;
+                const nuevaDisponibilidad = calcularDisponibilidad(nuevoStock);
+
+                setEstadoIA(estadoDetectado);
+                setStatusText("✅ Datos procesados y almacenados correctamente.");
+                setShowModalSuccess(true);
+            } else {
+                throw new Error(result.message || "Error en el servidor IA");
+            }
+        } catch (error: any) {
+            console.error("❌ Error en el backend:", error);
+            alert(`❌ Error al procesar el producto: ${error.message}`);
+            setStatusText("Ocurrió un error al guardar el producto.");
+        }
+    };
+
+    const handleVolver = () => {
+        setShowModalSuccess(false);
+        history.push("/tabs/registro");
+    };
+
     return (
         <IonPage>
             <IonContent className="ion-padding">
-                {/* Botón para activar la cámara */}
-                <IonButton expand="block" onClick={tomarFoto} disabled={loading}>Tomar Foto</IonButton>
+                <IonText color="medium">
+                    <p>
+                        Producto: <b>{formData.codigo || "Cargando..."}</b>
+                    </p>
+                </IonText>
 
-                {/* Muestra la imagen solo si el estado 'image' tiene un valor */}
-                {image && <IonImg src={image} style={{ marginTop: "1rem" }} />}
-                
-                {/* Muestra el botón de analizar solo si hay una imagen Y todavía no se ha analizado */}
-                {image && !estadoIA && (
-                    <IonButton color="secondary" expand="block" onClick={predecirEstadoLite} disabled={loading || !modeloLite} style={{ marginTop: "1rem" }}>
-                        Analizar con IA
-                    </IonButton>
+                <IonButton expand="block" onClick={tomarFoto} disabled={loading}>
+                    📸 Tomar Foto y Analizar
+                </IonButton>
+
+                <p
+                    style={{
+                        textAlign: "center",
+                        marginTop: "0.5rem",
+                        color: "#007bff",
+                    }}
+                >
+                    {statusText}
+                </p>
+
+                {image && (
+                    <IonImg
+                        src={image}
+                        alt="Foto del producto"
+                        style={{
+                            marginTop: "1rem",
+                            borderRadius: "8px",
+                            border: estadoIA ? "3px solid green" : "3px solid gray",
+                        }}
+                    />
                 )}
 
-                {/* Muestra el resultado y el botón de confirmar solo si ya hay un estado detectado por la IA */}
-                {estadoIA && (
-                    <>
-                        <IonText><h2 style={{ textAlign: "center", marginTop: "1rem" }}>Estado: {estadoIA}</h2></IonText>
-                        <IonButton color="success" expand="block" onClick={guardarYVolver} disabled={loading} style={{ marginTop: "1rem" }}>
-                            Confirmar y Volver
+                <IonLoading isOpen={loading} message={"Procesando..."} duration={0} />
+
+                <IonModal isOpen={showModalSuccess} backdropDismiss={false}>
+                    <div
+                        style={{
+                            textAlign: "center",
+                            padding: "2rem",
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            justifyContent: "center",
+                        }}
+                    >
+                        <IonIcon
+                            icon={checkmarkCircleOutline}
+                            color="success"
+                            style={{ fontSize: "4rem", marginBottom: "1rem" }}
+                        />
+                        <IonText color="success">
+                            <h2>Producto registrado correctamente</h2>
+                            <p style={{ color: "#333", marginTop: "0.5rem" }}>
+                                El estado, stock y disponibilidad fueron actualizados con éxito.
+                            </p>
+                            <p style={{ color: "#888", marginTop: "0.5rem" }}>
+                                (Se cerrará automáticamente en 7 segundos)
+                            </p>
+                        </IonText>
+                        <IonButton
+                            color="success"
+                            expand="block"
+                            style={{ marginTop: "1.5rem" }}
+                            onClick={handleVolver}
+                        >
+                            Volver ahora
                         </IonButton>
-                    </>
-                )}
-
-                {/* Componente de Ionic que muestra una pantalla de carga completa */}
-                <IonLoading isOpen={showLoadingOverlay} message={"Procesando..."} />
+                    </div>
+                </IonModal>
             </IonContent>
         </IonPage>
     );
-}
+};
+
+export default IAImage;

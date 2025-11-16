@@ -1,17 +1,24 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
-  IonPage,
   IonHeader,
   IonToolbar,
   IonTitle,
   IonContent,
+  IonButtons,
+  IonButton,
+  IonText,
 } from "@ionic/react";
-import "./report_bad_state.css";
+
+import { supabase } from "../../../supabaseClient";
 import jsPDF from "jspdf";
-// @ts-ignore
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
-import { supabase } from "../../../supabaseClient";
+
+import { Filesystem, Directory } from "@capacitor/filesystem";
+import { Capacitor } from "@capacitor/core";
+import { FileOpener } from "@capacitor-community/file-opener";
+import { Toast } from "@capacitor/toast";
+import "./report_bad_state.css";
 
 interface Producto {
   codigo: string;
@@ -21,125 +28,211 @@ interface Producto {
   categoria: string;
 }
 
-const ReportBadState: React.FC = () => {
-  const [productos, setProductos] = useState<Producto[]>([]);
+interface ReportBadStateProps {
+  onDidDismiss: () => void;
+}
 
-  useEffect(() => {
-    const fetchProductos = async () => {
-      const { data, error } = await supabase
-        .from("productos")
-        .select(`
-          id,
-          sku,
-          nombre,
-          marca,
-          modelo,
-          estado,
-          stock:stock(stock_actual)
-        `)
-        .eq("estado", "Mal estado");
+const ReportBadState: React.FC<ReportBadStateProps> = ({ onDidDismiss }) => {
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
-      if (error) {
-        console.error("Error al obtener productos:", error.message);
-      } else if (data) {
-        const mapped = data.map((p: any) => ({
-          codigo: p.sku,
-          nombre: p.nombre,
-          cantidad: p.stock?.stock_actual || 0,
-          estado: p.estado || "Desconocido",
-          categoria: p.marca || "General",
-        }));
-        setProductos(mapped);
-      }
-    };
-
-    fetchProductos();
-  }, []);
-
-  const exportarPDF = () => {
-    const doc = new jsPDF();
-    doc.text("Reporte de Productos en Mal Estado", 14, 15);
-
-    autoTable(doc, {
-      startY: 20,
-      head: [["Código", "Nombre", "Cantidad", "Estado", "Categoría"]],
-      body: productos.map((p) => [
-        p.codigo,
-        p.nombre,
-        p.cantidad,
-        p.estado,
-        p.categoria,
-      ]),
-    });
-
-    const finalY = (doc as any).lastAutoTable?.finalY || 30;
-    doc.text(
-      `Este reporte muestra los productos en "Mal estado".
-Se recomienda desecharlos ya que no están en buen uso.`,
-      14,
-      finalY + 10
-    );
-
-    doc.save("reporte_productos_mal_estado.pdf");
+  const mostrarNotificacion = async (mensaje: string) => {
+    await Toast.show({ text: mensaje, duration: "long" });
   };
 
-  const exportarExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(productos);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Productos Mal Estado");
-    XLSX.writeFile(wb, "reporte_productos_mal_estado.xlsx");
+  const solicitarPermisoDescarga = async (): Promise<boolean> => {
+    if (Capacitor.getPlatform() === "android") {
+      try {
+        const request = await Filesystem.requestPermissions();
+        if (request.publicStorage !== "granted") {
+          mostrarNotificacion("Se requiere permiso de almacenamiento.");
+          return false;
+        }
+      } catch (err) {
+        console.error("Error permisos:", err);
+        mostrarNotificacion("No se pudo obtener el permiso.");
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const fetchProductos = async (): Promise<Producto[]> => {
+    const { data, error } = await supabase
+      .from("productos")
+      .select(`
+        sku,
+        nombre,
+        estado,
+        marca,
+        stock(cantidad)
+      `)
+      .eq("estado", "Mal estado");
+
+    if (error) {
+      console.error("Error al obtener productos:", error.message);
+      throw error;
+    }
+
+    return (data ?? []).map((p: any) => ({
+      codigo: p.sku ?? "",
+      nombre: p.nombre ?? "",
+      cantidad: p.stock?.[0]?.cantidad ?? 0,
+      estado: p.estado ?? "",
+      categoria: p.marca ?? "",
+    }));
+  };
+
+  const guardarEnDispositivo = async (
+    fileName: string,
+    base64Data: string,
+    mimeType: string
+  ) => {
+    try {
+      const savedFile = await Filesystem.writeFile({
+        path: fileName,
+        data: base64Data,
+        directory: Directory.Documents,
+        recursive: true,
+      });
+
+      try {
+        await FileOpener.open({
+          filePath: savedFile.uri,
+          contentType: mimeType,
+        });
+      } catch (e) {
+        mostrarNotificacion("Archivo guardado en Documentos.");
+      }
+    } catch (e) {
+      console.error("Error al guardar archivo", e);
+      mostrarNotificacion("Error al guardar archivo.");
+    }
+  };
+
+  const exportarPDF = async () => {
+    const permitido = await solicitarPermisoDescarga();
+    if (!permitido) return;
+
+    mostrarNotificacion("Generando PDF...");
+
+    try {
+      const productos = await fetchProductos();
+      const doc = new jsPDF();
+      doc.text("Reporte de Productos en Mal Estado", 14, 15);
+
+      autoTable(doc, {
+        startY: 20,
+        head: [["Código", "Nombre", "Cantidad", "Estado", "Categoría"]],
+        body: productos.map((p) => [
+          p.codigo,
+          p.nombre,
+          p.cantidad.toString(),
+          p.estado,
+          p.categoria,
+        ]),
+      });
+
+      const finalY = (doc as any).lastAutoTable?.finalY || 30;
+      doc.text(
+        'Este reporte muestra los productos en "Mal estado". Se recomienda desecharlos.',
+        14,
+        finalY + 10
+      );
+
+      const base64Data = doc.output("datauristring").split(",")[1];
+      const timestamp = new Date().getTime();
+
+      await guardarEnDispositivo(
+        `reporte_mal_estado_${timestamp}.pdf`,
+        base64Data,
+        "application/pdf"
+      );
+
+      mostrarNotificacion("PDF descargado correctamente.");
+    } catch (error) {
+      console.error("Error PDF:", error);
+      mostrarNotificacion("No se pudo generar el PDF.");
+    }
+  };
+
+  const exportarExcel = async () => {
+    const permitido = await solicitarPermisoDescarga();
+    if (!permitido) return;
+
+    mostrarNotificacion("Generando Excel...");
+
+    try {
+      const productos = await fetchProductos();
+      const datosExcel = productos.map((p) => ({
+        Código: p.codigo,
+        Nombre: p.nombre,
+        Cantidad: Number(p.cantidad),
+        Estado: p.estado,
+        Categoría: p.categoria,
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(datosExcel);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Productos Mal Estado");
+
+      const base64Data = XLSX.write(wb, {
+        bookType: "xlsx",
+        type: "base64",
+      });
+
+      const timestamp = new Date().getTime();
+      await guardarEnDispositivo(
+        `reporte_mal_estado_${timestamp}.xlsx`,
+        base64Data,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+
+      mostrarNotificacion("Excel descargado correctamente.");
+    } catch (error) {
+      console.error("Error Excel:", error);
+      mostrarNotificacion("No se pudo generar el Excel.");
+    }
   };
 
   return (
-    <IonPage>
+    <>
+      {alertMessage && (
+        <div className="alert-modal">
+          <p>{alertMessage}</p>
+          <IonButton onClick={() => setAlertMessage(null)}>Aceptar</IonButton>
+        </div>
+      )}
+
       <IonHeader>
         <IonToolbar>
-          <IonTitle>Reporte de Productos en Mal Estado</IonTitle>
+          <IonTitle>Productos Mal Estado</IonTitle>
+          <IonButtons slot="end">
+            <IonButton onClick={onDidDismiss}>Cerrar</IonButton>
+          </IonButtons>
         </IonToolbar>
       </IonHeader>
-      <IonContent fullscreen>
-        <div className="reporte-container">
-          <h1>⚠️ Reporte de Productos en Mal Estado</h1>
-          <table className="tabla-productos">
-            <thead>
-              <tr>
-                <th>Código</th>
-                <th>Nombre</th>
-                <th>Cantidad</th>
-                <th>Estado</th>
-                <th>Categoría</th>
-              </tr>
-            </thead>
-            <tbody>
-              {productos.map((p, i) => (
-                <tr key={i}>
-                  <td>{p.codigo}</td>
-                  <td>{p.nombre}</td>
-                  <td>{p.cantidad}</td>
-                  <td>{p.estado}</td>
-                  <td>{p.categoria}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
 
-          <div className="resumen">
-            <p>
-              Este reporte lista todos los productos en <b>"Mal estado"</b>. Se
-              recomienda <b>desecharlos</b> porque no están en buen uso.
-            </p>
-          </div>
+      <IonContent className="ion-padding">
+        <IonText>
+          <h3 style={{ textAlign: "center", fontWeight: "bold" }}>
+            ¿Deseas descargar el reporte?
+          </h3>
+          <p style={{ textAlign: "center", fontSize: "0.9rem", color: "#666" }}>
+            Los archivos se guardarán en la carpeta Documentos.
+          </p>
+        </IonText>
 
-          <div className="acciones">
-            <button onClick={exportarPDF}>Exportar PDF</button>
-            <button onClick={exportarExcel}>Exportar Excel</button>
-          </div>
+        <div className="modal-buttons-container">
+          <IonButton expand="block" color="danger" onClick={exportarPDF}>
+            Descargar PDF
+          </IonButton>
+          <IonButton expand="block" color="success" onClick={exportarExcel}>
+            Descargar Excel
+          </IonButton>
         </div>
       </IonContent>
-    </IonPage>
+    </>
   );
 };
 
 export default ReportBadState;
-
-
