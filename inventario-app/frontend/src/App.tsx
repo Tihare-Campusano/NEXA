@@ -42,7 +42,7 @@ import Perfil from "./pages/perfil/perfil";
 
 /* Páginas de Registro */
 import RegisterManual from "./pages/register-product/register-manual";
-import ScannerGun from "./pages/register-product/scanner-gun";
+import RegistroPistola from "./pages/register-product/registro_pistola";
 import ScannerCamera from "./pages/register-product/scanner-camera";
 import IAImagen from "./pages/register-product/ia-images/ia-images";
 
@@ -91,7 +91,7 @@ const TabsLayout: React.FC = () => (
             <Route exact path="/tabs/perfil" component={Perfil} />
             {/* Rutas de Registro */}
             <Route exact path="/tabs/registro" component={RegisterManual} />
-            <Route exact path="/tabs/registro/pistola" component={ScannerGun} />
+            <Route exact path="/tabs/registro/pistola" component={RegistroPistola} />
             <Route exact path="/tabs/registro/camera" component={ScannerCamera} />
             <Route exact path="/tabs/registro/ia" component={IAImagen} />
             {/* Ruta interna con Tabs para detalle de producto */}
