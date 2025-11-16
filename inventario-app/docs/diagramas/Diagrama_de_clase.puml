@@ -7,6 +7,7 @@ class Usuario {
     +email: String
     +rol: String
     +activo: Boolean
+    +auth: UUID
     --
     +login()
     +logout()
@@ -21,6 +22,14 @@ class Producto {
     +compatibilidad: String
     +sku: String
     +nombre: String
+    +categoria_id: Int
+    +stock_minimo: Numeric
+    +observaciones: String
+    +activo: Boolean
+    +estado: String
+    +disponibilidad: String
+    +stock: Int
+    +imagen_url: String
     --
     +actualizarStock()
     +asociarCategoria()
@@ -36,16 +45,6 @@ class Categoria {
     +listarProductos()
 }
 
-class Imagen {
-    +id: Int
-    +ruta: String
-    +ancho: Int
-    +alto: Int
-    +fechaCaptura: DateTime
-    --
-    +asociarProducto()
-}
-
 class Movimiento {
     +id: Int
     +fecha: DateTime
@@ -54,14 +53,6 @@ class Movimiento {
     +motivo: String
     --
     +registrar()
-}
-
-class Stock {
-    +cantidad: Int
-    --
-    +incrementar()
-    +decrementar()
-    +consultar()
 }
 
 class Inspeccion {
@@ -87,12 +78,9 @@ class ModeloIA {
 
 ' Relaciones UML
 Usuario "1" --> "*" Movimiento
-Producto "1" --> "*" Imagen
-Producto "1" --> "1" Stock
 Producto "*" --> "1" Categoria
 Producto "1" --> "*" Movimiento
 Producto "1" --> "*" Inspeccion
-Imagen "1" --> "*" Inspeccion
 ModeloIA "1" --> "*" Inspeccion
 
 @enduml
