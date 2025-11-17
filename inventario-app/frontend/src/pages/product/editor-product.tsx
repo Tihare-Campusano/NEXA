@@ -30,7 +30,8 @@ export type Producto = {
     created_at?: string | null;
     updated_at?: string | null;
     categoria?: { nombre?: string | null } | null;
-    stock?: number | null; // por si la tabla tiene stock directo
+    stock?: number | null;
+    imagen_url?: string | null;
 };
 
 export default function EditorProducto() {
@@ -54,7 +55,6 @@ export default function EditorProducto() {
         };
     }, []);
 
-    // Formateador para fecha dd/mm/yyyy HH:MM
     const formatFecha = useCallback((fecha: string | null | undefined) => {
         if (!fecha) return "N/A";
         try {
@@ -70,20 +70,11 @@ export default function EditorProducto() {
         }
     }, []);
 
-    // Construye URL pública de la imagen en el bucket "images" usando created_at + .jpeg
-    const buildImageUrl = (createdAt?: string | null) => {
-        if (!createdAt) return null;
-        const filename = `${createdAt}.jpeg`;
-        const encoded = encodeURIComponent(filename);
-        const base = import.meta.env.VITE_SUPABASE_URL as string;
-        // URL pública estándar de Supabase storage
-        return `${base}/storage/v1/object/public/imageness/${encoded}`;
-    };
-
     useEffect(() => {
         if (!id) return;
 
         let ignore = false;
+
         const fetchProducto = async () => {
             if (mountedRef.current && !ignore) {
                 setProducto(null);
@@ -94,7 +85,7 @@ export default function EditorProducto() {
 
             const { data, error } = await supabase
                 .from("productos")
-                .select("*, categoria:categorias(nombre)")
+                .select("*, imagen_url, categoria:categorias(nombre)")
                 .eq("id", Number(id))
                 .single();
 
@@ -105,9 +96,7 @@ export default function EditorProducto() {
                 setProducto(null);
             } else {
                 const d = data as Producto;
-                // normalizar codigo_barras (usa codigo_barras o sku)
                 const codigo_barras = (d as any).codigo_barras ?? (d as any).sku ?? null;
-                // si la tabla tiene stock directo en la fila (stock numérico), úsalo; si no existe, intenta p. stock
                 const normalized: Producto = {
                     ...(d as any),
                     codigo_barras,
@@ -151,7 +140,6 @@ export default function EditorProducto() {
         alert("Cambios guardados ✅");
     };
 
-    // Actualiza stock restando directamente en la tabla productos.stock
     const handleRemoveStock = async () => {
         if (!producto) return;
         const qty = Math.max(0, Math.floor(Number(removeQty || 0)));
@@ -183,7 +171,6 @@ export default function EditorProducto() {
         alert("Stock actualizado ✅");
     };
 
-    // Handler copiar código de barras
     const copyCodigo = async () => {
         const text = String(editData.codigo_barras ?? producto?.codigo_barras ?? producto?.sku ?? "");
         if (!text) return;
@@ -192,25 +179,22 @@ export default function EditorProducto() {
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         } catch {
-            // fallback simple
             alert("Copiado: " + text);
         }
     };
 
-    // Placeholder SVG data URI (pequeña imagen cuando no existe foto)
     const placeholder =
         "data:image/svg+xml;utf8," +
         encodeURIComponent(
             `<svg xmlns='http://www.w3.org/2000/svg' width='600' height='400' viewBox='0 0 600 400'>
-        <rect width='100%' height='100%' fill='#f3f4f6'/>
-        <text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='#9ca3af' font-size='20'>No hay imagen</text>
+            <rect width='100%' height='100%' fill='#f3f4f6'/>
+            <text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='#9ca3af' font-size='20'>No hay imagen</text>
         </svg>`
         );
 
-    // Imagen URL calculada
-    const imageUrl = buildImageUrl(producto?.created_at);
+    // Imagen REAL desde la DB
+    const imageUrl = !imgError && producto?.imagen_url ? producto.imagen_url : placeholder;
 
-    // Loader
     if (loading) {
         return (
             <IonPage>
@@ -250,7 +234,7 @@ export default function EditorProducto() {
                         <div className="top-row">
                             <div className="image-wrap">
                                 <img
-                                    src={!imgError && imageUrl ? imageUrl : placeholder}
+                                    src={imageUrl}
                                     alt={producto.nombre}
                                     onError={() => setImgError(true)}
                                     className="product-image"
@@ -357,7 +341,6 @@ export default function EditorProducto() {
                 </div>
             </IonContent>
 
-            {/* Modal para retirar stock */}
             {showRemoveModal && (
                 <div className="modal-overlay">
                     <div className="modal-card">
