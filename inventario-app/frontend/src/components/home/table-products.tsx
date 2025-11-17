@@ -19,7 +19,7 @@ export type Producto = {
 };
 
 type Props = {
-    productos?: Producto[] | null; // puede venir undefined | null | array
+    productos?: Producto[] | null;
 };
 
 export default function ProductosTable({ productos: productosProp }: Props) {
@@ -29,7 +29,7 @@ export default function ProductosTable({ productos: productosProp }: Props) {
     const isMounted = useRef(true);
     const fetchInFlight = useRef(false);
 
-    // 🔹 Formateador de fecha
+    // 🔹 Formatear fecha
     function formatearFecha(fechaISO: string) {
         try {
             const date = new Date(fechaISO);
@@ -46,105 +46,80 @@ export default function ProductosTable({ productos: productosProp }: Props) {
                 })
             );
         } catch {
-            return fechaISO ?? "-";
+            return "-";
         }
     }
 
-    // Fetch desde Supabase
+    // 🔹 FETCH desde Supabase
     const fetchProductos = useCallback(async () => {
-        // Evitar llamadas concurrentes
         if (fetchInFlight.current) return;
         fetchInFlight.current = true;
 
         setLoading(true);
+
         try {
-            console.debug("[ProductosTable] fetchProductos: llamando a supabase...");
             const { data, error } = await supabase
                 .from("productos")
-                .select(
-                    `
-            id,
-            nombre,
-            activo,
-            stock,
-            estado,
-            disponibilidad,
-            created_at
-        `
-                )
+                .select(`
+                    id,
+                    nombre,
+                    activo,
+                    stock,
+                    estado,
+                    disponibilidad,
+                    created_at
+                `)
                 .order("id", { ascending: false });
 
-            if (error) {
-                console.error("[ProductosTable] Error al cargar productos:", error.message);
-                // No sobreescribir la lista actual si hay error (mejor dejar lo que haya)
-            } else if (data && Array.isArray(data)) {
+            if (error) console.error("Error al cargar productos:", error);
+
+            if (data && Array.isArray(data)) {
                 const productosFormateados: Producto[] = data.map((p: any) => ({
                     id: p.id,
                     nombre: p.nombre ?? "Sin nombre",
                     activo: !!p.activo,
-                    stock: (typeof p.stock === "number" ? p.stock : p.stock ?? 0) ?? 0,
+                    stock: typeof p.stock === "number" ? p.stock : 0,
                     estado: p.estado ?? "N/A",
                     disponibilidad: p.disponibilidad ?? "N/A",
                     fecha: p.created_at ? formatearFecha(p.created_at) : "-",
                 }));
 
-                if (isMounted.current) {
-                    setProductos(productosFormateados);
-                }
-            } else {
-                // data === null o inesperado
-                console.warn("[ProductosTable] fetchProductos: data vacía o no es array", data);
-                if (isMounted.current) setProductos([]);
+                if (isMounted.current) setProductos(productosFormateados);
             }
         } catch (e) {
-            console.error("[ProductosTable] Excepción fetchProductos:", e);
+            console.error("Excepción fetchProductos:", e);
         } finally {
             fetchInFlight.current = false;
             if (isMounted.current) setLoading(false);
         }
     }, []);
 
-    // Manage lifecycle + props
+    // 🔹 Manejo de props + recarga automática
     useEffect(() => {
         isMounted.current = true;
 
-        // Si productosProp está definido (puede ser null o array)
-        // - undefined  -> cargar desde supabase
-        // - null       -> búsqueda realizada pero sin resultados -> mostrar vacío
-        // - array      -> mostrar array
-        if (productosProp !== undefined) {
-            // Si vienen resultados (array) o null explícito (buscar sin resultados)
-            console.debug("[ProductosTable] productosProp recibido:", productosProp);
-            setProductos(productosProp ?? []); // null -> []
+        if (Array.isArray(productosProp) && productosProp.length > 0) {
+            setProductos(productosProp);
             setLoading(false);
         } else {
-            // productosProp === undefined -> cargar datos desde supabase
             fetchProductos();
         }
 
         return () => {
             isMounted.current = false;
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [productosProp, fetchProductos]); // fetchProductos está memorizado con useCallback
-
-    // Recargar cuando la ventana reciba foco (útil al volver desde otra página)
-    useEffect(() => {
-        function onFocus() {
-            console.debug("[ProductosTable] window focus - revalidando datos");
-            // Solo recargar si NO estamos mostrando resultados provenientes de búsqueda
-            if (productosProp === undefined) {
-                fetchProductos();
-            } else {
-                console.debug("[ProductosTable] productosProp definido, no re-cargar desde focus");
-            }
-        }
-
-        window.addEventListener("focus", onFocus);
-        return () => window.removeEventListener("focus", onFocus);
     }, [productosProp, fetchProductos]);
 
-    // Mostrar mensaje de carga sólo al inicio (si no hay datos)
+    // 🔹 Revalidar al volver a la pestaña
+    useEffect(() => {
+        function handleFocus() {
+            fetchProductos();
+        }
+
+        window.addEventListener("focus", handleFocus);
+        return () => window.removeEventListener("focus", handleFocus);
+    }, [fetchProductos]);
+
     if (loading && productos.length === 0) {
         return <p>Cargando productos...</p>;
     }
@@ -158,6 +133,7 @@ export default function ProductosTable({ productos: productosProp }: Props) {
                 </div>
             </div>
 
+            {/* TABLA EXTENDIDA (más abajo y más alta) */}
             <div className="table-container">
                 <table>
                     <thead>

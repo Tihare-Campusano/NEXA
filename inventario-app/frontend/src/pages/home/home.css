@@ -3,3 +3,22 @@ ion-toolbar {
   justify-content: center;
   align-items: center;
 }
+/* Contenedor principal: ocupa toda la pantalla */
+.home-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Hace que la tabla crezca y use el espacio disponible */
+.tabla-wrapper {
+  flex-grow: 1;
+  overflow-y: auto;
+  margin-top: 0.5rem;
+  padding-bottom: 2rem; /* para que no quede pegada al menú inferior */
+}
+
+/* Opcional: más ancho para que vea más limpia */
+.tabla-wrapper table {
+  width: 100%;
+}
