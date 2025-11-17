@@ -13,7 +13,13 @@ origins = [
     "http://localhost",
     "http://localhost:3000",
     "http://localhost:8100",
-    "https://inventario-ia-api-887072391939.us-central1.run.app"
+    "https://inventario-ia-api-887072391939.us-central1.run.app",
+
+    # 📱 Necesario para que funcione en tablet
+    "capacitor://localhost",
+    "http://192.168.0.0/16",   # permite toda la red WiFi
+    "http://127.0.0.1",
+    "https://localhost",
 ]
 
 app.add_middleware(
