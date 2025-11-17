@@ -7,7 +7,8 @@
 
 /* Card principal */
 .editor-producto-card {
-    background: #fff;
+    background: var(--ion-card-background, #ffffff);
+    color: var(--ion-text-color, #111827);
     padding: 1.2rem;
     border-radius: 10px;
     box-shadow: 0 8px 28px rgba(17, 24, 39, 0.06);
@@ -40,7 +41,7 @@
     height: auto;
     object-fit: cover;
     border-radius: 8px;
-    border: 1px solid #e6e6e6;
+    border: 1px solid rgba(148, 163, 184, 0.5);
     box-shadow: 0 6px 18px rgba(2, 6, 23, 0.06);
 }
 
@@ -54,7 +55,7 @@
 
 /* Back icon arriba */
 .back-icon {
-    color: #374151;
+    color: var(--ion-text-color, #374151);
     cursor: pointer;
     font-size: 20px;
     margin-bottom: 6px;
@@ -65,7 +66,7 @@
     margin: 0;
     font-size: 1.25rem;
     font-weight: 700;
-    color: #0f172a;
+    color: var(--ion-text-color, #0f172a);
 }
 
 /* fila del codigo y metadatos */
@@ -78,10 +79,10 @@
 
 /* caja del codigo de barras */
 .barcode-box {
-    background: #f8fafc;
+    background: rgba(148, 163, 184, 0.08);
     padding: 8px 10px;
     border-radius: 8px;
-    border: 1px solid #e6eef7;
+    border: 1px solid rgba(148, 163, 184, 0.4);
     display: flex;
     gap: 12px;
     align-items: center;
@@ -96,7 +97,7 @@
 
 .barcode-label {
     font-size: 0.82rem;
-    color: #374151;
+    color: var(--ion-text-color, #374151);
     font-weight: 600;
     margin-right: 6px;
 }
@@ -106,13 +107,13 @@
     background: transparent;
     border: none;
     cursor: pointer;
-    color: #374151;
+    color: var(--ion-text-color, #374151);
     padding: 6px;
     border-radius: 6px;
 }
 
 .copy-btn:hover {
-    background: rgba(0, 0, 0, 0.03);
+    background: rgba(0, 0, 0, 0.06);
 }
 
 /* badge copiado */
@@ -127,7 +128,7 @@
 .meta-row {
     display: flex;
     gap: 12px;
-    color: #374151;
+    color: var(--ion-text-color, #374151);
     font-size: 0.9rem;
     margin-left: 6px;
     align-items: center;
@@ -146,21 +147,33 @@
     display: block;
     margin-top: 10px;
     font-weight: 600;
-    color: #111827;
+    color: var(--ion-text-color, #111827);
     margin-bottom: 6px;
 }
 
 /* Inputs y textarea */
 .editor-body input,
 .editor-body textarea {
-    border: 1px solid #e6e6e6;
+    border: 1px solid var(--ion-color-medium, #e6e6e6);
     padding: 8px 10px;
     border-radius: 8px;
     width: 100%;
     box-sizing: border-box;
     font-size: 0.95rem;
-    background: #fff;
+    background: var(--ion-background-color, #ffffff);
+    color: var(--ion-text-color, #111827);
     outline: none;
+}
+
+.editor-body input::placeholder,
+.editor-body textarea::placeholder {
+    color: #9ca3af;
+}
+
+.editor-body input:focus,
+.editor-body textarea:focus {
+    border-color: var(--ion-color-primary, #28a745);
+    box-shadow: 0 0 0 1px rgba(40, 167, 69, 0.3);
 }
 
 .editor-body textarea {
@@ -267,7 +280,53 @@
     text-align: center;
     margin-top: 2rem;
     font-size: 1.05rem;
-    color: #444;
+    color: var(--ion-text-color, #444444);
+}
+
+/* --------- MODO OSCURO ESPECÍFICO --------- */
+body.dark .editor-producto-card {
+    background: #020617;
+    color: #e5e7eb;
+}
+
+body.dark .product-title {
+    color: #e5e7eb;
+}
+
+body.dark .barcode-box {
+    background: rgba(15, 23, 42, 0.9);
+    border-color: rgba(75, 85, 99, 0.9);
+}
+
+body.dark .barcode-label,
+body.dark .meta-row,
+body.dark .field-label {
+    color: #e5e7eb;
+}
+
+body.dark .copy-btn {
+    color: #e5e7eb;
+}
+
+body.dark .copy-btn:hover {
+    background: rgba(148, 163, 184, 0.2);
+}
+
+/* inputs / textareas en modo oscuro */
+body.dark .editor-body input,
+body.dark .editor-body textarea {
+    background: #020617;
+    color: #f9fafb;
+    border-color: #4b5563;
+}
+
+body.dark .editor-body input::placeholder,
+body.dark .editor-body textarea::placeholder {
+    color: #9ca3af;
+}
+
+body.dark .loading-container {
+    color: #e5e7eb;
 }
 
 /* Responsive adjustments */

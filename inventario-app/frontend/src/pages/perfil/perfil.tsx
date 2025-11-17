@@ -134,7 +134,7 @@ export default function Perfil() {
                 </div>
               </div>
 
-              <button
+              {/* <button
                 className="btn-soporte"
                 onClick={handleSoporte}
                 style={{
@@ -150,7 +150,7 @@ export default function Perfil() {
                 }}
               >
                 Soporte
-              </button>
+              </button> */}
 
               <button
                 className="btn-logout"

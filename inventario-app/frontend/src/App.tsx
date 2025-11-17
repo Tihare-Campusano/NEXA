@@ -13,6 +13,7 @@ import {
 import { IonReactRouter } from "@ionic/react-router";
 import { home, barChart, create, list, person } from "ionicons/icons";
 import { StatusBar, Style } from "@capacitor/status-bar";
+import AuthCallback from "./pages/auth/AuthCallback";
 
 
 /* CSS de Ionic */
@@ -68,6 +69,8 @@ const App: React.FC = () => {
             {/* Rutas Públicas */}
             <Route exact path="/" render={() => <Redirect to="/login" />} />
             <Route exact path="/login" component={Login} />
+            <Route exact path="/auth/callback" component={AuthCallback} /> 
+
             {/* Rutas con Tabs */}
             <Route path="/tabs" render={() => <TabsLayout />} />
           </IonRouterOutlet>

@@ -1,5 +1,6 @@
 :root {
   /* Colores principales */
+  --ion-toolbar-color: #000000;
   --ion-color-primary: #28a745; /* Verde principal */
   --ion-color-primary-rgb: 40, 167, 69;
   --ion-color-primary-contrast: #ffffff;
@@ -44,6 +45,7 @@
 
 /* ✅ Tema oscuro (UNA sola vez) */
 body.dark {
+  --ion-toolbar-color: #ffffff;
   --ion-background-color: #0f1115;
   --ion-background-color-rgb: 15, 17, 21;
 
