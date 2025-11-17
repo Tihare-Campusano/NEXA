@@ -9,7 +9,7 @@ import {
   IonText,
 } from "@ionic/react";
 
-import { supabase } from "../../../../supabaseClient";
+import { getSupabase } from "../../../../../backend/app/services/supabase_service";
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -20,7 +20,7 @@ import { Filesystem, Directory } from "@capacitor/filesystem";
 import { FileOpener } from "@capacitor-community/file-opener";
 import { Toast } from "@capacitor/toast";
 
-import "./report_stock_month.css";
+import "./report_register_for_month.css";
 
 interface ProductoStock {
   codigo: string;
@@ -64,7 +64,7 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
      📥 Obtener productos con stock ordenado ASC
   ============================================================ */
   const obtenerStock = async (): Promise<ProductoStock[]> => {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from("productos")
       .select(`
         sku,

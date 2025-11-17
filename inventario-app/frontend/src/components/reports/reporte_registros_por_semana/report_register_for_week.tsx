@@ -9,7 +9,7 @@ import {
   IonText,
 } from "@ionic/react";
 
-import { supabase } from "../../../../supabaseClient";
+import { getSupabase } from "../../../../../backend/app/services/supabase_service";
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -85,7 +85,7 @@ const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
      📥 Obtener registros desde Supabase
   ============================================================ */
   const obtenerRegistros = async (): Promise<ProductoSemana[]> => {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from("productos")
       .select("sku, nombre, marca, created_at");
 

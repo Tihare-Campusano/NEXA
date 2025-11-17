@@ -9,7 +9,7 @@ import {
   IonText,
 } from "@ionic/react";
 
-import { supabase } from "../../../../supabaseClient";
+import { getSupabase } from "../../../../../backend/app/services/supabase_service";
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -76,7 +76,7 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
     inicioMes.setDate(1);
     inicioMes.setHours(0, 0, 0, 0);
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from("productos")
       .select(`
         sku,
