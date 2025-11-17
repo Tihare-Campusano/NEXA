@@ -105,6 +105,7 @@ def registrar_producto_y_imagen(
     categoria_id: Optional[str] = None,
     compatibilidad: Optional[str] = None,
     observaciones: Optional[str] = None,
+    imagen_url: Optional[str] = None
 ):
     print(f"[START] Procesando código: {codigo_barras}")
     current_time = datetime.now().isoformat()
