@@ -10,53 +10,71 @@ import {
 } from "@ionic/react";
 
 import { supabase } from "../../../supabaseClient";
+
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
-import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Capacitor } from "@capacitor/core";
+import { Filesystem, Directory } from "@capacitor/filesystem";
 import { FileOpener } from "@capacitor-community/file-opener";
 import { Toast } from "@capacitor/toast";
+
 import "./report_bad_state.css";
 
+/* ============================================================
+   📌 INTERFACES
+   ============================================================ */
 interface Producto {
   codigo: string;
   nombre: string;
-  cantidad: number;
   estado: string;
-  categoria: string;
+  marca: string;
+  cantidad: number;
 }
 
-interface ReportBadStateProps {
+interface Props {
   onDidDismiss: () => void;
 }
 
-const ReportBadState: React.FC<ReportBadStateProps> = ({ onDidDismiss }) => {
-  const [alertMessage, setAlertMessage] = useState<string | null>(null);
+/* ============================================================
+   📌 COMPONENTE PRINCIPAL
+   ============================================================ */
+const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
+  const [alertMsg, setAlertMsg] = useState<string | null>(null);
 
-  const mostrarNotificacion = async (mensaje: string) => {
-    await Toast.show({ text: mensaje, duration: "long" });
+  /* ============================================================
+     📌 Toast Notification
+     ============================================================ */
+  const notify = async (msg: string) => {
+    await Toast.show({ text: msg, duration: "long" });
   };
 
-  const solicitarPermisoDescarga = async (): Promise<boolean> => {
+  /* ============================================================
+     📌 Solicitar permiso de almacenamiento (solo Android)
+     ============================================================ */
+  const solicitarPermiso = async (): Promise<boolean> => {
     if (Capacitor.getPlatform() === "android") {
       try {
-        const r = await Filesystem.requestPermissions();
-        if (r.publicStorage !== "granted") {
-          mostrarNotificacion("Se requiere permiso de almacenamiento.");
+
+        const status = await Filesystem.requestPermissions();
+        if (status.publicStorage !== "granted") {
+          notify("Debes otorgar permiso de almacenamiento.");
           return false;
         }
       } catch (err) {
-        console.error("Error permisos:", err);
-        mostrarNotificacion("No se pudo obtener el permiso.");
+        console.error(err);
+        notify("Error obteniendo permiso.");
         return false;
       }
     }
     return true;
   };
 
-  // 🔹 CORREGIDO según tu estructura real de productos
+
+  /* ============================================================
+     📌 Obtener productos con estado = 'mal estado'
+     ============================================================ */
   const fetchProductos = async (): Promise<Producto[]> => {
     const { data, error } = await supabase
       .from("productos")
@@ -67,56 +85,72 @@ const ReportBadState: React.FC<ReportBadStateProps> = ({ onDidDismiss }) => {
         stock,
         disponibilidad
       `)
-      .eq("estado", "Mal estado");
+      .eq("estado", "mal estado");
 
     if (error) {
-      console.error("Error al obtener productos:", error.message);
+      console.error(error);
       throw error;
     }
 
     console.log("PRODUCTOS MAL ESTADO:", data);
 
     return (data ?? []).map((p: any) => ({
-      codigo: p.id ?? "",
-      nombre: p.observaciones ?? "Sin descripción",
-      cantidad: p.stock ?? 0,
-      estado: p.estado ?? "",
-      categoria: p.disponibilidad ?? "General",
+
+      codigo: p.sku ?? "",
+      nombre: p.nombre ?? "",
+      estado: p.estado ?? "N/A",
+      marca: p.marca ?? "General",
+      cantidad: p.stock?.[0]?.cantidad ?? 0,
     }));
   };
 
-  const guardarEnDispositivo = async (
+  /* ============================================================
+     📌 Guardar archivos (Android / Web)
+     ============================================================ */
+  const guardarArchivo = async (
     fileName: string,
     base64Data: string,
-    mimeType: string
+    mime: string
   ) => {
-    try {
-      const savedFile = await Filesystem.writeFile({
-        path: fileName,
-        data: base64Data,
-        directory: Directory.Documents,
-        recursive: true,
-      });
+    const isAndroid = Capacitor.getPlatform() === "android";
 
+    if (isAndroid) {
       try {
-        await FileOpener.open({
-          filePath: savedFile.uri,
-          contentType: mimeType,
+        const saved = await Filesystem.writeFile({
+          path: fileName,
+          data: base64Data,
+          directory: Directory.Data, // ← 100% compatible Android 10–14
+          recursive: true,
         });
-      } catch {
-        mostrarNotificacion("Archivo guardado en Documentos.");
+
+
+        const fileUri = Capacitor.convertFileSrc(saved.uri);
+
+        try {
+          await FileOpener.open({ filePath: fileUri, contentType: mime });
+        } catch (err) {
+          notify("Archivo guardado. Revísalo en Documentos.");
+        }
+      } catch (err) {
+        console.error(err);
+        notify("Error guardando archivo.");
       }
-    } catch (e) {
-      console.error("Error al guardar archivo", e);
-      mostrarNotificacion("Error al guardar archivo.");
+    } else {
+      // WEB
+      const link = document.createElement("a");
+      link.href = "data:" + mime + ";base64," + base64Data;
+      link.download = fileName;
+      link.click();
     }
   };
 
+  /* ============================================================
+     📌 Exportar PDF
+     ============================================================ */
   const exportarPDF = async () => {
-    const permitido = await solicitarPermisoDescarga();
-    if (!permitido) return;
+    if (!(await solicitarPermiso())) return;
 
-    mostrarNotificacion("Generando PDF...");
+    notify("Generando PDF...");
 
     try {
       const productos = await fetchProductos();
@@ -126,91 +160,86 @@ const ReportBadState: React.FC<ReportBadStateProps> = ({ onDidDismiss }) => {
 
       autoTable(doc, {
         startY: 20,
-        head: [["Código", "Descripción", "Cantidad", "Estado", "Categoría"]],
+
+        head: [["Código", "Nombre", "Estado", "Marca", "Cantidad"]],
         body: productos.map((p) => [
           p.codigo,
           p.nombre,
-          p.cantidad.toString(),
           p.estado,
-          p.categoria,
+          p.marca,
+          p.cantidad.toString(),
         ]),
       });
 
-      const finalY = (doc as any).lastAutoTable?.finalY || 30;
-      doc.text(
-        'Este reporte muestra todos los productos con estado "Mal estado".',
-        14,
-        finalY + 10
-      );
 
-      const base64Data = doc.output("datauristring").split(",")[1];
-      const timestamp = new Date().getTime();
+      const base64 = doc.output("datauristring").split(",")[1];
+      const stamp = new Date().getTime();
 
-      await guardarEnDispositivo(
-        `reporte_mal_estado_${timestamp}.pdf`,
-        base64Data,
+      await guardarArchivo(
+        `reporte_mal_estado_${stamp}.pdf`,
+        base64,
         "application/pdf"
       );
 
-      mostrarNotificacion("PDF descargado correctamente.");
-    } catch (error) {
-      console.error("Error PDF:", error);
-      mostrarNotificacion("No se pudo generar el PDF.");
+      notify("PDF generado correctamente.");
+    } catch (err) {
+      console.error(err);
+      notify("Error generando PDF.");
     }
   };
 
+  /* ============================================================
+     📌 Exportar Excel
+     ============================================================ */
   const exportarExcel = async () => {
-    const permitido = await solicitarPermisoDescarga();
-    if (!permitido) return;
+    if (!(await solicitarPermiso())) return;
 
-    mostrarNotificacion("Generando Excel...");
+    notify("Generando Excel...");
 
     try {
       const productos = await fetchProductos();
 
-      const datosExcel = productos.map((p) => ({
-        Código: p.codigo,
-        Descripción: p.nombre,
-        Cantidad: Number(p.cantidad),
-        Estado: p.estado,
-        Categoría: p.categoria,
-      }));
+      const ws = XLSX.utils.json_to_sheet(
+        productos.map((p) => ({
+          Código: p.codigo,
+          Nombre: p.nombre,
+          Estado: p.estado,
+          Marca: p.marca,
+          Cantidad: p.cantidad,
+        }))
+      );
 
-      const ws = XLSX.utils.json_to_sheet(datosExcel);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Productos Mal Estado");
+      XLSX.utils.book_append_sheet(wb, ws, "Mal Estado");
 
-      const base64Data = XLSX.write(wb, {
-        bookType: "xlsx",
-        type: "base64",
-      });
+      const base64 = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
+      const stamp = new Date().getTime();
 
-      const timestamp = new Date().getTime();
-      await guardarEnDispositivo(
-        `reporte_mal_estado_${timestamp}.xlsx`,
-        base64Data,
+      await guardarArchivo(
+        `reporte_mal_estado_${stamp}.xlsx`,
+        base64,
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
 
-      mostrarNotificacion("Excel descargado correctamente.");
-    } catch (error) {
-      console.error("Error Excel:", error);
-      mostrarNotificacion("No se pudo generar el Excel.");
+      notify("Excel generado correctamente.");
+    } catch (err) {
+      console.error(err);
+      notify("Error generando Excel.");
     }
   };
 
   return (
     <>
-      {alertMessage && (
-        <div className="alert-modal">
-          <p>{alertMessage}</p>
-          <IonButton onClick={() => setAlertMessage(null)}>Aceptar</IonButton>
+      {alertMsg && (
+        <div className="alert-overlay">
+          <p>{alertMsg}</p>
+          <IonButton onClick={() => setAlertMsg(null)}>Aceptar</IonButton>
         </div>
       )}
 
       <IonHeader>
         <IonToolbar>
-          <IonTitle>Productos Mal Estado</IonTitle>
+          <IonTitle>Reporte de Productos en Mal Estado</IonTitle>
           <IonButtons slot="end">
             <IonButton onClick={onDidDismiss}>Cerrar</IonButton>
           </IonButtons>
@@ -220,18 +249,25 @@ const ReportBadState: React.FC<ReportBadStateProps> = ({ onDidDismiss }) => {
       <IonContent className="ion-padding">
         <IonText>
           <h3 style={{ textAlign: "center", fontWeight: "bold" }}>
-            ¿Deseas descargar el reporte?
+            ¿Descargar PDF o Excel?
           </h3>
-          <p style={{ textAlign: "center", fontSize: "0.9rem", color: "#666" }}>
-            Los archivos se guardarán en la carpeta Documentos.
+
+          <p style={{ textAlign: "center", color: "#666" }}>
+            Los archivos se guardarán en tu dispositivo.
           </p>
         </IonText>
 
-        <div className="modal-buttons-container">
+        <div style={{ padding: "16px" }}>
           <IonButton expand="block" color="danger" onClick={exportarPDF}>
             Descargar PDF
           </IonButton>
-          <IonButton expand="block" color="success" onClick={exportarExcel}>
+
+          <IonButton
+            expand="block"
+            color="success"
+            onClick={exportarExcel}
+            style={{ marginTop: "10px" }}
+          >
             Descargar Excel
           </IonButton>
         </div>
