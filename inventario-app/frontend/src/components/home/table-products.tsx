@@ -98,9 +98,22 @@ export default function ProductosTable({ productos: productosProp }: Props) {
     useEffect(() => {
         isMounted.current = true;
 
-        if (Array.isArray(productosProp) && productosProp.length > 0) {
-            setProductos(productosProp);
-            setLoading(false);
+        if (Array.isArray(productosProp)) {
+            // Normalizamos cada item para que tenga las propiedades que la tabla usa
+            const productosNormalizados: Producto[] = productosProp.map((p: any) => ({
+                id: Number(p.id ?? 0),
+                nombre: p.nombre ?? "Sin nombre",
+                activo: !!p.activo,
+                stock: typeof p.stock === "number" ? p.stock : (p.stock ?? 0),
+                estado: p.estado ?? (p.stock?.estado ?? "N/A"),
+                disponibilidad: p.disponibilidad ?? "N/A",
+                fecha: p.fecha ?? (p.created_at ? formatearFecha(p.created_at) : "-"),
+            }));
+
+            if (isMounted.current) {
+                setProductos(productosNormalizados);
+                setLoading(false);
+            }
         } else {
             fetchProductos();
         }

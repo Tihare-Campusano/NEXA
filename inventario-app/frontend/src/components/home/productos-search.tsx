@@ -15,17 +15,37 @@ export default function ProductosSearch({ onResults }: Props) {
     const [query, setQuery] = useState("");
     const [loading, setLoading] = useState(false);
 
+    // ---------- FORMATEO DE FECHA ----------
+    const formatFecha = (iso: string | null | undefined) => {
+        if (!iso) return "-";
+        try {
+            const d = new Date(iso);
+            return (
+                d.toLocaleDateString("es-CL", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                }) +
+                " " +
+                d.toLocaleTimeString("es-CL", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                })
+            );
+        } catch {
+            return "-";
+        }
+    };
+
     // ---------- FORMATEO DE DATOS ----------
     const mapProducto = (p: any) => ({
         id: p.id,
-        nombre: p.nombre,
-        marca: p.marca,
-        modelo: p.modelo,
-        codigo_barras: p.codigo_barras ?? null,
-        activo: p.activo,
-        stock: p.stock?.cantidad ?? 0,
-        estado: p.stock?.estado ?? "N/A",
-        created_at: p.created_at,
+        nombre: p.nombre ?? "Sin nombre",
+        stock: typeof p.stock === "number" ? p.stock : (p.stock?.cantidad ?? 0),
+        estado: p.stock?.estado ?? p.estado ?? "N/A",
+        disponibilidad: p.disponibilidad ?? "N/A",
+        activo: !!p.activo,
+        fecha: p.created_at ? formatFecha(p.created_at) : "-",
     });
 
     // ---------- CARGAR TODO ----------
@@ -37,11 +57,10 @@ export default function ProductosSearch({ onResults }: Props) {
             .select(`
                 id,
                 nombre,
-                marca,
-                modelo,
-                codigo_barras,
                 activo,
                 created_at,
+                disponibilidad,
+                estado,
                 stock ( cantidad, estado )
             `)
             .order("id", { ascending: false });
@@ -63,15 +82,14 @@ export default function ProductosSearch({ onResults }: Props) {
             .select(`
                 id,
                 nombre,
-                marca,
-                modelo,
-                codigo_barras,
                 activo,
                 created_at,
+                disponibilidad,
+                estado,
                 stock ( cantidad, estado )
             `)
             .or(
-                `nombre.ilike.%${query}%,marca.ilike.%${query}%,modelo.ilike.%${query}%,codigo_barras.ilike.%${query}%`
+                `nombre.ilike.%${query}%,estado.ilike.%${query}%,disponibilidad.ilike.%${query}%`
             )
             .order("id", { ascending: false });
 
@@ -98,7 +116,7 @@ export default function ProductosSearch({ onResults }: Props) {
 
                 <input
                     type="text"
-                    placeholder="Buscar por nombre, código de barras..."
+                    placeholder="Buscar por nombre, estado, disponibilidad, código..."
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     className="search-input"

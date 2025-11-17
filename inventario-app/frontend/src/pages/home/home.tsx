@@ -7,7 +7,7 @@ import HeaderApp from "../../components/header_app";
 import "./home.css";
 
 export default function Home() {
-  const [productosFiltrados, setProductosFiltrados] = useState<any[] | null>(null);
+  const [productosFiltrados, setProductosFiltrados] = useState<any[] | undefined>(undefined);
 
   return (
     <IonPage>
