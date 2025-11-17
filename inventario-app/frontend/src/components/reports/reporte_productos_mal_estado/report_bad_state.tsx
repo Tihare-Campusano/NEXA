@@ -42,8 +42,8 @@ const ReportBadState: React.FC<ReportBadStateProps> = ({ onDidDismiss }) => {
   const solicitarPermisoDescarga = async (): Promise<boolean> => {
     if (Capacitor.getPlatform() === "android") {
       try {
-        const request = await Filesystem.requestPermissions();
-        if (request.publicStorage !== "granted") {
+        const r = await Filesystem.requestPermissions();
+        if (r.publicStorage !== "granted") {
           mostrarNotificacion("Se requiere permiso de almacenamiento.");
           return false;
         }
@@ -56,15 +56,16 @@ const ReportBadState: React.FC<ReportBadStateProps> = ({ onDidDismiss }) => {
     return true;
   };
 
+  // 🔹 CORREGIDO según tu estructura real de productos
   const fetchProductos = async (): Promise<Producto[]> => {
     const { data, error } = await supabase
       .from("productos")
       .select(`
-        sku,
-        nombre,
+        id,
+        observaciones,
         estado,
-        marca,
-        stock(cantidad)
+        stock,
+        disponibilidad
       `)
       .eq("estado", "Mal estado");
 
@@ -73,12 +74,14 @@ const ReportBadState: React.FC<ReportBadStateProps> = ({ onDidDismiss }) => {
       throw error;
     }
 
+    console.log("PRODUCTOS MAL ESTADO:", data);
+
     return (data ?? []).map((p: any) => ({
-      codigo: p.sku ?? "",
-      nombre: p.nombre ?? "",
-      cantidad: p.stock?.[0]?.cantidad ?? 0,
+      codigo: p.id ?? "",
+      nombre: p.observaciones ?? "Sin descripción",
+      cantidad: p.stock ?? 0,
       estado: p.estado ?? "",
-      categoria: p.marca ?? "",
+      categoria: p.disponibilidad ?? "General",
     }));
   };
 
@@ -100,7 +103,7 @@ const ReportBadState: React.FC<ReportBadStateProps> = ({ onDidDismiss }) => {
           filePath: savedFile.uri,
           contentType: mimeType,
         });
-      } catch (e) {
+      } catch {
         mostrarNotificacion("Archivo guardado en Documentos.");
       }
     } catch (e) {
@@ -117,12 +120,13 @@ const ReportBadState: React.FC<ReportBadStateProps> = ({ onDidDismiss }) => {
 
     try {
       const productos = await fetchProductos();
+
       const doc = new jsPDF();
       doc.text("Reporte de Productos en Mal Estado", 14, 15);
 
       autoTable(doc, {
         startY: 20,
-        head: [["Código", "Nombre", "Cantidad", "Estado", "Categoría"]],
+        head: [["Código", "Descripción", "Cantidad", "Estado", "Categoría"]],
         body: productos.map((p) => [
           p.codigo,
           p.nombre,
@@ -134,7 +138,7 @@ const ReportBadState: React.FC<ReportBadStateProps> = ({ onDidDismiss }) => {
 
       const finalY = (doc as any).lastAutoTable?.finalY || 30;
       doc.text(
-        'Este reporte muestra los productos en "Mal estado". Se recomienda desecharlos.',
+        'Este reporte muestra todos los productos con estado "Mal estado".',
         14,
         finalY + 10
       );
@@ -163,9 +167,10 @@ const ReportBadState: React.FC<ReportBadStateProps> = ({ onDidDismiss }) => {
 
     try {
       const productos = await fetchProductos();
+
       const datosExcel = productos.map((p) => ({
         Código: p.codigo,
-        Nombre: p.nombre,
+        Descripción: p.nombre,
         Cantidad: Number(p.cantidad),
         Estado: p.estado,
         Categoría: p.categoria,
