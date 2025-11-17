@@ -9,7 +9,7 @@ type PerfilDB = {
   nombre: string | null;
   rol: string | null;
   email: string | null;
-  auth_id: string | null;
+  auth_uid: string | null;
 };
 
 export default function Perfil() {
@@ -45,12 +45,12 @@ export default function Perfil() {
       // 2) Traer perfil desde tabla usuarios por auth_id (sin fecha_ingreso)
       const { data: row, error: err1 } = await supabase
         .from("usuarios")
-        .select("nombre, rol, email, auth_id")
-        .eq("auth_id", user.id)
+        .select("nombre, rol, email, auth_uid")
+        .eq("auth_uid", user.id)
         .single();
 
       console.log("📋 by auth_id row:", row);
-      if (err1) console.error("❗ by auth_id err:", err1);
+      if (err1) console.error("❗ by auth_uid err:", err1);
 
       if (activo) {
         setPerfilDB(row ?? null);
