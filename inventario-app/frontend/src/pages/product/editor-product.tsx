@@ -31,7 +31,7 @@ export type Producto = {
     updated_at?: string | null;
     categoria?: { nombre?: string | null } | null;
     stock?: number | null;
-    imagen_url?: string | null;
+    imagen_url?: string | null; // URL REAL de la imagen
 };
 
 export default function EditorProducto() {
@@ -83,6 +83,7 @@ export default function EditorProducto() {
                 setLoading(true);
             }
 
+            // OBTIENE imagen_url DIRECTAMENTE, SIN PROCESAR
             const { data, error } = await supabase
                 .from("productos")
                 .select("*, imagen_url, categoria:categorias(nombre)")
@@ -104,6 +105,8 @@ export default function EditorProducto() {
                 };
                 setProducto(normalized);
                 setImgError(false);
+
+                console.log("🔎 Imagen URL cargada:", normalized.imagen_url);
             }
             setLoading(false);
         };
@@ -192,7 +195,7 @@ export default function EditorProducto() {
         </svg>`
         );
 
-    // Imagen REAL desde la DB
+    // URL REAL desde la base de datos (sin trucos, sin created_at)
     const imageUrl = !imgError && producto?.imagen_url ? producto.imagen_url : placeholder;
 
     if (loading) {
