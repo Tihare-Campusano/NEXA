@@ -28,13 +28,13 @@ app.add_middleware(
 class ClassificationRequest(BaseModel):
     image_base64: str
     codigo_barras: str
-
     nombre: Optional[str] = None
     marca: Optional[str] = None
     modelo: Optional[str] = None
     categoria_id: Optional[str] = None
     compatibilidad: Optional[str] = None
     observaciones: Optional[str] = None
+    imagen_url: Optional[str] = None
 
     class Config:
         extra = "allow"   # permitimos campos extras (no rompe si frontend envía más)
@@ -57,6 +57,7 @@ async def classify_product_endpoint(request: ClassificationRequest):
             request.categoria_id,
             request.compatibilidad,
             request.observaciones,
+            request.imagen_url
         )
     except Exception as e:
         print("[API ERROR] Excepción al procesar IA/DB:", repr(e))

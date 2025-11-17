@@ -21,8 +21,8 @@ CONFIDENCE_THRESHOLD = 0.50
 
 supabase: Union[Client, None] = None
 try:
-    from credenciales import SUPABASE_URL, SUPABASE_ANON_KEY
-    supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+    from credenciales import SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+    supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     print("[INIT] Supabase listo.")
 except Exception as e:
     print(f"[ERROR INIT] Supabase no inicializado: {e}")
