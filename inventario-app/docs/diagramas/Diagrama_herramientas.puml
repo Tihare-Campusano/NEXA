@@ -51,6 +51,8 @@ folder "🤖 Inteligencia Artificial" {
     [TensorFlow / Keras]
     [MobileNetV2]
     [TFLite]
+    [Docker] 
+    [Google Cloud Run] 
 }
 
 ' --- Distribución ---
