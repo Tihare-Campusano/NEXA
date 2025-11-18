@@ -22,7 +22,7 @@ supabase: Union[Client, None] = None
 try:
     # IMPORT CORRECTO SEGÚN TU ESTRUCTURA:
     # backend/app/api/credenciales.py
-    from app.api.credenciales import SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+    from .credenciales import SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 
     supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     print("[INIT] Supabase listo.")
