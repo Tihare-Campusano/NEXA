@@ -19,12 +19,21 @@ export type Producto = {
 };
 
 type Props = {
+    /**
+     * Opcional: Se usa cuando los datos vienen de la barra de búsqueda (componente padre).
+     * Si es 'null' o 'undefined', la tabla carga sus propios datos.
+     */
     productos?: Producto[] | null;
 };
 
 export default function ProductosTable({ productos: productosProp }: Props) {
+    // Estado para la data de carga inicial (solo se usa si productosProp es null/undefined)
     const [productos, setProductos] = useState<Producto[]>([]);
-    const [loading, setLoading] = useState(true);
+    
+    // El estado de carga inicial ahora depende de si se recibió data por prop.
+    const [loading, setLoading] = useState(
+        productosProp === undefined || productosProp === null
+    );
 
     const isMounted = useRef(true);
     const fetchInFlight = useRef(false);
@@ -50,7 +59,7 @@ export default function ProductosTable({ productos: productosProp }: Props) {
         }
     }
 
-    // 🔹 FETCH desde Supabase
+    // 🔹 FETCH desde Supabase (Usado para la carga inicial o revalidación sin búsqueda activa)
     const fetchProductos = useCallback(async () => {
         if (fetchInFlight.current) return;
         fetchInFlight.current = true;
@@ -94,27 +103,17 @@ export default function ProductosTable({ productos: productosProp }: Props) {
         }
     }, []);
 
-    // 🔹 Manejo de props + recarga automática
+    // 🔹 Lógica de Manejo de props o Carga Inicial
     useEffect(() => {
         isMounted.current = true;
 
         if (Array.isArray(productosProp)) {
-            // Normalizamos cada item para que tenga las propiedades que la tabla usa
-            const productosNormalizados: Producto[] = productosProp.map((p: any) => ({
-                id: Number(p.id ?? 0),
-                nombre: p.nombre ?? "Sin nombre",
-                activo: !!p.activo,
-                stock: typeof p.stock === "number" ? p.stock : (p.stock ?? 0),
-                estado: p.estado ?? (p.stock?.estado ?? "N/A"),
-                disponibilidad: p.disponibilidad ?? "N/A",
-                fecha: p.fecha ?? (p.created_at ? formatearFecha(p.created_at) : "-"),
-            }));
-
-            if (isMounted.current) {
-                setProductos(productosNormalizados);
-                setLoading(false);
-            }
+            // Caso 1: Hay resultados de la búsqueda (la data ya viene mapeada desde ProductosSearch)
+            setProductos(productosProp);
+            setLoading(false);
         } else {
+            // Caso 2: productosProp es undefined (carga inicial) o null (búsqueda vacía).
+            // Si es null, fetchProductos recarga todo, lo cual es el comportamiento deseado al limpiar la búsqueda.
             fetchProductos();
         }
 
@@ -123,18 +122,26 @@ export default function ProductosTable({ productos: productosProp }: Props) {
         };
     }, [productosProp, fetchProductos]);
 
-    // 🔹 Revalidar al volver a la pestaña
+
+    // 🔹 Revalidar al volver a la pestaña (solo si no hay búsqueda activa)
     useEffect(() => {
         function handleFocus() {
-            fetchProductos();
+            // Si no estamos mostrando resultados de búsqueda (productosProp es null o undefined), revalidamos.
+            if (productosProp === undefined || productosProp === null) {
+                fetchProductos();
+            }
         }
 
         window.addEventListener("focus", handleFocus);
         return () => window.removeEventListener("focus", handleFocus);
-    }, [fetchProductos]);
+    }, [fetchProductos, productosProp]);
 
-    if (loading && productos.length === 0) {
-        return <p>Cargando productos...</p>;
+
+    // Determina qué conjunto de datos renderizar: la prop (búsqueda) o el estado interno (carga inicial)
+    const dataToRender = productosProp && Array.isArray(productosProp) ? productosProp : productos;
+
+    if (loading && dataToRender.length === 0) {
+        return <p className="loading-message">Cargando productos...</p>;
     }
 
     return (
@@ -146,7 +153,7 @@ export default function ProductosTable({ productos: productosProp }: Props) {
                 </div>
             </div>
 
-            {/* TABLA EXTENDIDA (más abajo y más alta) */}
+            {/* TABLA EXTENDIDA */}
             <div className="table-container">
                 <table>
                     <thead>
@@ -161,8 +168,8 @@ export default function ProductosTable({ productos: productosProp }: Props) {
                         </tr>
                     </thead>
                     <tbody>
-                        {productos.length > 0 ? (
-                            productos.map((p) => (
+                        {dataToRender.length > 0 ? (
+                            dataToRender.map((p) => (
                                 <tr key={p.id}>
                                     <td>{p.id}</td>
                                     <td>{p.nombre}</td>
@@ -176,7 +183,11 @@ export default function ProductosTable({ productos: productosProp }: Props) {
                         ) : (
                             <tr>
                                 <td colSpan={7} style={{ textAlign: "center", padding: "10px" }}>
-                                    No hay productos
+                                    {/* Mensaje dinámico según si se está buscando o no */}
+                                    {productosProp !== undefined && productosProp !== null
+                                        ? "No hay productos que coincidan con la búsqueda."
+                                        : "No hay productos."
+                                    }
                                 </td>
                             </tr>
                         )}
