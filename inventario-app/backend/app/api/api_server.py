@@ -5,7 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 
-from api.app_ia import registrar_producto_y_imagen
+# ✅ IMPORT CORRECTO SEGÚN TU ESTRUCTURA
+from app.api.app_ia import registrar_producto_y_imagen
 
 app = FastAPI()
 
@@ -15,7 +16,7 @@ origins = [
     "http://localhost:8100",
     "https://inventario-ia-api-887072391939.us-central1.run.app",
 
-    # 📱 Necesario para que funcione en tablet
+    # 📱 Necesario para aplicaciones móviles / tabletas
     "capacitor://localhost",
     "http://192.168.0.0/16",   # permite toda la red WiFi
     "http://127.0.0.1",
@@ -30,7 +31,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- MODELO (limpio, acepta extras) ---
+# --- MODELO ---
 class ClassificationRequest(BaseModel):
     image_base64: str
     codigo_barras: str
@@ -43,16 +44,17 @@ class ClassificationRequest(BaseModel):
     imagen_url: Optional[str] = None
 
     class Config:
-        extra = "allow"   # permitimos campos extras (no rompe si frontend envía más)
+        extra = "allow"   # permite campos extra sin romper
+
 
 # --- ENDPOINT ---
 @app.post("/api/clasificar-producto")
 async def classify_product_endpoint(request: ClassificationRequest):
-    # Opcional: log de lo que llega (útil para debugear)
+
     print("[API] Request recibido:", request.model_dump(exclude_none=True))
 
     try:
-        # Ejecutar la función síncrona en un thread para no bloquear el event-loop
+        # Llama a la función del backend en un thread separado
         result = await asyncio.to_thread(
             registrar_producto_y_imagen,
             request.image_base64,
@@ -65,17 +67,17 @@ async def classify_product_endpoint(request: ClassificationRequest):
             request.observaciones,
             request.imagen_url
         )
+
     except Exception as e:
         print("[API ERROR] Excepción al procesar IA/DB:", repr(e))
-        # Devolvemos detalle para la consola; el frontend verá 500 y el texto
         raise HTTPException(status_code=500, detail=f"Error interno del servidor IA: {e}")
 
-    # Si la función devolvió un objeto de error (estatus 'error'), lo transformamos a 400
     if isinstance(result, dict) and result.get("status") == "error":
-        print("[API] Resultado de app_ia con status=error:", result.get("message"))
+        print("[API] Resultado con error:", result.get("message"))
         raise HTTPException(status_code=400, detail=result.get("message"))
 
     return result
+
 
 @app.get("/")
 def root():
