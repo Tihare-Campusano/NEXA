@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   IonHeader,
   IonToolbar,
@@ -22,7 +22,7 @@ import { Toast } from "@capacitor/toast";
 
 import "./report_all_products.css";
 
-// 🔹 Interfaz del producto
+// 🔹 Datos del producto
 interface Producto {
   codigo: string;
   nombre: string;
@@ -36,56 +36,63 @@ interface ReportAllProductsProps {
 }
 
 const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) => {
-  const [alertMessage, setAlertMessage] = useState<string | null>(null);
+  const isWeb = Capacitor.getPlatform() === "web";
 
-  // Mostrar notificación
-  const mostrarNotificacion = async (mensaje: string) => {
-    await Toast.show({ text: mensaje });
+  // Notificación universal
+  const notify = async (text: string) => {
+    await Toast.show({ text });
   };
 
+  // ------------------------------------------------------------------
+  // 🔹 Solicitar permiso correctamente (Android/iOS)
+  // ------------------------------------------------------------------
+  const solicitarPermiso = async (): Promise<boolean> => {
+  if (isWeb) return true;
 
-  // 🔹 Solicitar permiso
-  const solicitarPermisoDescarga = async () => {
-    if (Capacitor.getPlatform() === "android") {
-      try {
-        const permiso = await Filesystem.requestPermissions();
-        if (permiso.state !== "granted") {
-          mostrarNotificacion("Necesitas otorgar permiso de almacenamiento.");
-          return false;
-        }
-      } catch (e) {
-        mostrarNotificacion("Error al solicitar permisos.");
-        return false;
-      }
-    }
-    return true;
-  };
+  try {
+    const permission = await Filesystem.requestPermissions();
+
+    // Capacitor 6 no expone estas propiedades en el tipo
+    const perm: any = permission;
+
+    const granted =
+      perm?.granted === true ||
+      perm?.state === "granted" ||
+      perm?.publicStorage === "granted";
+
+    return granted;
+  } catch {
+    return false;
+  }
+};
 
 
+  // ------------------------------------------------------------------
   // 🔹 Obtener productos
+  // ------------------------------------------------------------------
   const fetchProductos = async (): Promise<Producto[]> => {
     const { data, error } = await supabase.from("productos").select(`
-      sku,
+      id,
       nombre,
       estado,
-      marca,
-      stock(cantidad)
+      disponibilidad,
+      stock
     `);
 
     if (error) throw error;
 
-    // Transformar datos para el reporte
     return (data ?? []).map((p: any) => ({
       codigo: p.id ?? "",
-      nombre: p.observaciones ?? "Sin nombre",
+      nombre: p.nombre ?? "Sin nombre",
       cantidad: p.stock ?? 0,
       estado: p.estado ?? "Sin estado",
       categoria: p.disponibilidad ?? "General",
     }));
   };
 
-
-  // 🔹 Guardar archivo
+  // ------------------------------------------------------------------
+  // 🔹 Guardar archivo en Android/iOS
+  // ------------------------------------------------------------------
   const guardarEnDispositivo = async (
     fileName: string,
     base64Data: string,
@@ -95,32 +102,51 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
       const file = await Filesystem.writeFile({
         path: fileName,
         data: base64Data,
-        directory: Directory.Data, // ★ Reemplazado para Android
+        directory: Directory.Documents,
+        recursive: true,
       });
 
       const filePath = Capacitor.convertFileSrc(file.uri);
 
       try {
-
         await FileOpener.open({
           filePath,
           contentType: mimeType,
         });
       } catch {
-        mostrarNotificacion("Archivo guardado. Revísalo en Archivos → Data.");
+        notify("Archivo guardado en Documentos.");
       }
     } catch (e) {
-      mostrarNotificacion("No se pudo guardar el archivo.");
+      notify("Error al guardar archivo.");
     }
   };
 
-  // 🔹 PDF
+  // ------------------------------------------------------------------
+  // 🔹 Guardar archivo en Web
+  // ------------------------------------------------------------------
+  const guardarWeb = (fileName: string, blob: Blob) => {
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.click();
+
+    URL.revokeObjectURL(url);
+  };
+
+  // ------------------------------------------------------------------
+  // 🔹 EXPORTAR PDF
+  // ------------------------------------------------------------------
   const exportarPDF = async () => {
-    if (!(await solicitarPermisoDescarga())) return;
+    if (!(await solicitarPermiso())) {
+      notify("Permiso denegado.");
+      return;
+    }
+
+    notify("Generando PDF…");
 
     try {
-      mostrarNotificacion("Generando PDF…");
-
       const productos = await fetchProductos();
 
       const doc = new jsPDF();
@@ -138,29 +164,35 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
         ]),
       });
 
-      const base64Data = doc.output("datauristring").split(",")[1];
-      const timestamp = new Date().getTime();
+      const timestamp = Date.now();
+      const fileName = `reporte_productos_${timestamp}.pdf`;
 
-      await guardarEnDispositivo(
-        `reporte_productos_${timestamp}.pdf`,
-        base64Data,
-        "application/pdf"
-      );
+      if (isWeb) {
+        const blob = doc.output("blob");
+        guardarWeb(fileName, blob);
+      } else {
+        const base64Data = doc.output("datauristring").split(",")[1];
+        await guardarEnDispositivo(fileName, base64Data, "application/pdf");
+      }
 
-
-      mostrarNotificacion("PDF listo 🎉");
+      notify("PDF listo 🎉");
     } catch (e) {
-      mostrarNotificacion("Error al generar PDF.");
+      notify("Error al generar PDF.");
     }
   };
 
-  // 🔹 Excel
+  // ------------------------------------------------------------------
+  // 🔹 EXPORTAR EXCEL
+  // ------------------------------------------------------------------
   const exportarExcel = async () => {
-    if (!(await solicitarPermisoDescarga())) return;
+    if (!(await solicitarPermiso())) {
+      notify("Permiso denegado.");
+      return;
+    }
+
+    notify("Generando Excel…");
 
     try {
-      mostrarNotificacion("Generando Excel…");
-
       const productos = await fetchProductos();
 
       const ws = XLSX.utils.json_to_sheet(
@@ -176,24 +208,25 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Productos");
 
-      const base64Data = XLSX.write(wb, {
-        bookType: "xlsx",
-        type: "base64",
-      });
-
-
       const timestamp = Date.now();
+      const fileName = `reporte_productos_${timestamp}.xlsx`;
 
-      await guardarEnDispositivo(
-        `reporte_productos_${timestamp}.xlsx`,
-        base64Data,
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-      );
+      if (isWeb) {
+        const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+        guardarWeb(fileName, new Blob([excelBuffer]));
+      } else {
+        const base64Data = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
 
+        await guardarEnDispositivo(
+          fileName,
+          base64Data,
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        );
+      }
 
-      mostrarNotificacion("Excel listo 🎉");
+      notify("Excel listo 🎉");
     } catch {
-      mostrarNotificacion("Error al generar Excel.");
+      notify("Error al generar Excel.");
     }
   };
 
@@ -210,20 +243,19 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
 
       <IonContent className="ion-padding">
         <IonText>
-
           <h3 style={{ textAlign: "center", fontWeight: "bold" }}>
             ¿Deseas descargar en PDF o Excel?
           </h3>
           <p style={{ textAlign: "center" }}>
-            Los archivos se guardarán en el almacenamiento interno.
+            Los archivos se guardarán automáticamente.
           </p>
         </IonText>
 
         <div style={{ padding: 20 }}>
-
           <IonButton expand="block" color="danger" onClick={exportarPDF}>
             Descargar PDF
           </IonButton>
+
           <IonButton
             expand="block"
             color="success"
