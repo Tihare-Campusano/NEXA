@@ -1,6 +1,6 @@
 fastapi
 uvicorn
-tflite-runtime==2.14.0
+tensorflow==2.17.0
 supabase
 pillow
 python-multipart

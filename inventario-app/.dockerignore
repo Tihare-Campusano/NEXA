@@ -1,55 +1,18 @@
-# --- Python ---
-__pycache__/
+# Carpetas y archivos de Python
+**/__pycache__
 *.pyc
-*.pyo
-*.pyd
-*.pytest_cache/
-.pytest_cache/
-
-# --- Virtual env ---
-venv/
-*/venv/
+.pytest_cache
+venv
 */venv_ia_311/
-.venv/
 
-# --- Node ---
-node_modules/
-*.log
+# Carpetas y archivos de Node.js (Frontend)
+node_modules
 package-lock.json
 
-# --- Git ---
-.git/
+# Carpetas de desarrollo y configuración de IDE
+.git
 .gitignore
 .vscode/
 
-# --- Backend ---
-backend/__pycache__/
-backend/app/__pycache__/
-backend/app/**/__pycache__/
-backend/.mypy_cache/
-
-# No enviar modelos viejos o pesados que no se usan
-backend/app/api/modelo_ia/*.old
-backend/app/api/modelo_ia/*.zip
-backend/app/api/modelo_ia/*.h5
-
-# --- Frontend (si está dentro del proyecto) ---
-frontend/
-dist/
-build/
-
-# --- Archivos grandes que pueden romper el build ---
-*.jpg
-*.jpeg
-*.png
-*.mp4
-*.avi
-*.mov
-*.zip
-*.rar
-*.7z
-*.pdf
-
-# --- Sistema ---
-.DS_Store
-Thumbs.db
+# Ignorar archivos del backend que no son necesarios para el servidor final
+# backend/requirements.txt # Ya lo copiaste

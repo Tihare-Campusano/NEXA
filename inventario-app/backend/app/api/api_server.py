@@ -5,25 +5,26 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 
-# Import correcto según estructura real
 from api.app_ia import registrar_producto_y_imagen
 
 app = FastAPI()
 
-# -----------------------
-# CORS FULL (para desarrollo; en producción restringir los orígenes)
-# -----------------------
+origins = [
+    "http://localhost",
+    "http://localhost:3000",
+    "http://localhost:8100",
+    "https://inventario-ia-api-887072391939.us-central1.run.app"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],      # durante desarrollo está bien; en prod poner orígenes explícitos
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# -----------------------
-# Modelo de request
-# -----------------------
+# --- MODELO (limpio, acepta extras) ---
 class ClassificationRequest(BaseModel):
     image_base64: str
     codigo_barras: str
@@ -36,21 +37,16 @@ class ClassificationRequest(BaseModel):
     imagen_url: Optional[str] = None
 
     class Config:
-        extra = "allow"
+        extra = "allow"   # permitimos campos extras (no rompe si frontend envía más)
 
-
-# -----------------------
-# ENDPOINT PRINCIPAL
-# -----------------------
+# --- ENDPOINT ---
 @app.post("/api/clasificar-producto")
 async def classify_product_endpoint(request: ClassificationRequest):
-    """
-    Recibe la imagen base64 + metadatos y delega en registrar_producto_y_imagen.
-    Devuelve el resultado tal cual lo produce esa función.
-    """
+    # Opcional: log de lo que llega (útil para debugear)
     print("[API] Request recibido:", request.model_dump(exclude_none=True))
 
     try:
+        # Ejecutar la función síncrona en un thread para no bloquear el event-loop
         result = await asyncio.to_thread(
             registrar_producto_y_imagen,
             request.image_base64,
@@ -63,17 +59,17 @@ async def classify_product_endpoint(request: ClassificationRequest):
             request.observaciones,
             request.imagen_url
         )
-
     except Exception as e:
-        print("[API ERROR]", repr(e))
-        raise HTTPException(status_code=500, detail=f"Error interno: {e}")
+        print("[API ERROR] Excepción al procesar IA/DB:", repr(e))
+        # Devolvemos detalle para la consola; el frontend verá 500 y el texto
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor IA: {e}")
 
-    # registrar_producto_y_imagen devuelve dict con "status": "ok" o "status": "error"
+    # Si la función devolvió un objeto de error (estatus 'error'), lo transformamos a 400
     if isinstance(result, dict) and result.get("status") == "error":
+        print("[API] Resultado de app_ia con status=error:", result.get("message"))
         raise HTTPException(status_code=400, detail=result.get("message"))
 
     return result
-
 
 @app.get("/")
 def root():
