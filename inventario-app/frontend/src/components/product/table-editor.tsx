@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { withRouter, RouteComponentProps } from "react-router-dom";
-import { IonIcon } from "@ionic/react";
-import { copyOutline } from "ionicons/icons";
 import "./table-editor.css";
 
 // Configura tu cliente de Supabase
@@ -13,7 +11,6 @@ const supabase = createClient(
 
 export type Producto = {
     id: number;
-    codigo_barras: string | null;
     nombre: string;
 };
 
@@ -29,42 +26,37 @@ function ProductosTable({ productos: productosProp, history }: ProductosTablePro
     const [page, setPage] = useState(1);
     const [pageSize] = useState(10);
     const [total, setTotal] = useState(0);
-    const [copiedId, setCopiedId] = useState<number | null>(null);
 
-    // Detectar si estamos en modo buscador
     const modoBusqueda = !!productosProp;
 
     useEffect(() => {
-        // 🔹 Si recibimos productos desde props (ej: búsqueda), usamos esos
         if (productosProp) {
             setProductos(productosProp);
             setLoading(false);
             return;
         }
 
-        // 🔹 Si no hay props, cargamos los productos desde Supabase (solo nombre, id, codigo_barras)
         const fetchProductos = async () => {
             setLoading(true);
 
             const { data, error } = await supabase
                 .from("productos")
                 .select(`
-        id,
-        nombre,
-        codigo_barras
-      `)
+                    id,
+                    nombre
+                `)
                 .order("id", { ascending: false });
 
             if (error) {
                 console.error("Error al cargar productos:", error.message);
             } else {
-                const productosSimplificados: Producto[] = data.map((p: any) => ({
+                const productosLimpios: Producto[] = data.map((p: any) => ({
                     id: p.id,
                     nombre: p.nombre,
-                    codigo_barras: p.codigo_barras ?? "-",
                 }));
 
-                setProductos(productosSimplificados);
+                setProductos(productosLimpios);
+                setTotal(data.length);
             }
 
             setLoading(false);
@@ -72,7 +64,6 @@ function ProductosTable({ productos: productosProp, history }: ProductosTablePro
 
         fetchProductos();
     }, [productosProp]);
-
 
     if (loading) return <p>Cargando productos...</p>;
 
@@ -86,12 +77,11 @@ function ProductosTable({ productos: productosProp, history }: ProductosTablePro
                 </div>
             </div>
 
-            {/* Tabla con estilos mejorados */}
+            {/* Tabla */}
             <div className="table-container">
                 <table>
                     <thead>
                         <tr>
-                            <th>Código de Barras</th>
                             <th>Nombre</th>
                             <th>Acción</th>
                         </tr>
@@ -100,42 +90,6 @@ function ProductosTable({ productos: productosProp, history }: ProductosTablePro
                         {productos.length > 0 ? (
                             productos.map((prod) => (
                                 <tr key={prod.id}>
-                                    <td>
-                                        {prod.codigo_barras || "N/A"}
-                                        {prod.codigo_barras && (
-                                            <>
-                                                <IonIcon
-                                                    icon={copyOutline}
-                                                    onClick={() => {
-                                                        navigator.clipboard.writeText(prod.codigo_barras as string);
-                                                        setCopiedId(prod.id);
-                                                        setTimeout(
-                                                            () => setCopiedId((prev) => (prev === prod.id ? null : prev)),
-                                                            2000
-                                                        );
-                                                    }}
-                                                    title="Copiar código"
-                                                    style={{
-                                                        marginLeft: 8,
-                                                        cursor: "pointer",
-                                                        fontSize: 18,
-                                                        color: "#555",
-                                                    }}
-                                                />
-                                                {copiedId === prod.id && (
-                                                    <span
-                                                        style={{
-                                                            marginLeft: 6,
-                                                            fontSize: 12,
-                                                            color: "#10b981",
-                                                        }}
-                                                    >
-                                                        ¡Copiado!
-                                                    </span>
-                                                )}
-                                            </>
-                                        )}
-                                    </td>
                                     <td>{prod.nombre}</td>
                                     <td>
                                         <button
@@ -149,7 +103,7 @@ function ProductosTable({ productos: productosProp, history }: ProductosTablePro
                             ))
                         ) : (
                             <tr>
-                                <td colSpan={3} style={{ textAlign: "center", padding: "10px" }}>
+                                <td colSpan={2} style={{ textAlign: "center", padding: "10px" }}>
                                     No hay productos
                                 </td>
                             </tr>
@@ -157,7 +111,7 @@ function ProductosTable({ productos: productosProp, history }: ProductosTablePro
                     </tbody>
                 </table>
 
-                {/* Paginación simple */}
+                {/* Paginación */}
                 {!modoBusqueda && total > pageSize && (
                     <div
                         style={{
