@@ -41,106 +41,107 @@ interface Props {
    📌 COMPONENTE PRINCIPAL
    ============================================================ */
 const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
-  const [alertMsg, setAlertMsg] = useState<string | null>(null);
-
-  /* ============================================================
-     📌 Toast Notification
-     ============================================================ */
   const notify = async (msg: string) => {
-    await Toast.show({ text: msg, duration: "long" });
+    await Toast.show({ text: msg });
   };
 
   /* ============================================================
-     📌 Solicitar permiso de almacenamiento (solo Android)
+     📌 Solicitar permisos (solo Android)
      ============================================================ */
   const solicitarPermiso = async (): Promise<boolean> => {
-    if (Capacitor.getPlatform() === "android") {
-      try {
+    const platform = Capacitor.getPlatform();
 
-        const status = await Filesystem.requestPermissions();
-        if (status.publicStorage !== "granted") {
-          notify("Debes otorgar permiso de almacenamiento.");
-          return false;
-        }
-      } catch (err) {
-        console.error(err);
-        notify("Error obteniendo permiso.");
+    if (platform === "web" || platform === "ios") return true;
+
+    try {
+      const perm: any = await Filesystem.requestPermissions();
+
+      const granted =
+        perm?.publicStorage === "granted" ||
+        perm?.granted === true ||
+        perm?.state === "granted";
+
+      if (!granted) {
+        notify("Debes otorgar permiso de almacenamiento.");
         return false;
       }
+
+      return true;
+    } catch (err) {
+      console.error(err);
+      notify("Error solicitando permisos.");
+      return false;
     }
-    return true;
   };
 
-
   /* ============================================================
-     📌 Obtener productos con estado = 'mal estado'
+     📌 Obtener productos con estado = mal estado / Mal estado
      ============================================================ */
   const fetchProductos = async (): Promise<Producto[]> => {
     const { data, error } = await supabase
       .from("productos")
       .select(`
-        id,
-        observaciones,
+        sku,
+        nombre,
+        marca,
         estado,
-        stock,
-        disponibilidad
+        stock
       `)
-      .eq("estado", "mal estado");
+      .in("estado", ["mal estado", "Mal estado"]); // 👈 CORRECCIÓN REAL
 
     if (error) {
       console.error(error);
       throw error;
     }
 
-    console.log("PRODUCTOS MAL ESTADO:", data);
-
     return (data ?? []).map((p: any) => ({
-
-      codigo: p.sku ?? "",
-      nombre: p.nombre ?? "",
+      codigo: p.sku ?? "N/A",
+      nombre: p.nombre ?? "Sin nombre",
       estado: p.estado ?? "N/A",
       marca: p.marca ?? "General",
-      cantidad: p.stock?.[0]?.cantidad ?? 0,
+      cantidad: Array.isArray(p.stock) ? p.stock[0]?.cantidad ?? 0 : 0,
     }));
   };
 
   /* ============================================================
-     📌 Guardar archivos (Android / Web)
+     📌 Guardar archivo
      ============================================================ */
   const guardarArchivo = async (
     fileName: string,
     base64Data: string,
     mime: string
   ) => {
-    const isAndroid = Capacitor.getPlatform() === "android";
+    const platform = Capacitor.getPlatform();
 
-    if (isAndroid) {
-      try {
-        const saved = await Filesystem.writeFile({
-          path: fileName,
-          data: base64Data,
-          directory: Directory.Data, // ← 100% compatible Android 10–14
-          recursive: true,
-        });
-
-
-        const fileUri = Capacitor.convertFileSrc(saved.uri);
-
-        try {
-          await FileOpener.open({ filePath: fileUri, contentType: mime });
-        } catch (err) {
-          notify("Archivo guardado. Revísalo en Documentos.");
-        }
-      } catch (err) {
-        console.error(err);
-        notify("Error guardando archivo.");
-      }
-    } else {
-      // WEB
+    if (platform === "web") {
       const link = document.createElement("a");
-      link.href = "data:" + mime + ";base64," + base64Data;
+      link.href = `data:${mime};base64,${base64Data}`;
       link.download = fileName;
       link.click();
+      return;
+    }
+
+    try {
+      const saved = await Filesystem.writeFile({
+        path: fileName,
+        data: base64Data,
+        directory: Directory.Documents,
+        recursive: true,
+      });
+
+      const finalPath = Capacitor.convertFileSrc(saved.uri);
+
+      try {
+        await FileOpener.open({
+          filePath: finalPath,
+          contentType: mime,
+        });
+      } catch {
+        notify("Archivo guardado en Documentos.");
+      }
+    } catch (err) {
+      console.error(err);
+      notify("Error guardando archivo.");
     }
   };
 
@@ -160,7 +161,6 @@ const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
 
       autoTable(doc, {
         startY: 20,
-
         head: [["Código", "Nombre", "Estado", "Marca", "Cantidad"]],
         body: productos.map((p) => [
           p.codigo,
@@ -171,9 +171,8 @@ const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
         ]),
       });
 
-
       const base64 = doc.output("datauristring").split(",")[1];
-      const stamp = new Date().getTime();
+      const stamp = Date.now();
 
       await guardarArchivo(
         `reporte_mal_estado_${stamp}.pdf`,
@@ -181,7 +180,7 @@ const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
         "application/pdf"
       );
 
-      notify("PDF generado correctamente.");
+      notify("PDF generado correctamente 🎉");
     } catch (err) {
       console.error(err);
       notify("Error generando PDF.");
@@ -213,7 +212,7 @@ const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
       XLSX.utils.book_append_sheet(wb, ws, "Mal Estado");
 
       const base64 = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
-      const stamp = new Date().getTime();
+      const stamp = Date.now();
 
       await guardarArchivo(
         `reporte_mal_estado_${stamp}.xlsx`,
@@ -221,22 +220,18 @@ const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
 
-      notify("Excel generado correctamente.");
+      notify("Excel generado correctamente 🎉");
     } catch (err) {
       console.error(err);
       notify("Error generando Excel.");
     }
   };
 
+  /* ============================================================
+     📌 Render
+     ============================================================ */
   return (
     <>
-      {alertMsg && (
-        <div className="alert-overlay">
-          <p>{alertMsg}</p>
-          <IonButton onClick={() => setAlertMsg(null)}>Aceptar</IonButton>
-        </div>
-      )}
-
       <IonHeader>
         <IonToolbar>
           <IonTitle>Reporte de Productos en Mal Estado</IonTitle>
@@ -251,7 +246,6 @@ const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
           <h3 style={{ textAlign: "center", fontWeight: "bold" }}>
             ¿Descargar PDF o Excel?
           </h3>
-
           <p style={{ textAlign: "center", color: "#666" }}>
             Los archivos se guardarán en tu dispositivo.
           </p>
