@@ -22,6 +22,9 @@ import { Toast } from "@capacitor/toast";
 
 import "./report_register_for_month.css";
 
+/* ============================================================
+   📌 Interfaces
+============================================================ */
 interface ProductoStock {
   codigo: string;
   nombre: string;
@@ -34,25 +37,30 @@ interface Props {
   onDidDismiss: () => void;
 }
 
+/* ============================================================
+   📌 Componente Principal
+============================================================ */
 const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
   const [alerta, setAlerta] = useState<string | null>(null);
 
   const notificar = async (msg: string) => {
-    await Toast.show({ text: msg, duration: "long" });
+    await Toast.show({ text: msg });
   };
 
   /* ============================================================
-     🔐 Permisos de almacenamiento (solo Android)
-  ============================================================ */
+     🔐 Permisos Android
+============================================================ */
   const solicitarPermisos = async (): Promise<boolean> => {
     if (Capacitor.getPlatform() === "android") {
       try {
         const p = await Filesystem.requestPermissions();
+
         if (p.publicStorage !== "granted") {
           notificar("Debes otorgar permisos de almacenamiento.");
           return false;
         }
-      } catch {
+      } catch (err) {
+        console.error(err);
         notificar("Error al solicitar permisos.");
         return false;
       }
@@ -61,35 +69,33 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
   };
 
   /* ============================================================
-     📥 Obtener productos con stock ordenado ASC
-  ============================================================ */
+     📥 Obtener STOCK ordenado ASC
+     👍 Ahora usa:
+       - código = id
+       - cantidad = stock
+       - categoría = marca
+============================================================ */
   const obtenerStock = async (): Promise<ProductoStock[]> => {
     const { data, error } = await getSupabase()
       .from("productos")
-      .select(`
-        sku,
-        nombre,
-        marca,
-        estado,
-        stock(cantidad)
-      `);
+      .select("id, nombre, marca, estado, stock");
 
     if (error) throw error;
 
-    const mapped = (data ?? []).map((p: any) => ({
-      codigo: p.sku ?? "",
+    const productos = (data ?? []).map((p: any) => ({
+      codigo: p.id?.toString() ?? "",
       nombre: p.nombre ?? "",
-      cantidad: p.stock?.[0]?.cantidad ?? 0,
+      cantidad: p.stock ?? 0,
       estado: p.estado ?? "Desconocido",
       categoria: p.marca ?? "General",
     }));
 
-    return mapped.sort((a: any, b: any) => a.cantidad - b.cantidad);
+    return productos.sort((a, b) => a.cantidad - b.cantidad);
   };
 
   /* ============================================================
-      💾 Guardar archivo en Android o Web
-  ============================================================ */
+      💾 Guardar archivos PDF/Excel en Android o Web
+============================================================ */
   const guardarArchivo = async (
     filename: string,
     base64Data: string,
@@ -102,7 +108,7 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
         const saved = await Filesystem.writeFile({
           path: filename,
           data: base64Data,
-          directory: Directory.Data,
+          directory: Directory.Documents,
           recursive: true,
         });
 
@@ -130,7 +136,7 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
 
   /* ============================================================
       📄 Exportar PDF
-  ============================================================ */
+============================================================ */
   const exportarPDF = async () => {
     if (!(await solicitarPermisos())) return;
 
@@ -178,7 +184,7 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
 
   /* ============================================================
       📊 Exportar Excel
-  ============================================================ */
+============================================================ */
   const exportarExcel = async () => {
     if (!(await solicitarPermisos())) return;
 
@@ -218,7 +224,7 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
 
   /* ============================================================
       🎨 Render
-  ============================================================ */
+============================================================ */
   return (
     <>
       {alerta && (
@@ -240,7 +246,7 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
       <IonContent className="ion-padding">
         <IonText>
           <h3 style={{ textAlign: "center", fontWeight: "bold" }}>
-            Descarga del Stock Mensual
+            Descarga el Stock Mensual
           </h3>
         </IonText>
 

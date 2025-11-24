@@ -39,21 +39,22 @@ interface Props {
 }
 
 /* ==================================================================
-   Función para obtener número de semana
+   Función para obtener el número de semana (ISO 8601)
 ================================================================== */
 function obtenerSemana(fecha: Date): { semana: number; anio: number } {
-  const tempDate = new Date(Date.UTC(fecha.getFullYear(), fecha.getMonth(), fecha.getDate()));
-  const diaSemana = tempDate.getUTCDay() || 7;
-  tempDate.setUTCDate(tempDate.getUTCDate() + 4 - diaSemana);
+  const temp = new Date(Date.UTC(fecha.getFullYear(), fecha.getMonth(), fecha.getDate()));
+  const dia = temp.getUTCDay() || 7;
 
-  const inicioAnio = new Date(Date.UTC(tempDate.getUTCFullYear(), 0, 1));
-  const numeroSemana = Math.ceil(((tempDate.getTime() - inicioAnio.getTime()) / 86400000 + 1) / 7);
+  temp.setUTCDate(temp.getUTCDate() + 4 - dia);
 
-  return { semana: numeroSemana, anio: tempDate.getUTCFullYear() };
+  const inicio = new Date(Date.UTC(temp.getUTCFullYear(), 0, 1));
+  const semana = Math.ceil(((temp.getTime() - inicio.getTime()) / 86400000 + 1) / 7);
+
+  return { semana, anio: temp.getUTCFullYear() };
 }
 
 /* ==================================================================
-   Reporte por semana
+   Componente principal
 ================================================================== */
 const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
   const [alerta, setAlerta] = useState<string | null>(null);
@@ -74,7 +75,7 @@ const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
           return false;
         }
       } catch {
-        notificar("No se pudo obtener permisos.");
+        notificar("No se pudieron obtener permisos.");
         return false;
       }
     }
@@ -87,27 +88,30 @@ const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
   const obtenerRegistros = async (): Promise<ProductoSemana[]> => {
     const { data, error } = await getSupabase()
       .from("productos")
-      .select("sku, nombre, marca, created_at");
+      .select("id, sku, nombre, marca, created_at");
 
     if (error) throw error;
 
-    return (data ?? []).map((p: any) => {
-      const fechaObj = new Date(p.created_at);
-      const { semana, anio } = obtenerSemana(fechaObj);
+    return (data ?? [])
+      .map((p: any) => {
+        const fechaObj = new Date(p.created_at);
+        const { semana, anio } = obtenerSemana(fechaObj);
 
-      return {
-        codigo: p.sku ?? "",
-        nombre: p.nombre ?? "",
-        marca: p.marca ?? "General",
-        fecha: fechaObj.toLocaleDateString("es-CL"),
-        semana,
-        anio,
-      };
-    }).sort((a, b) => {
-      if (a.anio !== b.anio) return b.anio - a.anio;
-      return b.semana - a.semana;
-    });
+        return {
+          codigo: p.id ?? "",   // ← AHORA EL CÓDIGO ES EL ID
+          nombre: p.nombre ?? "",
+          marca: p.marca ?? "General",
+          fecha: fechaObj.toLocaleDateString("es-CL"),
+          semana,
+          anio,
+        };
+      })
+      .sort((a, b) => {
+        if (a.anio !== b.anio) return b.anio - a.anio;
+        return b.semana - a.semana;
+      });
   };
+
 
   /* ============================================================
       💾 Guardar archivo (Android / Web)
@@ -129,19 +133,20 @@ const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
         });
 
         const fileUri = Capacitor.convertFileSrc(saved.uri);
+
         try {
           await FileOpener.open({
             filePath: fileUri,
             contentType: mimeType,
           });
         } catch {
-          notificar("Archivo guardado. Revisa la carpeta Documentos.");
+          notificar("Archivo guardado. Revisa Documentos.");
         }
-      } catch (err) {
+      } catch {
         notificar("Error al guardar archivo.");
       }
     } else {
-      // Web
+      // 🌐 Web
       const a = document.createElement("a");
       a.href = `data:${mimeType};base64,${base64Data}`;
       a.download = filename;
@@ -154,12 +159,13 @@ const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
   ============================================================ */
   const exportarPDF = async () => {
     if (!(await solicitarPermisos())) return;
+
     notificar("Generando PDF...");
 
     try {
       const registros = await obtenerRegistros();
-      const doc = new jsPDF();
 
+      const doc = new jsPDF();
       doc.text("Reporte de Registros por Semana (Histórico)", 14, 15);
 
       autoTable(doc, {
@@ -186,6 +192,7 @@ const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
 
       notificar("PDF generado correctamente.");
     } catch (err) {
+      console.error(err);
       notificar("Error al generar PDF.");
     }
   };
@@ -215,6 +222,7 @@ const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
       XLSX.utils.book_append_sheet(wb, ws, "Registros");
 
       const base64 = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
+
       const timestamp = Date.now();
 
       await guardarArchivo(
@@ -230,7 +238,7 @@ const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
   };
 
   /* ============================================================
-     🎨 Render
+     🎨 Render UI
   ============================================================ */
   return (
     <>
@@ -277,4 +285,3 @@ const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
 };
 
 export default ReportRegisterForWeek;
-

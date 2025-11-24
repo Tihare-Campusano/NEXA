@@ -43,11 +43,8 @@ interface Props {
 const ReportUsedProduct: React.FC<Props> = ({ onDidDismiss }) => {
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
 
-  /* ============================================================
-     📌 Mostrar toast
-     ============================================================ */
   const notify = async (msg: string) => {
-    await Toast.show({ text: msg, duration: "long" });
+    await Toast.show({ text: msg });
   };
 
   /* ============================================================
@@ -57,6 +54,7 @@ const ReportUsedProduct: React.FC<Props> = ({ onDidDismiss }) => {
     if (Capacitor.getPlatform() === "android") {
       try {
         const status = await Filesystem.requestPermissions();
+
         if (status.publicStorage !== "granted") {
           notify("Debes otorgar permiso de almacenamiento para continuar.");
           return false;
@@ -76,27 +74,27 @@ const ReportUsedProduct: React.FC<Props> = ({ onDidDismiss }) => {
   const fetchProductos = async (): Promise<Producto[]> => {
     const { data, error } = await supabase
       .from("productos")
-      .select(`sku, nombre, marca, stock(cantidad), fecha_uso`)
-      .eq("estado", "usado");
+      .select("id, nombre, marca, stock, created_at, estado")
+      .in("estado", ["usado", "Usado"]);
 
     if (error) {
-      console.error(error);
+      console.error("ERROR SUPABASE:", error);
       throw error;
     }
 
     return (data ?? []).map((p: any) => ({
-      codigo: p.sku ?? "",
+      codigo: p.id?.toString() ?? "",
       nombre: p.nombre ?? "",
       marca: p.marca ?? "General",
-      cantidad: p.stock?.[0]?.cantidad ?? 0,
-      fecha: p.fecha_uso
-        ? new Date(p.fecha_uso).toLocaleDateString("es-CL")
-        : "N/A",
+      cantidad: p.stock ?? 0,
+      fecha: p.created_at
+        ? new Date(p.created_at).toLocaleDateString("es-CL")
+        : "Sin fecha",
     }));
   };
 
   /* ============================================================
-     📌 Guardar archivo en Android o Web
+     📌 Guardar archivo PDF/Excel en Android o Web
      ============================================================ */
   const guardarArchivo = async (
     filename: string,
@@ -110,7 +108,7 @@ const ReportUsedProduct: React.FC<Props> = ({ onDidDismiss }) => {
         const saved = await Filesystem.writeFile({
           path: filename,
           data: base64Data,
-          directory: Directory.Data,
+          directory: Directory.Documents,
           recursive: true,
         });
 
@@ -118,17 +116,16 @@ const ReportUsedProduct: React.FC<Props> = ({ onDidDismiss }) => {
 
         try {
           await FileOpener.open({ filePath: fileUri, contentType: mime });
-        } catch (err) {
-          notify("Archivo guardado, revísalo en Documentos.");
+        } catch {
+          notify("Archivo guardado en Documentos.");
         }
       } catch (err) {
         console.error(err);
         notify("Error guardando archivo.");
       }
     } else {
-      // Web
       const link = document.createElement("a");
-      link.href = "data:" + mime + ";base64," + base64Data;
+      link.href = `data:${mime};base64,${base64Data}`;
       link.download = filename;
       link.click();
     }
@@ -150,7 +147,7 @@ const ReportUsedProduct: React.FC<Props> = ({ onDidDismiss }) => {
 
       autoTable(doc, {
         startY: 20,
-        head: [["Código", "Nombre", "Marca", "Cantidad", "Fecha de Uso"]],
+        head: [["Código", "Nombre", "Marca", "Cantidad", "Fecha"]],
         body: productos.map((p) => [
           p.codigo,
           p.nombre,
@@ -169,7 +166,7 @@ const ReportUsedProduct: React.FC<Props> = ({ onDidDismiss }) => {
         "application/pdf"
       );
 
-      notify("PDF creado correctamente.");
+      notify("PDF generado correctamente.");
     } catch (err) {
       console.error(err);
       notify("Error generando PDF.");
@@ -192,7 +189,7 @@ const ReportUsedProduct: React.FC<Props> = ({ onDidDismiss }) => {
         Nombre: p.nombre,
         Marca: p.marca,
         Cantidad: p.cantidad,
-        "Fecha de Uso": p.fecha,
+        Fecha: p.fecha,
       }));
 
       const ws = XLSX.utils.json_to_sheet(datos);
@@ -263,5 +260,3 @@ const ReportUsedProduct: React.FC<Props> = ({ onDidDismiss }) => {
 };
 
 export default ReportUsedProduct;
-
-

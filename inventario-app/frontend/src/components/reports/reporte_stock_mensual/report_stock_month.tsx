@@ -26,7 +26,7 @@ import "./report_stock_month.css";
    📌 Interface
 ============================================================ */
 interface ProductoStock {
-  codigo: string;
+  codigo: string; // ahora usa el id
   nombre: string;
   cantidad: number;
   marca: string;
@@ -43,7 +43,7 @@ interface Props {
 const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
   const [alerta, setAlerta] = useState<string | null>(null);
 
-  /* Mostrar mensaje */
+  /* Mostrar toast */
   const notificar = async (msg: string) => {
     await Toast.show({ text: msg, duration: "long" });
   };
@@ -61,7 +61,7 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
         }
       } catch (err) {
         console.error(err);
-        notificar("No se pudo obtener permisos.");
+        notificar("No se pudieron obtener permisos.");
         return false;
       }
     }
@@ -69,7 +69,7 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
   };
 
   /* ============================================================
-     📥 Obtener stock del mes desde Supabase
+     📥 Obtener stock del mes desde productos (CORREGIDO)
   ============================================================ */
   const obtenerStockMes = async (): Promise<ProductoStock[]> => {
     const inicioMes = new Date();
@@ -78,22 +78,16 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
 
     const { data, error } = await getSupabase()
       .from("productos")
-      .select(`
-        sku,
-        nombre,
-        marca,
-        created_at,
-        stock(cantidad)
-      `)
+      .select("id, nombre, marca, created_at, stock")
       .gte("created_at", inicioMes.toISOString());
 
     if (error) throw error;
 
     return (data ?? []).map((p: any) => ({
-      codigo: p.sku ?? "",
+      codigo: p.id?.toString() ?? "",
       nombre: p.nombre ?? "",
       marca: p.marca ?? "",
-      cantidad: p.stock?.[0]?.cantidad ?? 0,
+      cantidad: Number(p.stock) ?? 0,
       fecha: p.created_at
         ? new Date(p.created_at).toLocaleDateString("es-CL")
         : "N/A",
@@ -101,7 +95,7 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
   };
 
   /* ============================================================
-      💾 Guardar archivo PDF o Excel (Android + Web)
+     💾 Guardar archivo (PDF/Excel)
   ============================================================ */
   const guardarArchivo = async (
     filename: string,
@@ -115,7 +109,7 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
         const saved = await Filesystem.writeFile({
           path: filename,
           data: base64Data,
-          directory: Directory.Data,
+          directory: Directory.Documents,
           recursive: true,
         });
 
@@ -131,9 +125,10 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
         }
       } catch (err) {
         console.error(err);
-        notificar("Error al guardar archivo.");
+        notificar("Error al guardar archivo en Android.");
       }
     } else {
+      // WEB
       const link = document.createElement("a");
       link.href = `data:${mimeType};base64,${base64Data}`;
       link.download = filename;
@@ -168,13 +163,9 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
       });
 
       const base64 = doc.output("datauristring").split(",")[1];
-      const timestamp = Date.now();
+      const filename = `stock_mes_${Date.now()}.pdf`;
 
-      await guardarArchivo(
-        `stock_mes_${timestamp}.pdf`,
-        base64,
-        "application/pdf"
-      );
+      await guardarArchivo(filename, base64, "application/pdf");
 
       notificar("PDF generado exitosamente.");
     } catch (err) {
@@ -206,11 +197,11 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Stock Mes");
 
-      const base64 = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
-      const timestamp = Date.now();
+      // IMPORTANTE: Excel debe ser base64 puro
+      const base64 = XLSX.write(wb, { type: "base64", bookType: "xlsx" });
 
       await guardarArchivo(
-        `stock_mes_${timestamp}.xlsx`,
+        `stock_mes_${Date.now()}.xlsx`,
         base64,
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
