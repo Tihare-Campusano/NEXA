@@ -5,33 +5,25 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 
-# ✅ IMPORT CORRECTO SEGÚN TU ESTRUCTURA
+# Import correcto según estructura real
 from api.app_ia import registrar_producto_y_imagen
 
 app = FastAPI()
 
-origins = [
-    "http://localhost",
-    "http://localhost:3000",
-    "http://localhost:8100",
-    "https://inventario-ia-api-887072391939.us-central1.run.app",
-
-    # 📱 Necesario para aplicaciones móviles / tabletas
-    "capacitor://localhost",
-    "http://192.168.0.0/16",   # permite toda la red WiFi
-    "http://127.0.0.1",
-    "https://localhost",
-]
-
+# -----------------------
+# CORS FULL (para desarrollo; en producción restringir los orígenes)
+# -----------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],              # Permite todos los orígenes
-    allow_credentials=False,          # Obligatorio si usas "*"
-    allow_methods=["*"],              # GET, POST, OPTIONS…
-    allow_headers=["*"],              # Content-Type, Authorization…
+    allow_origins=["*"],      # durante desarrollo está bien; en prod poner orígenes explícitos
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# --- MODELO ---
+# -----------------------
+# Modelo de request
+# -----------------------
 class ClassificationRequest(BaseModel):
     image_base64: str
     codigo_barras: str
@@ -44,17 +36,21 @@ class ClassificationRequest(BaseModel):
     imagen_url: Optional[str] = None
 
     class Config:
-        extra = "allow"   # permite campos extra sin romper
+        extra = "allow"
 
 
-# --- ENDPOINT ---
+# -----------------------
+# ENDPOINT PRINCIPAL
+# -----------------------
 @app.post("/api/clasificar-producto")
 async def classify_product_endpoint(request: ClassificationRequest):
-
+    """
+    Recibe la imagen base64 + metadatos y delega en registrar_producto_y_imagen.
+    Devuelve el resultado tal cual lo produce esa función.
+    """
     print("[API] Request recibido:", request.model_dump(exclude_none=True))
 
     try:
-        # Llama a la función del backend en un thread separado
         result = await asyncio.to_thread(
             registrar_producto_y_imagen,
             request.image_base64,
@@ -69,11 +65,11 @@ async def classify_product_endpoint(request: ClassificationRequest):
         )
 
     except Exception as e:
-        print("[API ERROR] Excepción al procesar IA/DB:", repr(e))
-        raise HTTPException(status_code=500, detail=f"Error interno del servidor IA: {e}")
+        print("[API ERROR]", repr(e))
+        raise HTTPException(status_code=500, detail=f"Error interno: {e}")
 
+    # registrar_producto_y_imagen devuelve dict con "status": "ok" o "status": "error"
     if isinstance(result, dict) and result.get("status") == "error":
-        print("[API] Resultado con error:", result.get("message"))
         raise HTTPException(status_code=400, detail=result.get("message"))
 
     return result

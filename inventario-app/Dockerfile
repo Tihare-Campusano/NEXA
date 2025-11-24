@@ -1,26 +1,32 @@
-# Esta es la imagen base optimizada para FastAPI, que incluye Gunicorn y Uvicorn
-# ya configurados y resuelve los problemas de rutas (PYTHONPATH) que tuvimos.
+# Imagen base con FastAPI + Uvicorn + Gunicorn
 FROM tiangolo/uvicorn-gunicorn-fastapi:python3.11
 
-# 2. Establecer el directorio de trabajo dentro del contenedor
+# Directorio dentro del contenedor
 WORKDIR /app
 
-# 3. Copiar e instalar las dependencias
-# Instala las librerías necesarias para tu aplicación (TensorFlow, Supabase, etc.)
-# Nota: La imagen base ya trae FastAPI, Uvicorn y Gunicorn.
+# ------------------------------
+# DEPENDENCIAS
+# ------------------------------
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 4. Copiar los archivos de la aplicación (código, credenciales y modelos)
-# Esto copia la carpeta 'api' (que contiene api_server.py, app_ia.py, credenciales.py, y modelo_ia)
+# ------------------------------
+# COPIAR APP COMPLETA
+# ------------------------------
 COPY backend/app /app
 
-# 5. Configuración de Inicio
-# La imagen base lee estas variables para saber qué archivo Python y qué objeto iniciar.
-# api.api_server es el módulo, y app es el objeto FastAPI.
+# ------------------------------
+# COPIAR MODELO TFLITE Y LABELS (asegura que existan)
+# ------------------------------
+# (opcional si ya están dentro de backend/app, pero lo incluimos para garantizar la presencia)
+COPY backend/app/api/modelo_ia/modelo_final_v3.tflite /app/api/modelo_ia/modelo_final_v3.tflite
+COPY backend/app/api/modelo_ia/labels.txt /app/api/modelo_ia/labels.txt
+
+# ------------------------------
+# CONFIG DEL SERVIDOR
+# ------------------------------
 ENV MODULE_NAME="api.api_server"
 ENV VARIABLE_NAME="app"
 
-# 6. Exponer el puerto
+# Puerto para Cloud Run
 EXPOSE 80
-# El comando de inicio (Gunicorn con workers) es manejado internamente por la imagen base.
