@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 # ✅ IMPORT CORRECTO SEGÚN TU ESTRUCTURA
-from app.api.app_ia import registrar_producto_y_imagen
+from api.app_ia import registrar_producto_y_imagen
 
 app = FastAPI()
 
