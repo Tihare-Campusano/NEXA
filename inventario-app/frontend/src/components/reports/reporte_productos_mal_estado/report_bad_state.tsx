@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   IonHeader,
   IonToolbar,
@@ -30,7 +30,7 @@ interface Producto {
   nombre: string;
   estado: string;
   marca: string;
-  cantidad: number;
+  cantidad: number; // ← Stock REAL
 }
 
 interface Props {
@@ -39,15 +39,15 @@ interface Props {
 
 /* ============================================================
    📌 COMPONENTE PRINCIPAL
-   ============================================================ */
+============================================================ */
 const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
   const notify = async (msg: string) => {
     await Toast.show({ text: msg });
   };
 
   /* ============================================================
-     📌 Solicitar permisos (solo Android)
-     ============================================================ */
+     📌 Permisos Android
+  ============================================================ */
   const solicitarPermiso = async (): Promise<boolean> => {
     const platform = Capacitor.getPlatform();
 
@@ -75,19 +75,20 @@ const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
   };
 
   /* ============================================================
-     📌 Obtener productos con estado = mal estado / Mal estado
-     ============================================================ */
+     📌 Obtener productos en MAL ESTADO
+  ============================================================ */
   const fetchProductos = async (): Promise<Producto[]> => {
     const { data, error } = await supabase
       .from("productos")
       .select(`
+        id,
         sku,
         nombre,
         marca,
         estado,
         stock
       `)
-      .in("estado", ["mal estado", "Mal estado"]); // 👈 CORRECCIÓN REAL
+      .in("estado", ["mal estado", "Mal estado"]);
 
     if (error) {
       console.error(error);
@@ -95,17 +96,17 @@ const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
     }
 
     return (data ?? []).map((p: any) => ({
-      codigo: p.sku ?? "N/A",
+      codigo: p.id?.toString() ?? p.sku ?? "N/A",
       nombre: p.nombre ?? "Sin nombre",
       estado: p.estado ?? "N/A",
       marca: p.marca ?? "General",
-      cantidad: Array.isArray(p.stock) ? p.stock[0]?.cantidad ?? 0 : 0,
+      cantidad: p.stock ?? 0, // ← CORRECCIÓN FINAL (stock real)
     }));
   };
 
   /* ============================================================
-     📌 Guardar archivo
-     ============================================================ */
+     📌 Guardar archivo en Web / Android
+  ============================================================ */
   const guardarArchivo = async (
     fileName: string,
     base64Data: string,
@@ -147,7 +148,7 @@ const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
 
   /* ============================================================
      📌 Exportar PDF
-     ============================================================ */
+  ============================================================ */
   const exportarPDF = async () => {
     if (!(await solicitarPermiso())) return;
 
@@ -189,7 +190,7 @@ const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
 
   /* ============================================================
      📌 Exportar Excel
-     ============================================================ */
+  ============================================================ */
   const exportarExcel = async () => {
     if (!(await solicitarPermiso())) return;
 
@@ -229,7 +230,7 @@ const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
 
   /* ============================================================
      📌 Render
-     ============================================================ */
+  ============================================================ */
   return (
     <>
       <IonHeader>

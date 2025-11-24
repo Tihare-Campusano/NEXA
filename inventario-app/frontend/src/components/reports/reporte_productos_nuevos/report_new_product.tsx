@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   IonHeader,
   IonToolbar,
@@ -15,7 +15,6 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
-
 import { Capacitor } from "@capacitor/core";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { FileOpener } from "@capacitor-community/file-opener";
@@ -30,7 +29,7 @@ interface Producto {
   codigo: string;
   nombre: string;
   marca: string;
-  cantidad: number;
+  stock: number;
   fecha: string;
 }
 
@@ -38,41 +37,42 @@ interface Props {
   onDidDismiss: () => void;
 }
 
-
 /* ============================================================
    📌 Componente principal
 ============================================================ */
 const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
-  const [alertMsg, setAlertMsg] = useState<string | null>(null);
-
-  /* ============================================================
-     📌 Mostrar mensaje flotante (Toast)
-  ============================================================ */
   const notify = async (msg: string) => {
-    await Toast.show({ text: msg, duration: "long" });
+    await Toast.show({ text: msg });
   };
 
   /* ============================================================
-     📌 Solicitar permisos de almacenamiento (solo Android)
+     📌 Solicitar permisos (Android)
   ============================================================ */
   const solicitarPermiso = async (): Promise<boolean> => {
-    if (Capacitor.getPlatform() === "android") {
-      try {
+    const platform = Capacitor.getPlatform();
 
-        const status = await Filesystem.requestPermissions();
-        if (status.publicStorage !== "granted") {
-          notify("Debes otorgar permisos de almacenamiento.");
-          return false;
-        }
-      } catch (err) {
-        console.error(err);
-        notify("No se pudieron obtener permisos.");
+    if (platform === "web" || platform === "ios") return true;
+
+    try {
+      const perm: any = await Filesystem.requestPermissions();
+
+      const granted =
+        perm?.publicStorage === "granted" ||
+        perm?.granted === true ||
+        perm?.state === "granted";
+
+      if (!granted) {
+        notify("Debe otorgar permisos de almacenamiento.");
         return false;
       }
-    }
-    return true;
-  };
 
+      return true;
+    } catch (err) {
+      console.error(err);
+      notify("Error solicitando permisos.");
+      return false;
+    }
+  };
 
   /* ============================================================
      📌 Obtener productos NUEVOS desde Supabase
@@ -80,22 +80,26 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
   const fetchProductos = async (): Promise<Producto[]> => {
     const { data, error } = await supabase
       .from("productos")
-      .select(`sku, nombre, marca, stock(cantidad), created_at`)
-      .eq("estado", "nuevo");
+      .select(`
+        id,
+        nombre,
+        marca,
+        estado,
+        stock,
+        created_at
+      `)
+      .in("estado", ["nuevo", "Nuevo"]);
 
     if (error) {
       console.error(error);
       throw error;
     }
 
-    console.log("PRODUCTOS NUEVOS:", data);
-
     return (data ?? []).map((p: any) => ({
-
-      codigo: p.sku ?? "",
+      codigo: p.id?.toString() ?? "",
       nombre: p.nombre ?? "",
       marca: p.marca ?? "General",
-      cantidad: p.stock?.[0]?.cantidad ?? 0,
+      stock: p.stock ?? 0, // ← AHORA VIENE DEL CAMPO REAL
       fecha: p.created_at
         ? new Date(p.created_at).toLocaleDateString("es-CL")
         : "N/A",
@@ -103,45 +107,44 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
   };
 
   /* ============================================================
-     📌 Guardar archivo en Android o Web
+     📌 Guardar archivo en Android / Web
   ============================================================ */
   const guardarArchivo = async (
     filename: string,
     base64Data: string,
     mime: string
   ) => {
+    const platform = Capacitor.getPlatform();
 
-    const isAndroid = Capacitor.getPlatform() === "android";
-
-    if (isAndroid) {
-      try {
-        const saved = await Filesystem.writeFile({
-          path: filename,
-          data: base64Data,
-          directory: Directory.Data,
-          recursive: true,
-        });
-
-        const fileUri = Capacitor.convertFileSrc(saved.uri);
-
-        try {
-          await FileOpener.open({
-            filePath: fileUri,
-            contentType: mime,
-          });
-        } catch (err) {
-          notify("Archivo guardado en Documentos.");
-        }
-      } catch (err) {
-        console.error(err);
-        notify("Error guardando archivo.");
-      }
-    } else {
-      // WEB
+    if (platform === "web") {
       const link = document.createElement("a");
-      link.href = "data:" + mime + ";base64," + base64Data;
+      link.href = `data:${mime};base64,${base64Data}`;
       link.download = filename;
       link.click();
+      return;
+    }
+
+    try {
+      const saved = await Filesystem.writeFile({
+        path: filename,
+        data: base64Data,
+        directory: Directory.Documents,
+        recursive: true,
+      });
+
+      const finalPath = Capacitor.convertFileSrc(saved.uri);
+
+      try {
+        await FileOpener.open({
+          filePath: finalPath,
+          contentType: mime,
+        });
+      } catch {
+        notify("Archivo guardado en Documentos.");
+      }
+    } catch (err) {
+      console.error(err);
+      notify("Error guardando archivo.");
     }
   };
 
@@ -149,7 +152,6 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
      📌 Exportar PDF
   ============================================================ */
   const exportarPDF = async () => {
-
     if (!(await solicitarPermiso())) return;
 
     notify("Generando PDF...");
@@ -162,19 +164,17 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
 
       autoTable(doc, {
         startY: 20,
-
-        head: [["Código", "Nombre", "Marca", "Cantidad", "Fecha Ingreso"]],
+        head: [["Código", "Nombre", "Marca", "Stock", "Fecha Ingreso"]],
         body: productos.map((p) => [
           p.codigo,
           p.nombre,
           p.marca,
-          p.cantidad.toString(),
+          p.stock.toString(),
           p.fecha,
         ]),
       });
 
       const base64 = doc.output("datauristring").split(",")[1];
-
       const stamp = Date.now();
 
       await guardarArchivo(
@@ -183,11 +183,10 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
         "application/pdf"
       );
 
-
-      notify("PDF descargado exitosamente.");
+      notify("PDF generado correctamente.");
     } catch (err) {
       console.error(err);
-      notify("Error al generar PDF.");
+      notify("Error generando PDF.");
     }
   };
 
@@ -195,7 +194,6 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
      📌 Exportar Excel
   ============================================================ */
   const exportarExcel = async () => {
-
     if (!(await solicitarPermiso())) return;
 
     notify("Generando Excel...");
@@ -207,7 +205,7 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
         Código: p.codigo,
         Nombre: p.nombre,
         Marca: p.marca,
-        Cantidad: p.cantidad,
+        Stock: p.stock,
         "Fecha Ingreso": p.fecha,
       }));
 
@@ -224,23 +222,15 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
 
-
-      notify("Excel generado exitosamente.");
+      notify("Excel generado correctamente.");
     } catch (err) {
       console.error(err);
-      notify("Error al generar Excel.");
+      notify("Error generando Excel.");
     }
   };
 
   return (
     <>
-      {alertMsg && (
-        <div className="alert-overlay">
-          <p>{alertMsg}</p>
-          <IonButton onClick={() => setAlertMsg(null)}>Aceptar</IonButton>
-        </div>
-      )}
-
       <IonHeader>
         <IonToolbar>
           <IonTitle>Productos Nuevos</IonTitle>
@@ -252,7 +242,6 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
 
       <IonContent className="ion-padding">
         <IonText>
-
           <h3 style={{ textAlign: "center", fontWeight: "bold" }}>
             Descargar Reporte
           </h3>
@@ -261,12 +250,10 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
           </p>
         </IonText>
 
-
         <div style={{ padding: "16px" }}>
           <IonButton expand="block" color="danger" onClick={exportarPDF}>
             Descargar PDF
           </IonButton>
-
 
           <IonButton
             expand="block"
@@ -282,6 +269,4 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
   );
 };
 
-
 export default ReportNewProduct;
-
