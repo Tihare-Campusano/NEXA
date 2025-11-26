@@ -16,9 +16,9 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
 import { Capacitor } from "@capacitor/core";
-import { Filesystem, Directory } from "@capacitor/filesystem";
-import { FileOpener } from "@capacitor-community/file-opener";
 import { Toast } from "@capacitor/toast";
+
+import { descargarAndroid } from "../../../plugins/downloadPlugin";
 
 import "./report_new_product.css";
 
@@ -46,36 +46,7 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
   };
 
   /* ============================================================
-     📌 Solicitar permisos (Android)
-  ============================================================ */
-  const solicitarPermiso = async (): Promise<boolean> => {
-    const platform = Capacitor.getPlatform();
-
-    if (platform === "web" || platform === "ios") return true;
-
-    try {
-      const perm: any = await Filesystem.requestPermissions();
-
-      const granted =
-        perm?.publicStorage === "granted" ||
-        perm?.granted === true ||
-        perm?.state === "granted";
-
-      if (!granted) {
-        notify("Debe otorgar permisos de almacenamiento.");
-        return false;
-      }
-
-      return true;
-    } catch (err) {
-      console.error(err);
-      notify("Error solicitando permisos.");
-      return false;
-    }
-  };
-
-  /* ============================================================
-     📌 Obtener productos NUEVOS desde Supabase
+     📌 Obtener productos NUEVOS
   ============================================================ */
   const fetchProductos = async (): Promise<Producto[]> => {
     const { data, error } = await supabase
@@ -97,9 +68,9 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
 
     return (data ?? []).map((p: any) => ({
       codigo: p.id?.toString() ?? "",
-      nombre: p.nombre ?? "",
+      nombre: p.nombre ?? "Sin nombre",
       marca: p.marca ?? "General",
-      stock: p.stock ?? 0, // ← AHORA VIENE DEL CAMPO REAL
+      stock: p.stock ?? 0,
       fecha: p.created_at
         ? new Date(p.created_at).toLocaleDateString("es-CL")
         : "N/A",
@@ -107,7 +78,7 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
   };
 
   /* ============================================================
-     📌 Guardar archivo en Android / Web
+     📌 Guardar archivo según plataforma
   ============================================================ */
   const guardarArchivo = async (
     filename: string,
@@ -116,6 +87,7 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
   ) => {
     const platform = Capacitor.getPlatform();
 
+    // 🌐 Web — descarga directa
     if (platform === "web") {
       const link = document.createElement("a");
       link.href = `data:${mime};base64,${base64Data}`;
@@ -124,36 +96,14 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
       return;
     }
 
-    try {
-      const saved = await Filesystem.writeFile({
-        path: filename,
-        data: base64Data,
-        directory: Directory.Documents,
-        recursive: true,
-      });
-
-      const finalPath = Capacitor.convertFileSrc(saved.uri);
-
-      try {
-        await FileOpener.open({
-          filePath: finalPath,
-          contentType: mime,
-        });
-      } catch {
-        notify("Archivo guardado en Documentos.");
-      }
-    } catch (err) {
-      console.error(err);
-      notify("Error guardando archivo.");
-    }
+    // 🤖 Android — DownloadManager real
+    await descargarAndroid(filename, base64Data, mime);
   };
 
   /* ============================================================
      📌 Exportar PDF
   ============================================================ */
   const exportarPDF = async () => {
-    if (!(await solicitarPermiso())) return;
-
     notify("Generando PDF...");
 
     try {
@@ -183,7 +133,7 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
         "application/pdf"
       );
 
-      notify("PDF generado correctamente.");
+      notify("PDF generado correctamente 🎉");
     } catch (err) {
       console.error(err);
       notify("Error generando PDF.");
@@ -194,8 +144,6 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
      📌 Exportar Excel
   ============================================================ */
   const exportarExcel = async () => {
-    if (!(await solicitarPermiso())) return;
-
     notify("Generando Excel...");
 
     try {
@@ -222,7 +170,7 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
 
-      notify("Excel generado correctamente.");
+      notify("Excel generado correctamente 🎉");
     } catch (err) {
       console.error(err);
       notify("Error generando Excel.");

@@ -16,9 +16,9 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
 import { Capacitor } from "@capacitor/core";
-import { Filesystem, Directory } from "@capacitor/filesystem";
-import { FileOpener } from "@capacitor-community/file-opener";
 import { Toast } from "@capacitor/toast";
+
+import { descargarAndroid } from "../../../plugins/downloadPlugin";
 
 import "./report_register_for_week.css";
 
@@ -39,7 +39,7 @@ interface Props {
 }
 
 /* ==================================================================
-   Función para obtener el número de semana (ISO 8601)
+   Obtener semana ISO
 ================================================================== */
 function obtenerSemana(fecha: Date): { semana: number; anio: number } {
   const temp = new Date(Date.UTC(fecha.getFullYear(), fecha.getMonth(), fecha.getDate()));
@@ -60,26 +60,7 @@ const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
   const [alerta, setAlerta] = useState<string | null>(null);
 
   const notificar = async (msg: string) => {
-    await Toast.show({ text: msg, duration: "long" });
-  };
-
-  /* ============================================================
-     🔐 Permisos Android
-  ============================================================ */
-  const solicitarPermisos = async (): Promise<boolean> => {
-    if (Capacitor.getPlatform() === "android") {
-      try {
-        const perm = await Filesystem.requestPermissions();
-        if (perm.publicStorage !== "granted") {
-          notificar("Debes conceder permisos de almacenamiento.");
-          return false;
-        }
-      } catch {
-        notificar("No se pudieron obtener permisos.");
-        return false;
-      }
-    }
-    return true;
+    await Toast.show({ text: msg });
   };
 
   /* ============================================================
@@ -98,7 +79,7 @@ const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
         const { semana, anio } = obtenerSemana(fechaObj);
 
         return {
-          codigo: p.id ?? "",   // ← AHORA EL CÓDIGO ES EL ID
+          codigo: p.id ?? "",
           nombre: p.nombre ?? "",
           marca: p.marca ?? "General",
           fecha: fechaObj.toLocaleDateString("es-CL"),
@@ -112,54 +93,33 @@ const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
       });
   };
 
-
   /* ============================================================
-      💾 Guardar archivo (Android / Web)
+      💾 Guardar archivo según plataforma
   ============================================================ */
   const guardarArchivo = async (
     filename: string,
     base64Data: string,
     mimeType: string
   ) => {
-    const isAndroid = Capacitor.getPlatform() === "android";
+    const platform = Capacitor.getPlatform();
 
-    if (isAndroid) {
-      try {
-        const saved = await Filesystem.writeFile({
-          path: filename,
-          data: base64Data,
-          directory: Directory.Data,
-          recursive: true,
-        });
-
-        const fileUri = Capacitor.convertFileSrc(saved.uri);
-
-        try {
-          await FileOpener.open({
-            filePath: fileUri,
-            contentType: mimeType,
-          });
-        } catch {
-          notificar("Archivo guardado. Revisa Documentos.");
-        }
-      } catch {
-        notificar("Error al guardar archivo.");
-      }
-    } else {
-      // 🌐 Web
+    // 🌐 Web
+    if (platform === "web") {
       const a = document.createElement("a");
       a.href = `data:${mimeType};base64,${base64Data}`;
       a.download = filename;
       a.click();
+      return;
     }
+
+    // 🤖 Android — descarga real
+    await descargarAndroid(filename, base64Data, mimeType);
   };
 
   /* ============================================================
       📄 Exportar PDF
   ============================================================ */
   const exportarPDF = async () => {
-    if (!(await solicitarPermisos())) return;
-
     notificar("Generando PDF...");
 
     try {
@@ -182,15 +142,15 @@ const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
       });
 
       const base64 = doc.output("datauristring").split(",")[1];
-      const timestamp = Date.now();
+      const stamp = Date.now();
 
       await guardarArchivo(
-        `registros_semanales_${timestamp}.pdf`,
+        `registros_semanales_${stamp}.pdf`,
         base64,
         "application/pdf"
       );
 
-      notificar("PDF generado correctamente.");
+      notificar("PDF generado correctamente 🎉");
     } catch (err) {
       console.error(err);
       notificar("Error al generar PDF.");
@@ -201,7 +161,6 @@ const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
       📊 Exportar Excel
   ============================================================ */
   const exportarExcel = async () => {
-    if (!(await solicitarPermisos())) return;
     notificar("Generando Excel...");
 
     try {
@@ -222,17 +181,17 @@ const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
       XLSX.utils.book_append_sheet(wb, ws, "Registros");
 
       const base64 = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
-
-      const timestamp = Date.now();
+      const stamp = Date.now();
 
       await guardarArchivo(
-        `registros_semanales_${timestamp}.xlsx`,
+        `registros_semanales_${stamp}.xlsx`,
         base64,
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
 
-      notificar("Excel generado correctamente.");
-    } catch {
+      notificar("Excel generado correctamente 🎉");
+    } catch (err) {
+      console.error(err);
       notificar("Error al generar Excel.");
     }
   };

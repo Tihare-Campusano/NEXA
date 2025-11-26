@@ -16,9 +16,9 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
 import { Capacitor } from "@capacitor/core";
-import { Filesystem, Directory } from "@capacitor/filesystem";
-import { FileOpener } from "@capacitor-community/file-opener";
 import { Toast } from "@capacitor/toast";
+
+import { descargarAndroid } from "../../../plugins/downloadPlugin";
 
 import "./report_stock_month.css";
 
@@ -26,7 +26,7 @@ import "./report_stock_month.css";
    📌 Interface
 ============================================================ */
 interface ProductoStock {
-  codigo: string; // ahora usa el id
+  codigo: string;
   nombre: string;
   cantidad: number;
   marca: string;
@@ -43,33 +43,13 @@ interface Props {
 const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
   const [alerta, setAlerta] = useState<string | null>(null);
 
-  /* Mostrar toast */
+  /* Toast */
   const notificar = async (msg: string) => {
-    await Toast.show({ text: msg, duration: "long" });
+    await Toast.show({ text: msg });
   };
 
   /* ============================================================
-     🔐 Solicitar permisos (ANDROID)
-  ============================================================ */
-  const solicitarPermisos = async (): Promise<boolean> => {
-    if (Capacitor.getPlatform() === "android") {
-      try {
-        const st = await Filesystem.requestPermissions();
-        if (st.publicStorage !== "granted") {
-          notificar("Debes otorgar permisos de almacenamiento.");
-          return false;
-        }
-      } catch (err) {
-        console.error(err);
-        notificar("No se pudieron obtener permisos.");
-        return false;
-      }
-    }
-    return true;
-  };
-
-  /* ============================================================
-     📥 Obtener stock del mes desde productos (CORREGIDO)
+     📥 Obtener stock del mes
   ============================================================ */
   const obtenerStockMes = async (): Promise<ProductoStock[]> => {
     const inicioMes = new Date();
@@ -95,54 +75,33 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
   };
 
   /* ============================================================
-     💾 Guardar archivo (PDF/Excel)
+     💾 Guardar archivo según plataforma
   ============================================================ */
   const guardarArchivo = async (
     filename: string,
     base64Data: string,
     mimeType: string
   ) => {
-    const isAndroid = Capacitor.getPlatform() === "android";
+    const platform = Capacitor.getPlatform();
 
-    if (isAndroid) {
-      try {
-        const saved = await Filesystem.writeFile({
-          path: filename,
-          data: base64Data,
-          directory: Directory.Documents,
-          recursive: true,
-        });
-
-        const fileUri = Capacitor.convertFileSrc(saved.uri);
-
-        try {
-          await FileOpener.open({
-            filePath: fileUri,
-            contentType: mimeType,
-          });
-        } catch {
-          notificar("Archivo guardado en Documentos.");
-        }
-      } catch (err) {
-        console.error(err);
-        notificar("Error al guardar archivo en Android.");
-      }
-    } else {
-      // WEB
+    // 🌐 WEB
+    if (platform === "web") {
       const link = document.createElement("a");
       link.href = `data:${mimeType};base64,${base64Data}`;
       link.download = filename;
       link.click();
+      return;
     }
+
+    // 🤖 ANDROID — descarga real
+    await descargarAndroid(filename, base64Data, mimeType);
   };
 
   /* ============================================================
       📄 Exportar PDF
   ============================================================ */
   const exportarPDF = async () => {
-    if (!(await solicitarPermisos())) return;
-
-    notificar("Generando PDF...");
+    notificar("Generando PDF…");
 
     try {
       const productos = await obtenerStockMes();
@@ -167,7 +126,7 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
 
       await guardarArchivo(filename, base64, "application/pdf");
 
-      notificar("PDF generado exitosamente.");
+      notificar("PDF generado exitosamente 🎉");
     } catch (err) {
       console.error(err);
       notificar("Error al generar PDF.");
@@ -178,9 +137,7 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
       📊 Exportar Excel
   ============================================================ */
   const exportarExcel = async () => {
-    if (!(await solicitarPermisos())) return;
-
-    notificar("Generando Excel...");
+    notificar("Generando Excel…");
 
     try {
       const productos = await obtenerStockMes();
@@ -197,7 +154,6 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Stock Mes");
 
-      // IMPORTANTE: Excel debe ser base64 puro
       const base64 = XLSX.write(wb, { type: "base64", bookType: "xlsx" });
 
       await guardarArchivo(
@@ -206,7 +162,7 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
 
-      notificar("Excel generado exitosamente.");
+      notificar("Excel generado exitosamente 🎉");
     } catch (err) {
       console.error(err);
       notificar("Error al generar Excel.");

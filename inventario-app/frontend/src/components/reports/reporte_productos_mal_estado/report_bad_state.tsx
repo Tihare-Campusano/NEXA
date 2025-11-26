@@ -16,21 +16,21 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
 import { Capacitor } from "@capacitor/core";
-import { Filesystem, Directory } from "@capacitor/filesystem";
-import { FileOpener } from "@capacitor-community/file-opener";
 import { Toast } from "@capacitor/toast";
+
+import { descargarAndroid } from "../../../plugins/downloadPlugin";
 
 import "./report_bad_state.css";
 
 /* ============================================================
    📌 INTERFACES
-   ============================================================ */
+============================================================ */
 interface Producto {
   codigo: string;
   nombre: string;
   estado: string;
   marca: string;
-  cantidad: number; // ← Stock REAL
+  cantidad: number;
 }
 
 interface Props {
@@ -43,35 +43,6 @@ interface Props {
 const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
   const notify = async (msg: string) => {
     await Toast.show({ text: msg });
-  };
-
-  /* ============================================================
-     📌 Permisos Android
-  ============================================================ */
-  const solicitarPermiso = async (): Promise<boolean> => {
-    const platform = Capacitor.getPlatform();
-
-    if (platform === "web" || platform === "ios") return true;
-
-    try {
-      const perm: any = await Filesystem.requestPermissions();
-
-      const granted =
-        perm?.publicStorage === "granted" ||
-        perm?.granted === true ||
-        perm?.state === "granted";
-
-      if (!granted) {
-        notify("Debes otorgar permiso de almacenamiento.");
-        return false;
-      }
-
-      return true;
-    } catch (err) {
-      console.error(err);
-      notify("Error solicitando permisos.");
-      return false;
-    }
   };
 
   /* ============================================================
@@ -100,12 +71,12 @@ const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
       nombre: p.nombre ?? "Sin nombre",
       estado: p.estado ?? "N/A",
       marca: p.marca ?? "General",
-      cantidad: p.stock ?? 0, // ← CORRECCIÓN FINAL (stock real)
+      cantidad: p.stock ?? 0,
     }));
   };
 
   /* ============================================================
-     📌 Guardar archivo en Web / Android
+     📌 Guardar archivo según plataforma
   ============================================================ */
   const guardarArchivo = async (
     fileName: string,
@@ -114,6 +85,7 @@ const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
   ) => {
     const platform = Capacitor.getPlatform();
 
+    // 🌐 WEB — Descargar con <a>
     if (platform === "web") {
       const link = document.createElement("a");
       link.href = `data:${mime};base64,${base64Data}`;
@@ -122,36 +94,14 @@ const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
       return;
     }
 
-    try {
-      const saved = await Filesystem.writeFile({
-        path: fileName,
-        data: base64Data,
-        directory: Directory.Documents,
-        recursive: true,
-      });
-
-      const finalPath = Capacitor.convertFileSrc(saved.uri);
-
-      try {
-        await FileOpener.open({
-          filePath: finalPath,
-          contentType: mime,
-        });
-      } catch {
-        notify("Archivo guardado en Documentos.");
-      }
-    } catch (err) {
-      console.error(err);
-      notify("Error guardando archivo.");
-    }
+    // 🤖 ANDROID — DownloadManager real
+    await descargarAndroid(fileName, base64Data, mime);
   };
 
   /* ============================================================
      📌 Exportar PDF
   ============================================================ */
   const exportarPDF = async () => {
-    if (!(await solicitarPermiso())) return;
-
     notify("Generando PDF...");
 
     try {
@@ -192,8 +142,6 @@ const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
      📌 Exportar Excel
   ============================================================ */
   const exportarExcel = async () => {
-    if (!(await solicitarPermiso())) return;
-
     notify("Generando Excel...");
 
     try {
@@ -248,7 +196,7 @@ const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
             ¿Descargar PDF o Excel?
           </h3>
           <p style={{ textAlign: "center", color: "#666" }}>
-            Los archivos se guardarán en tu dispositivo.
+            Los archivos se guardarán como una descarga real.
           </p>
         </IonText>
 

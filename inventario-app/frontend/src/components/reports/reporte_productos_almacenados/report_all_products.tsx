@@ -15,10 +15,10 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
-import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Capacitor } from "@capacitor/core";
-import { FileOpener } from "@capacitor-community/file-opener";
 import { Toast } from "@capacitor/toast";
+
+import { descargarAndroid } from "../../../plugins/downloadPlugin";
 
 import "./report_all_products.css";
 
@@ -44,30 +44,6 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
   };
 
   // ------------------------------------------------------------------
-  // 🔹 Solicitar permiso correctamente (Android/iOS)
-  // ------------------------------------------------------------------
-  const solicitarPermiso = async (): Promise<boolean> => {
-  if (isWeb) return true;
-
-  try {
-    const permission = await Filesystem.requestPermissions();
-
-    // Capacitor 6 no expone estas propiedades en el tipo
-    const perm: any = permission;
-
-    const granted =
-      perm?.granted === true ||
-      perm?.state === "granted" ||
-      perm?.publicStorage === "granted";
-
-    return granted;
-  } catch {
-    return false;
-  }
-};
-
-
-  // ------------------------------------------------------------------
   // 🔹 Obtener productos
   // ------------------------------------------------------------------
   const fetchProductos = async (): Promise<Producto[]> => {
@@ -91,37 +67,6 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
   };
 
   // ------------------------------------------------------------------
-  // 🔹 Guardar archivo en Android/iOS
-  // ------------------------------------------------------------------
-  const guardarEnDispositivo = async (
-    fileName: string,
-    base64Data: string,
-    mimeType: string
-  ) => {
-    try {
-      const file = await Filesystem.writeFile({
-        path: fileName,
-        data: base64Data,
-        directory: Directory.Documents,
-        recursive: true,
-      });
-
-      const filePath = Capacitor.convertFileSrc(file.uri);
-
-      try {
-        await FileOpener.open({
-          filePath,
-          contentType: mimeType,
-        });
-      } catch {
-        notify("Archivo guardado en Documentos.");
-      }
-    } catch (e) {
-      notify("Error al guardar archivo.");
-    }
-  };
-
-  // ------------------------------------------------------------------
   // 🔹 Guardar archivo en Web
   // ------------------------------------------------------------------
   const guardarWeb = (fileName: string, blob: Blob) => {
@@ -139,11 +84,6 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
   // 🔹 EXPORTAR PDF
   // ------------------------------------------------------------------
   const exportarPDF = async () => {
-    if (!(await solicitarPermiso())) {
-      notify("Permiso denegado.");
-      return;
-    }
-
     notify("Generando PDF…");
 
     try {
@@ -172,7 +112,9 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
         guardarWeb(fileName, blob);
       } else {
         const base64Data = doc.output("datauristring").split(",")[1];
-        await guardarEnDispositivo(fileName, base64Data, "application/pdf");
+
+        // --- Android descarga REAL ---
+        await descargarAndroid(fileName, base64Data, "application/pdf");
       }
 
       notify("PDF listo 🎉");
@@ -185,11 +127,6 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
   // 🔹 EXPORTAR EXCEL
   // ------------------------------------------------------------------
   const exportarExcel = async () => {
-    if (!(await solicitarPermiso())) {
-      notify("Permiso denegado.");
-      return;
-    }
-
     notify("Generando Excel…");
 
     try {
@@ -217,7 +154,8 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
       } else {
         const base64Data = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
 
-        await guardarEnDispositivo(
+        // --- Android descarga REAL ---
+        await descargarAndroid(
           fileName,
           base64Data,
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

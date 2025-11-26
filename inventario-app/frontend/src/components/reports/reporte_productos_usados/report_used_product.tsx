@@ -16,15 +16,15 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
 import { Capacitor } from "@capacitor/core";
-import { Filesystem, Directory } from "@capacitor/filesystem";
-import { FileOpener } from "@capacitor-community/file-opener";
 import { Toast } from "@capacitor/toast";
+
+import { descargarAndroid } from "../../../plugins/downloadPlugin";
 
 import "./report_used_product.css";
 
 /* ============================================================
    📌 Interfaces
-   ============================================================ */
+============================================================ */
 interface Producto {
   codigo: string;
   nombre: string;
@@ -39,7 +39,7 @@ interface Props {
 
 /* ============================================================
    📌 Componente principal
-   ============================================================ */
+============================================================ */
 const ReportUsedProduct: React.FC<Props> = ({ onDidDismiss }) => {
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
 
@@ -48,29 +48,8 @@ const ReportUsedProduct: React.FC<Props> = ({ onDidDismiss }) => {
   };
 
   /* ============================================================
-     📌 Solicitar permiso de almacenamiento (Android)
-     ============================================================ */
-  const solicitarPermiso = async (): Promise<boolean> => {
-    if (Capacitor.getPlatform() === "android") {
-      try {
-        const status = await Filesystem.requestPermissions();
-
-        if (status.publicStorage !== "granted") {
-          notify("Debes otorgar permiso de almacenamiento para continuar.");
-          return false;
-        }
-      } catch (err) {
-        console.error(err);
-        notify("Error solicitando permisos.");
-        return false;
-      }
-    }
-    return true;
-  };
-
-  /* ============================================================
      📌 Obtener productos USADOS desde Supabase
-     ============================================================ */
+  ============================================================ */
   const fetchProductos = async (): Promise<Producto[]> => {
     const { data, error } = await supabase
       .from("productos")
@@ -94,49 +73,32 @@ const ReportUsedProduct: React.FC<Props> = ({ onDidDismiss }) => {
   };
 
   /* ============================================================
-     📌 Guardar archivo PDF/Excel en Android o Web
-     ============================================================ */
+     📌 Guardar archivo según plataforma
+  ============================================================ */
   const guardarArchivo = async (
     filename: string,
     base64Data: string,
     mime: string
   ) => {
-    const isAndroid = Capacitor.getPlatform() === "android";
+    const platform = Capacitor.getPlatform();
 
-    if (isAndroid) {
-      try {
-        const saved = await Filesystem.writeFile({
-          path: filename,
-          data: base64Data,
-          directory: Directory.Documents,
-          recursive: true,
-        });
-
-        const fileUri = Capacitor.convertFileSrc(saved.uri);
-
-        try {
-          await FileOpener.open({ filePath: fileUri, contentType: mime });
-        } catch {
-          notify("Archivo guardado en Documentos.");
-        }
-      } catch (err) {
-        console.error(err);
-        notify("Error guardando archivo.");
-      }
-    } else {
+    // 🌐 WEB
+    if (platform === "web") {
       const link = document.createElement("a");
       link.href = `data:${mime};base64,${base64Data}`;
       link.download = filename;
       link.click();
+      return;
     }
+
+    // 🤖 ANDROID — descarga real con DownloadManager
+    await descargarAndroid(filename, base64Data, mime);
   };
 
   /* ============================================================
      📌 Exportar PDF
-     ============================================================ */
+  ============================================================ */
   const exportarPDF = async () => {
-    if (!(await solicitarPermiso())) return;
-
     notify("Generando PDF...");
 
     try {
@@ -166,7 +128,7 @@ const ReportUsedProduct: React.FC<Props> = ({ onDidDismiss }) => {
         "application/pdf"
       );
 
-      notify("PDF generado correctamente.");
+      notify("PDF generado correctamente 🎉");
     } catch (err) {
       console.error(err);
       notify("Error generando PDF.");
@@ -175,10 +137,8 @@ const ReportUsedProduct: React.FC<Props> = ({ onDidDismiss }) => {
 
   /* ============================================================
      📌 Exportar Excel
-     ============================================================ */
+  ============================================================ */
   const exportarExcel = async () => {
-    if (!(await solicitarPermiso())) return;
-
     notify("Generando Excel...");
 
     try {
@@ -205,7 +165,7 @@ const ReportUsedProduct: React.FC<Props> = ({ onDidDismiss }) => {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
 
-      notify("Excel generado correctamente.");
+      notify("Excel generado correctamente 🎉");
     } catch (err) {
       console.error(err);
       notify("Error generando Excel.");

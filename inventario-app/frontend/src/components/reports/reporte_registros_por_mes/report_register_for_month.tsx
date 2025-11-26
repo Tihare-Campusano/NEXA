@@ -16,9 +16,9 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
 import { Capacitor } from "@capacitor/core";
-import { Filesystem, Directory } from "@capacitor/filesystem";
-import { FileOpener } from "@capacitor-community/file-opener";
 import { Toast } from "@capacitor/toast";
+
+import { descargarAndroid } from "../../../plugins/downloadPlugin";
 
 import "./report_register_for_month.css";
 
@@ -48,32 +48,7 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
   };
 
   /* ============================================================
-     🔐 Permisos Android
-============================================================ */
-  const solicitarPermisos = async (): Promise<boolean> => {
-    if (Capacitor.getPlatform() === "android") {
-      try {
-        const p = await Filesystem.requestPermissions();
-
-        if (p.publicStorage !== "granted") {
-          notificar("Debes otorgar permisos de almacenamiento.");
-          return false;
-        }
-      } catch (err) {
-        console.error(err);
-        notificar("Error al solicitar permisos.");
-        return false;
-      }
-    }
-    return true;
-  };
-
-  /* ============================================================
      📥 Obtener STOCK ordenado ASC
-     👍 Ahora usa:
-       - código = id
-       - cantidad = stock
-       - categoría = marca
 ============================================================ */
   const obtenerStock = async (): Promise<ProductoStock[]> => {
     const { data, error } = await getSupabase()
@@ -94,52 +69,32 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
   };
 
   /* ============================================================
-      💾 Guardar archivos PDF/Excel en Android o Web
+     💾 Guardar archivo según plataforma
 ============================================================ */
   const guardarArchivo = async (
     filename: string,
     base64Data: string,
     mimeType: string
   ) => {
-    const isAndroid = Capacitor.getPlatform() === "android";
+    const platform = Capacitor.getPlatform();
 
-    if (isAndroid) {
-      try {
-        const saved = await Filesystem.writeFile({
-          path: filename,
-          data: base64Data,
-          directory: Directory.Documents,
-          recursive: true,
-        });
-
-        const fileUri = Capacitor.convertFileSrc(saved.uri);
-
-        try {
-          await FileOpener.open({
-            filePath: fileUri,
-            contentType: mimeType,
-          });
-        } catch {
-          notificar("Archivo guardado en Documentos.");
-        }
-      } catch (err) {
-        console.error(err);
-        notificar("Error al guardar archivo.");
-      }
-    } else {
-      const a = document.createElement("a");
-      a.href = `data:${mimeType};base64,${base64Data}`;
-      a.download = filename;
-      a.click();
+    // 🌐 WEB
+    if (platform === "web") {
+      const link = document.createElement("a");
+      link.href = `data:${mimeType};base64,${base64Data}`;
+      link.download = filename;
+      link.click();
+      return;
     }
+
+    // 🤖 ANDROID — descarga real
+    await descargarAndroid(filename, base64Data, mimeType);
   };
 
   /* ============================================================
-      📄 Exportar PDF
+     📄 Exportar PDF
 ============================================================ */
   const exportarPDF = async () => {
-    if (!(await solicitarPermisos())) return;
-
     notificar("Generando PDF...");
 
     try {
@@ -175,7 +130,7 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
         "application/pdf"
       );
 
-      notificar("PDF generado correctamente.");
+      notificar("PDF generado correctamente 🎉");
     } catch (err) {
       console.error(err);
       notificar("Error al generar PDF.");
@@ -183,11 +138,9 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
   };
 
   /* ============================================================
-      📊 Exportar Excel
+     📊 Exportar Excel
 ============================================================ */
   const exportarExcel = async () => {
-    if (!(await solicitarPermisos())) return;
-
     notificar("Generando Excel...");
 
     try {
@@ -206,7 +159,6 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
       XLSX.utils.book_append_sheet(wb, ws, "Stock");
 
       const base64 = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
-
       const timestamp = Date.now();
 
       await guardarArchivo(
@@ -215,7 +167,7 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
 
-      notificar("Excel generado correctamente.");
+      notificar("Excel generado correctamente 🎉");
     } catch (err) {
       console.error(err);
       notificar("Error al generar Excel.");
@@ -223,7 +175,7 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
   };
 
   /* ============================================================
-      🎨 Render
+     🎨 Render
 ============================================================ */
   return (
     <>
