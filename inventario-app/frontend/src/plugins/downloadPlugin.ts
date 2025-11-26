@@ -6,19 +6,20 @@ export const DownloadPlugin = registerPlugin<{
     base64: string;
     mimeType: string;
   }): Promise<{ success: boolean }>;
-}>("DownloadPlugin");
+}>("DownloadPlugin", {
+  web: () => import("../plugins/downloadPlugin.web").then((m) => new m.DownloadWeb()),
+});
 
-// Función para usar en tu app
 export const descargarAndroid = async (
   fileName: string,
   base64: string,
-  mime: string
+  mimeType: string
 ) => {
   try {
     await DownloadPlugin.downloadFile({
       fileName,
       base64,
-      mimeType: mime,
+      mimeType,
     });
 
     console.log("Archivo descargado con éxito ✔️");

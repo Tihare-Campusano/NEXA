@@ -21,11 +21,16 @@ public class DownloadPlugin extends Plugin {
             return;
         }
 
-        Context context = getContext();
-        DownloadHelper.startDownload(context, fileName, base64, mimeType);
+        try {
+            Context context = getContext();
+            DownloadHelper.startDownload(context, fileName, base64, mimeType);
 
-        JSObject ret = new JSObject();
-        ret.put("success", true);
-        call.resolve(ret);
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            call.resolve(ret);
+
+        } catch (Exception e) {
+            call.reject("No se pudo guardar el archivo", e);
+        }
     }
 }
