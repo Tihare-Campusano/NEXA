@@ -22,9 +22,6 @@ import { Toast } from "@capacitor/toast";
 
 import "./report_all_products.css";
 
-// ----------------------
-// INTERFACES
-// ----------------------
 interface Producto {
   codigo: string;
   nombre: string;
@@ -42,27 +39,6 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
 
   const notificar = async (msg: string) => {
     await Toast.show({ text: msg });
-  };
-
-  // ----------------------
-  // PERMISOS EN ANDROID
-  // ----------------------
-  const solicitarPermisos = async () => {
-    if (Capacitor.getPlatform() === "android") {
-      try {
-        const permisos = await Filesystem.requestPermissions();
-
-        if (permisos.publicStorage === "denied") {
-          await notificar("Debes otorgar permisos de almacenamiento.");
-          return false;
-        }
-      } catch (err) {
-        console.log("Error permisos:", err);
-        await notificar("No se pudieron solicitar permisos.");
-        return false;
-      }
-    }
-    return true;
   };
 
   // ----------------------
@@ -91,49 +67,41 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
   };
 
   // ----------------------
-  // GUARDAR ARCHIVO (NATIVO)
+  // GUARDAR ARCHIVO NATIVO (SIN PLUGIN EXTRA)
   // ----------------------
-  const guardarArchivoNativo = async (
-    fileName: string,
-    base64: string,
-    mimeType: string
-  ) => {
+  const guardarArchivoNativo = async (fileName: string, base64: string, mime: string) => {
     try {
-      // 1) Escribir archivo en directorio externo de la app
+      // 1) Guardar archivo en carpeta de documentos privada
       await Filesystem.writeFile({
         path: fileName,
         data: base64,
-        directory: Directory.External, // app-specific externo
+        directory: Directory.Documents,
         recursive: true,
       });
 
-      // 2) Obtener URI real del archivo
-      const uriResult = await Filesystem.getUri({
+      // 2) Obtener URI real
+      const uri = await Filesystem.getUri({
         path: fileName,
-        directory: Directory.External,
+        directory: Directory.Documents,
       });
 
-      console.log("URI archivo:", uriResult.uri);
+      console.log("📄 Archivo guardado en:", uri.uri);
 
-      // 3) Abrir con FileOpener
+      // 3) Abrir archivo
       await FileOpener.open({
-        filePath: uriResult.uri,
-        contentType: mimeType,
+        filePath: uri.uri,
+        contentType: mime,
       });
 
-      await notificar("Archivo generado y abierto correctamente.");
+      await notificar("Archivo generado exitosamente.");
     } catch (err: any) {
-      console.log("Error guardando/abriendo archivo:", err);
-      await notificar(
-        "Error al guardar o abrir el archivo: " +
-          (err?.message ?? "revísalo en la consola")
-      );
-      throw err;
+      console.log("Error guardando archivo:", err);
+      await notificar("No se pudo guardar el archivo.");
     }
   };
 
   // ----------------------
-  // DESCARGA EN WEB
+  // DESCARGA WEB
   // ----------------------
   const descargarWeb = (fileName: string, blob: Blob) => {
     const url = URL.createObjectURL(blob);
@@ -167,20 +135,17 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
         ]),
       });
 
-      const fileName = `reporte_productos_${Date.now()}.pdf`;
+      const nombre = `reporte_${Date.now()}.pdf`;
 
       if (isWeb) {
-        // 👉 En web: descarga normal
         const blob = doc.output("blob") as Blob;
-        descargarWeb(fileName, blob);
+        descargarWeb(nombre, blob);
         return;
       }
 
-      // 👉 En Android/iOS: usar Filesystem + FileOpener
-      if (!(await solicitarPermisos())) return;
-
       const base64 = doc.output("datauristring").split(",")[1];
-      await guardarArchivoNativo(fileName, base64, "application/pdf");
+
+      await guardarArchivoNativo(nombre, base64, "application/pdf");
     } catch (err) {
       console.log("Error PDF:", err);
       await notificar("No se pudo generar el PDF.");
@@ -207,25 +172,21 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Productos");
 
-      const fileName = `reporte_productos_${Date.now()}.xlsx`;
+      const nombre = `reporte_${Date.now()}.xlsx`;
 
       if (isWeb) {
-        // 👉 En web: blob + descarga
         const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
         const blob = new Blob([wbout], {
           type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         });
-        descargarWeb(fileName, blob);
+        descargarWeb(nombre, blob);
         return;
       }
-
-      // 👉 En Android/iOS
-      if (!(await solicitarPermisos())) return;
 
       const base64 = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
 
       await guardarArchivoNativo(
-        fileName,
+        nombre,
         base64,
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
