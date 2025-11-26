@@ -15,13 +15,17 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
-import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Capacitor } from "@capacitor/core";
-import { FileOpener } from "@capacitor-community/file-opener";
 import { Toast } from "@capacitor/toast";
+
+// 👇 ESTA ES LA RUTA CORRECTA SEGÚN TU PROYECTO
+import { descargarAndroid } from "../../../downloadPlugins/downloadPlugin";
 
 import "./report_all_products.css";
 
+// -------------------------
+// INTERFACES
+// -------------------------
 interface Producto {
   codigo: string;
   nombre: string;
@@ -67,40 +71,6 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
   };
 
   // ----------------------
-  // GUARDAR ARCHIVO NATIVO (SIN PLUGIN EXTRA)
-  // ----------------------
-  const guardarArchivoNativo = async (fileName: string, base64: string, mime: string) => {
-    try {
-      // 1) Guardar archivo en carpeta de documentos privada
-      await Filesystem.writeFile({
-        path: fileName,
-        data: base64,
-        directory: Directory.Documents,
-        recursive: true,
-      });
-
-      // 2) Obtener URI real
-      const uri = await Filesystem.getUri({
-        path: fileName,
-        directory: Directory.Documents,
-      });
-
-      console.log("📄 Archivo guardado en:", uri.uri);
-
-      // 3) Abrir archivo
-      await FileOpener.open({
-        filePath: uri.uri,
-        contentType: mime,
-      });
-
-      await notificar("Archivo generado exitosamente.");
-    } catch (err: any) {
-      console.log("Error guardando archivo:", err);
-      await notificar("No se pudo guardar el archivo.");
-    }
-  };
-
-  // ----------------------
   // DESCARGA WEB
   // ----------------------
   const descargarWeb = (fileName: string, blob: Blob) => {
@@ -143,9 +113,11 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
         return;
       }
 
+      // ANDROID → Convertir PDF en base64
       const base64 = doc.output("datauristring").split(",")[1];
 
-      await guardarArchivoNativo(nombre, base64, "application/pdf");
+      await descargarAndroid(nombre, base64, "application/pdf");
+      await notificar("PDF guardado en /Descargas y abierto ✔️");
     } catch (err) {
       console.log("Error PDF:", err);
       await notificar("No se pudo generar el PDF.");
@@ -183,13 +155,16 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
         return;
       }
 
+      // ANDROID → convertir Excel a base64
       const base64 = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
 
-      await guardarArchivoNativo(
+      await descargarAndroid(
         nombre,
         base64,
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
+
+      await notificar("Excel guardado en /Descargas y abierto ✔️");
     } catch (err) {
       console.log("Error Excel:", err);
       await notificar("No se pudo generar el Excel.");
@@ -227,7 +202,11 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
             Descargar PDF
           </IonButton>
 
-          <IonButton expand="block" color="success" onClick={exportarExcel}>
+          <IonButton
+            expand="block"
+            color="success"
+            onClick={exportarExcel}
+          >
             Descargar Excel
           </IonButton>
         </div>
