@@ -15,8 +15,10 @@ export default function ProductosSearch({ onResults }: Props) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // ---------- FORMATEO DE FECHA ----------
-  const formatFecha = (iso: string | null | undefined) => {
+  /* -------------------------------------------------------
+    📌 FORMATEO DE FECHA
+  ------------------------------------------------------- */
+  const formatFecha = (iso?: string | null) => {
     if (!iso) return "-";
     try {
       const d = new Date(iso);
@@ -37,24 +39,29 @@ export default function ProductosSearch({ onResults }: Props) {
     }
   };
 
-  // ---------- FORMATEO DE DATOS ----------
+  /* -------------------------------------------------------
+    📌 FORMATEO DE PRODUCTO
+  ------------------------------------------------------- */
   const mapProducto = (p: any) => ({
     id: p.id,
     nombre: p.nombre ?? "Sin nombre",
-    stock: p.stock ?? 0, 
+    stock: p.stock ?? 0,
     estado: p.estado ?? "N/A",
     disponibilidad: p.disponibilidad ?? "N/A",
     activo: !!p.activo,
     fecha: p.created_at ? formatFecha(p.created_at) : "-",
   });
 
-  // ---------- CARGAR TODO ----------
+  /* -------------------------------------------------------
+    📌 TRAER TODOS LOS PRODUCTOS
+  ------------------------------------------------------- */
   const fetchAll = useCallback(async () => {
     setLoading(true);
 
     const { data, error } = await supabase
       .from("productos")
-      .select(`
+      .select(
+        `
         id,
         nombre,
         activo,
@@ -62,11 +69,13 @@ export default function ProductosSearch({ onResults }: Props) {
         disponibilidad,
         estado,
         stock
-      `)
+      `
+      )
       .order("id", { ascending: false });
 
     if (error) {
       console.error("Error al cargar productos:", error);
+      onResults([]);
     } else if (data) {
       onResults(data.map(mapProducto));
     }
@@ -74,16 +83,21 @@ export default function ProductosSearch({ onResults }: Props) {
     setLoading(false);
   }, [onResults]);
 
-  // ---------- BÚSQUEDA ----------
+  /* -------------------------------------------------------
+    📌 BÚSQUEDA
+  ------------------------------------------------------- */
   const fetchSearch = useCallback(async () => {
     const term = query.trim();
-    if (!term) return; 
+    if (!term) {
+      return fetchAll(); // sin texto → recargar todo
+    }
 
     setLoading(true);
 
     const { data, error } = await supabase
       .from("productos")
-      .select(`
+      .select(
+        `
         id,
         nombre,
         activo,
@@ -91,7 +105,8 @@ export default function ProductosSearch({ onResults }: Props) {
         disponibilidad,
         estado,
         stock
-      `)
+      `
+      )
       .or(
         `nombre.ilike.%${term}%,estado.ilike.%${term}%,disponibilidad.ilike.%${term}%`
       )
@@ -99,31 +114,32 @@ export default function ProductosSearch({ onResults }: Props) {
 
     if (error) {
       console.error("Error al buscar productos:", error);
+      onResults([]);
     } else if (data) {
       onResults(data.map(mapProducto));
     }
 
     setLoading(false);
-  }, [query, onResults]);
+  }, [query, fetchAll, onResults]);
 
-    // ---------- EFECTO DE BÚSQUEDA ----------
+  /* -------------------------------------------------------
+    📌 EFECTO DE BÚSQUEDA CON DEBOUNCE
+  ------------------------------------------------------- */
   useEffect(() => {
-    const term = query.trim();
-
-    const t = setTimeout(() => {
-      if (!term) {
-        // input vacío -> siempre traemos todos los productos
+    const delay = setTimeout(() => {
+      if (query.trim() === "") {
         fetchAll();
       } else {
-        // hay texto -> buscar
         fetchSearch();
       }
     }, 350);
 
-    return () => clearTimeout(t);
+    return () => clearTimeout(delay);
   }, [query, fetchAll, fetchSearch]);
 
-  // ---------- UI ----------
+  /* -------------------------------------------------------
+    📌 UI
+  ------------------------------------------------------- */
   return (
     <div className="search-bar-container">
       <div className="search-box">
