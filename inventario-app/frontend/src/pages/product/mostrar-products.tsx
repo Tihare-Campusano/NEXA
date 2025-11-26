@@ -11,14 +11,19 @@ export default function Productos() {
 
   return (
     <IonPage>
-      {/* 🔹 Header reutilizable */}
-      <HeaderApp icon={<FaBoxOpen size={28} className="text-green-400" />} title="Productos para editar" />
-      <IonContent className="ion-padding"> 
-        {/* Buscador opcional */}
+      <HeaderApp
+        icon={<FaBoxOpen size={28} className="text-green-400" />}
+        title="Productos para editar"
+      />
+
+      <IonContent className="ion-padding">
+        {/* Buscador */}
         <ProductosSearch onResults={(arr) => setProductosFiltrados(arr as Producto[])} />
+
         <br />
-        {/* Tabla de productos */}
-        <ProductosTable productos={productosFiltrados ?? undefined} />
+
+        {/* Tabla */}
+        <ProductosTable productos={productosFiltrados || undefined} />
       </IonContent>
     </IonPage>
   );

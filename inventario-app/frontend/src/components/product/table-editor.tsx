@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { withRouter, RouteComponentProps } from "react-router-dom";
-import { IonIcon } from "@ionic/react";
-import { copyOutline } from "ionicons/icons";
 import "./table-editor.css";
 
-// Configura tu cliente de Supabase
+// Configura Supabase
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL as string,
   import.meta.env.VITE_SUPABASE_ANON_KEY as string
@@ -13,68 +11,79 @@ const supabase = createClient(
 
 export type Producto = {
   id: number;
-  codigo_barras: string | null;
   nombre: string;
 };
 
-type ProductosTableProps = RouteComponentProps;
+interface Props extends RouteComponentProps {
+  productos?: Producto[] | undefined; // ← resultados de búsqueda
+}
 
-function ProductosTable({ history }: ProductosTableProps) {
-  const [productos, setProductos] = useState<Producto[]>([]);
+function ProductosTable({ history, productos }: Props) {
+  const [data, setData] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // PAGINACIÓN solo cuando NO hay búsqueda
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
+  const pageSize = 10;
   const [total, setTotal] = useState(0);
-  const [copiedId, setCopiedId] = useState<number | null>(null);
 
+  /* ============================================================
+     🔥 FETCH desde Supabase SOLO si no viene búsqueda
+  ============================================================ */
+  const fetchProductos = async () => {
+    if (productos) return; // si hay búsqueda → NO fetch
+
+    setLoading(true);
+
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    const { data, error, count } = await supabase
+      .from("productos")
+      .select(
+        `
+        id,
+        nombre
+      `,
+        { count: "exact" }
+      )
+      .order("id", { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      console.error("Error al cargar productos:", error.message);
+      setData([]);
+      setTotal(0);
+    } else {
+      const parsed =
+        data?.map((p: any) => ({
+          id: p.id,
+          nombre: p.nombre,
+        })) ?? [];
+
+      setData(parsed);
+      setTotal(count ?? parsed.length);
+    }
+
+    setLoading(false);
+  };
+
+  /* ============================================================
+     🧠 USE EFFECT
+  ============================================================ */
   useEffect(() => {
-    const fetchProductos = async () => {
-      setLoading(true);
-
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize - 1;
-
-      const { data, error, count } = await supabase
-        .from("productos")
-        .select(
-          `
-          id,
-          nombre,
-          codigo_barras
-        `,
-          { count: "exact" }
-        )
-        .order("id", { ascending: false })
-        .range(from, to);
-
-      if (error) {
-        console.error("Error al cargar productos:", error.message);
-        setProductos([]);
-        setTotal(0);
-      } else {
-        const productosSimplificados: Producto[] =
-          (data || []).map((p: any) => ({
-            id: p.id,
-            nombre: p.nombre,
-            // si viene null de la BD, lo dejamos null
-            codigo_barras: p.codigo_barras ?? null,
-          })) ?? [];
-
-        setProductos(productosSimplificados);
-        setTotal(count ?? productosSimplificados.length);
-      }
-
+    if (productos && Array.isArray(productos)) {
+      setData(productos);
       setLoading(false);
-    };
-
-    fetchProductos();
-  }, [page, pageSize]);
+    } else {
+      fetchProductos();
+    }
+  }, [productos, page]);
 
   if (loading) return <p>Cargando productos...</p>;
 
   return (
     <div className="productos-card-outer">
-      {/* Card interna solo para encabezado */}
       <div className="productos-card">
         <div className="productos-header">
           <span className="productos-icon">📦</span>
@@ -82,61 +91,24 @@ function ProductosTable({ history }: ProductosTableProps) {
         </div>
       </div>
 
-      {/* Tabla con estilos mejorados */}
       <div className="table-container">
         <table>
           <thead>
             <tr>
-              <th>Código de Barras</th>
+              <th>ID</th>
               <th>Nombre</th>
               <th>Acción</th>
             </tr>
           </thead>
+
           <tbody>
-            {productos.length > 0 ? (
-              productos.map((prod) => (
+            {data.length > 0 ? (
+              data.map((prod) => (
                 <tr key={prod.id}>
-                  <td>
-                    {/* mostramos "-" solo si es null/undefined */}
-                    {prod.codigo_barras ?? "-"}
-                    {prod.codigo_barras && (
-                      <>
-                        <IonIcon
-                          icon={copyOutline}
-                          onClick={() => {
-                            navigator.clipboard.writeText(
-                              prod.codigo_barras as string
-                            );
-                            setCopiedId(prod.id);
-                            setTimeout(() => {
-                              setCopiedId((prev) =>
-                                prev === prod.id ? null : prev
-                              );
-                            }, 2000);
-                          }}
-                          title="Copiar código"
-                          style={{
-                            marginLeft: 8,
-                            cursor: "pointer",
-                            fontSize: 18,
-                            color: "#555",
-                          }}
-                        />
-                        {copiedId === prod.id && (
-                          <span
-                            style={{
-                              marginLeft: 6,
-                              fontSize: 12,
-                              color: "#10b981",
-                            }}
-                          >
-                            ¡Copiado!
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </td>
+                  <td>{prod.id}</td>
+
                   <td>{prod.nombre}</td>
+
                   <td>
                     <button
                       className="btn-ver"
@@ -149,7 +121,7 @@ function ProductosTable({ history }: ProductosTableProps) {
               ))
             ) : (
               <tr>
-                <td colSpan={3} style={{ textAlign: "center", padding: "10px" }}>
+                <td colSpan={3} style={{ textAlign: "center" }}>
                   No hay productos
                 </td>
               </tr>
@@ -157,34 +129,25 @@ function ProductosTable({ history }: ProductosTableProps) {
           </tbody>
         </table>
 
-        {/* Paginación simple */}
-        {total > pageSize && (
-          <div
-            style={{
-              display: "flex",
-              gap: 12,
-              alignItems: "center",
-              marginTop: 12,
-            }}
-          >
+        {/* PAGINACIÓN solo si NO hay búsqueda */}
+        {!productos && total > pageSize && (
+          <div className="pagination">
             <button
               className="btn-ver"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
             >
               Anterior
             </button>
+
             <span>
-              Página {page} de {Math.max(1, Math.ceil(total / pageSize))}
+              Página {page} de {Math.ceil(total / pageSize)}
             </span>
+
             <button
               className="btn-ver"
-              onClick={() =>
-                setPage((p) =>
-                  p < Math.ceil(total / pageSize) ? p + 1 : p
-                )
-              }
               disabled={page >= Math.ceil(total / pageSize)}
+              onClick={() => setPage((p) => p + 1)}
             >
               Siguiente
             </button>
@@ -195,5 +158,4 @@ function ProductosTable({ history }: ProductosTableProps) {
   );
 }
 
-const ProductosTableWithRouter = withRouter(ProductosTable);
-export default ProductosTableWithRouter;
+export default withRouter(ProductosTable);
