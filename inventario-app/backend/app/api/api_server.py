@@ -10,19 +10,24 @@ from api.app_ia import registrar_producto_y_imagen
 app = FastAPI()
 
 origins = [
+    "*",
     "http://localhost",
     "http://localhost:3000",
     "http://localhost:8100",
+    "http://127.0.0.1",
+    "capacitor://localhost",
+    "http://localhost",
     "https://inventario-ia-api-887072391939.us-central1.run.app"
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],  # Para mobile siempre * (seguro si tu API no es pública)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # --- MODELO (limpio, acepta extras) ---
 class ClassificationRequest(BaseModel):
