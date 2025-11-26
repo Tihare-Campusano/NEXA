@@ -4,6 +4,7 @@ import ProductosSearch from "../../components/home/productos-search";
 import { FaBoxes } from "react-icons/fa";
 import { IonPage, IonContent } from "@ionic/react";
 import HeaderApp from "../../components/header_app"; 
+import ResumenDisponibilidad from "../../components/home/ResumenDisponibilidad";
 import "./home.css";
 
 export default function Home() {
@@ -23,6 +24,9 @@ export default function Home() {
           <ProductosSearch onResults={setProductosFiltrados} />
           <br />
           <ProductosTable productos={productosFiltrados === null ? undefined : productosFiltrados} />
+          <br />
+          <ResumenDisponibilidad />
+          <br />
         </div>
       </IonContent>
     </IonPage>

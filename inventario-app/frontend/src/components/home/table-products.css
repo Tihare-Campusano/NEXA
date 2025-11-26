@@ -1,11 +1,11 @@
 /* Card exterior */
 .productos-card-outer {
-    background: #fff;
+    background: #ffffff;
     border-radius: 10px;
     border: 1px solid #2c2c2c;
     padding: 16px;
     margin-bottom: 20px;
-    margin-top: 10px;   /* ← más espacio para la tabla */
+    margin-top: 10px;
     box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.2);
 }
 
@@ -34,14 +34,11 @@
     font-size: 20px;
     font-weight: 600;
     color: #333;
-    margin: 0;
 }
 
-/* TABLA MÁS GRANDE, ALTURA RESPONSIVA */
+/* Tabla principal */
 .table-container {
     margin-top: 16px;
-    height: calc(100vh - 280px); /* ← ahora llena toda la pantalla */
-    overflow-y: auto;
     border: 1px solid #ddd;
     border-radius: 8px;
     background: #fff;
@@ -50,31 +47,50 @@
 .table-container table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 16px;
-}
-
-.table-container thead {
-    position: sticky;
-    top: 0;
-    background-color: #f8f9fa;
-    z-index: 5;
-    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.08);
 }
 
 .table-container th,
 .table-container td {
-    padding: 16px 14px; /* ← filas más grandes */
-    font-size: 15px;
+    padding: 14px 12px;
+    font-size: 14px;
     border-bottom: 1px solid #eee;
 }
 
-.table-container tbody tr:hover {
-    background: #f3f4f6;
-    transition: background 0.2s;
+.table-container thead {
+    background-color: #f8f9fa;
+    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.08);
 }
 
-/* Activo */
+.table-container tbody tr:hover {
+    filter: brightness(0.97);
+    transition: 0.15s;
+}
+
 .check {
-    font-size: 18px;
     text-align: center;
+    font-size: 18px;
+}
+
+/* COLORES */
+.row-sin-stock {
+    background-color: #ffe5e5;
+}
+
+.row-baja {
+    background-color: #fff8dc;
+}
+
+.row-media {
+    background-color: #e6f0ff;
+}
+
+.row-alta {
+    background-color: #e6ffed;
+}
+
+/* Carga */
+.loading-message {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 15px;
 }
