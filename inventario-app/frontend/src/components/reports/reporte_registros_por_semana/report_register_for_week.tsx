@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   IonHeader,
   IonToolbar,
@@ -8,187 +8,200 @@ import {
   IonButton,
   IonText,
 } from "@ionic/react";
-
-import { getSupabase } from "../../../../../backend/app/services/supabase_service";
+import { supabase } from "../../../supabaseClient";
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
-
+import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Capacitor } from "@capacitor/core";
+import { FileOpener } from "@capacitor-community/file-opener";
 import { Toast } from "@capacitor/toast";
-
-import { descargarAndroid } from "../../../plugins/downloadPlugin";
-
 import "./report_register_for_week.css";
 
-/* ==================================================================
-   Interfaces
-================================================================== */
-interface ProductoSemana {
-  codigo: string;
-  nombre: string;
-  marca: string;
-  fecha: string;
-  semana: number;
-  anio: number;
-}
-
-interface Props {
+interface ReportRegisterForWeekProps {
   onDidDismiss: () => void;
 }
 
-/* ==================================================================
-   Obtener semana ISO
-================================================================== */
-function obtenerSemana(fecha: Date): { semana: number; anio: number } {
-  const temp = new Date(Date.UTC(fecha.getFullYear(), fecha.getMonth(), fecha.getDate()));
-  const dia = temp.getUTCDay() || 7;
+const ReportRegisterForWeek: React.FC<ReportRegisterForWeekProps> = ({
+  onDidDismiss,
+}) => {
 
-  temp.setUTCDate(temp.getUTCDate() + 4 - dia);
-
-  const inicio = new Date(Date.UTC(temp.getUTCFullYear(), 0, 1));
-  const semana = Math.ceil(((temp.getTime() - inicio.getTime()) / 86400000 + 1) / 7);
-
-  return { semana, anio: temp.getUTCFullYear() };
-}
-
-/* ==================================================================
-   Componente principal
-================================================================== */
-const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
-  const notify = async (msg: string) => {
-    await Toast.show({ text: msg });
+  // 🔹 Mostrar toast
+  const mostrarNotificacion = async (mensaje: string) => {
+    await Toast.show({ text: mensaje, duration: "long" });
   };
 
-  /* ============================================================
-     📥 Obtener registros desde Supabase
-  ============================================================ */
-  const obtenerRegistros = async (): Promise<ProductoSemana[]> => {
-    const { data, error } = await getSupabase()
+  // 🔹 Solicitar permiso de almacenamiento
+  const solicitarPermisoDescarga = async (): Promise<boolean> => {
+    if (Capacitor.getPlatform() === "android") {
+      try {
+        const check = await Filesystem.checkPermissions();
+        if (check.publicStorage !== "granted") {
+          const request = await Filesystem.requestPermissions();
+          if (request.publicStorage !== "granted") {
+            mostrarNotificacion(
+              "Por favor, concede permiso de almacenamiento para descargar archivos."
+            );
+            return false;
+          }
+        }
+      } catch (err) {
+        console.error("Error al verificar permisos de almacenamiento:", err);
+        mostrarNotificacion("No se pudo obtener el permiso de almacenamiento.");
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // 🔹 Obtener datos de la semana actual
+  const getReportData = async () => {
+    const hoy = new Date();
+    const inicioSemana = new Date(hoy);
+    inicioSemana.setDate(hoy.getDate() - hoy.getDay());
+    inicioSemana.setHours(0, 0, 0, 0);
+
+    const finSemana = new Date(inicioSemana);
+    finSemana.setDate(inicioSemana.getDate() + 6);
+    finSemana.setHours(23, 59, 59, 999);
+
+    const semana = `Semana del ${inicioSemana.toLocaleDateString(
+      "es-ES"
+    )} al ${finSemana.toLocaleDateString("es-ES")}`;
+
+    const { data, error } = await supabase
       .from("productos")
-      .select("id, sku, nombre, marca, created_at");
+      .select("id, sku, nombre, marca, modelo, created_at")
+      .gte("created_at", inicioSemana.toISOString())
+      .lte("created_at", finSemana.toISOString());
 
-    if (error) throw error;
+    if (error) {
+      console.error("❌ Error al obtener productos:", error.message);
+      throw error;
+    }
 
-    return (data ?? [])
-      .map((p: any) => {
-        const fechaObj = new Date(p.created_at);
-        const { semana, anio } = obtenerSemana(fechaObj);
+    const productos = (data ?? []).map((p: any) => ({
+      codigo: p.sku,
+      nombre: p.nombre,
+      marca: p.marca || "N/A",
+      modelo: p.modelo || "N/A",
+      fecha: new Date(p.created_at).toLocaleDateString("es-ES"),
+    }));
 
-        return {
-          codigo: p.id?.toString() ?? p.sku ?? "",
-          nombre: p.nombre ?? "",
-          marca: p.marca ?? "General",
-          fecha: fechaObj.toLocaleDateString("es-CL"),
-          semana,
-          anio,
-        };
-      })
-      .sort((a, b) => {
-        if (a.anio !== b.anio) return b.anio - a.anio;
-        return b.semana - a.semana;
-      });
+    return { productos, semana };
   };
 
-  /* ============================================================
-      💾 Guardar archivo según plataforma
-  ============================================================ */
-  const guardarArchivo = async (
-    filename: string,
+  // 🔹 Guardar archivo y abrirlo
+  const guardarEnDispositivo = async (
+    fileName: string,
     base64Data: string,
     mimeType: string
   ) => {
-    const platform = Capacitor.getPlatform();
+    try {
+      const savedFile = await Filesystem.writeFile({
+        path: fileName,
+        data: base64Data,
+        directory: Directory.Documents,
+        recursive: true,
+      });
 
-    if (platform === "web") {
-      const a = document.createElement("a");
-      a.href = `data:${mimeType};base64,${base64Data}`;
-      a.download = filename;
-      a.click();
-      return;
+      const fileUri = savedFile.uri;
+
+      try {
+        await FileOpener.open({
+          filePath: fileUri,
+          contentType: mimeType,
+        });
+      } catch (e) {
+        console.error("Error al abrir archivo automáticamente:", e);
+        mostrarNotificacion(
+          "Archivo guardado. Búscalo en la carpeta Documentos de tu dispositivo."
+        );
+      }
+    } catch (e) {
+      console.error("Error al guardar archivo", e);
+      mostrarNotificacion(
+        "Error al guardar archivo. ¿Otorgaste permisos a la app?"
+      );
     }
-
-    await descargarAndroid(filename, base64Data, mimeType);
   };
 
-  /* ============================================================
-      📄 Exportar PDF
-  ============================================================ */
+  // 🔹 Exportar PDF
   const exportarPDF = async () => {
-    notify("Generando PDF...");
+    const permitido = await solicitarPermisoDescarga();
+    if (!permitido) return;
+
+    mostrarNotificacion("Generando PDF, la descarga se iniciará en breve...");
 
     try {
-      const registros = await obtenerRegistros();
-
+      const { productos, semana } = await getReportData();
       const doc = new jsPDF();
-      doc.text("Reporte de Registros por Semana (Histórico)", 14, 15);
+      doc.text(`📅 Reporte de registros (${semana})`, 14, 15);
 
       autoTable(doc, {
         startY: 20,
-        head: [["Año", "Semana", "Código", "Nombre", "Marca", "Fecha"]],
-        body: registros.map((r) => [
-          r.anio.toString(),
-          r.semana.toString(),
-          r.codigo,
-          r.nombre,
-          r.marca,
-          r.fecha,
+        head: [["Código", "Nombre", "Marca", "Modelo", "Fecha"]],
+        body: productos.map((p) => [
+          p.codigo,
+          p.nombre,
+          p.marca,
+          p.modelo,
+          p.fecha,
         ]),
       });
 
-      const base64 = doc.output("datauristring").split(",")[1];
-      const stamp = Date.now();
+      const finalY = (doc as any).lastAutoTable?.finalY || 30;
+      doc.text(
+        `Este reporte muestra los productos registrados durante la semana indicada.`,
+        14,
+        finalY + 10
+      );
 
-      await guardarArchivo(
-        `registros_semanales_${stamp}.pdf`,
-        base64,
+      const base64Data = doc.output("datauristring").split(",")[1];
+      const timestamp = new Date().getTime();
+      await guardarEnDispositivo(
+        `reporte_registros_semana_${timestamp}.pdf`,
+        base64Data,
         "application/pdf"
       );
 
-      notify("PDF generado correctamente 🎉");
-    } catch (err) {
-      console.error(err);
-      notify("Error al generar PDF.");
+      mostrarNotificacion(
+        "PDF descargado correctamente. Revisa el panel de notificaciones o la carpeta Documentos."
+      );
+    } catch (error) {
+      console.error("Error PDF:", error);
+      mostrarNotificacion("No se pudo generar el PDF.");
     }
   };
 
-  /* ============================================================
-      📊 Exportar Excel
-  ============================================================ */
+  // 🔹 Exportar Excel
   const exportarExcel = async () => {
-    notify("Generando Excel...");
+    const permitido = await solicitarPermisoDescarga();
+    if (!permitido) return;
+
+    mostrarNotificacion("Generando Excel, la descarga se iniciará en breve...");
 
     try {
-      const registros = await obtenerRegistros();
-
-      const ws = XLSX.utils.json_to_sheet(
-        registros.map((r) => ({
-          Año: r.anio,
-          Semana: r.semana,
-          Código: r.codigo,
-          Nombre: r.nombre,
-          Marca: r.marca,
-          Fecha: r.fecha,
-        }))
-      );
-
+      const { productos, semana } = await getReportData();
+      const ws = XLSX.utils.json_to_sheet(productos);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Registros");
+      XLSX.utils.book_append_sheet(wb, ws, `Semana`);
 
-      const base64 = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
-      const stamp = Date.now();
-
-      await guardarArchivo(
-        `registros_semanales_${stamp}.xlsx`,
-        base64,
+      const base64Data = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
+      const timestamp = new Date().getTime();
+      await guardarEnDispositivo(
+        `reporte_registros_semana_${timestamp}.xlsx`,
+        base64Data,
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
 
-      notify("Excel generado correctamente 🎉");
-    } catch (err) {
-      console.error(err);
-      notify("Error al generar Excel.");
+      mostrarNotificacion(
+        "Excel descargado correctamente. Revisa el panel de notificaciones o la carpeta Documentos."
+      );
+    } catch (error) {
+      console.error("Error Excel:", error);
+      mostrarNotificacion("No se pudo generar el Excel.");
     }
   };
 
@@ -198,28 +211,38 @@ const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
         <IonToolbar>
           <IonTitle>Registros por Semana</IonTitle>
           <IonButtons slot="end">
-            <IonButton onClick={onDidDismiss}>Cerrar</IonButton>
+            <IonButton onClick={onDidDismiss}>Cancelar</IonButton>
           </IonButtons>
         </IonToolbar>
       </IonHeader>
 
       <IonContent className="ion-padding">
         <IonText>
-          <h3 style={{ textAlign: "center", fontWeight: "bold" }}>
-            Descarga del Reporte Semanal Histórico
+          <h3
+            style={{
+              textAlign: "center",
+              fontWeight: "bold",
+              marginTop: "1rem",
+            }}
+          >
+            ¿Deseas descargar en formato PDF o Excel?
           </h3>
         </IonText>
-
-        <div style={{ padding: "16px" }}>
-          <IonButton expand="block" color="danger" onClick={exportarPDF}>
+        <div className="modal-buttons-container" style={{ padding: "20px" }}>
+          <IonButton
+            className="modal-button"
+            color="danger"
+            expand="block"
+            onClick={exportarPDF}
+            style={{ marginBottom: "10px" }}
+          >
             Descargar PDF
           </IonButton>
-
           <IonButton
-            expand="block"
+            className="modal-button"
             color="success"
+            expand="block"
             onClick={exportarExcel}
-            style={{ marginTop: "10px" }}
           >
             Descargar Excel
           </IonButton>

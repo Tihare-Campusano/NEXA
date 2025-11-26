@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   IonHeader,
   IonToolbar,
@@ -8,202 +8,231 @@ import {
   IonButton,
   IonText,
 } from "@ionic/react";
-
-import { getSupabase } from "../../../../../backend/app/services/supabase_service";
+import { supabase } from "../../../supabaseClient";
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
-
+import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Capacitor } from "@capacitor/core";
+import { FileOpener } from "@capacitor-community/file-opener";
 import { Toast } from "@capacitor/toast";
-
-import { descargarAndroid } from "../../../plugins/downloadPlugin";
-
 import "./report_register_for_month.css";
 
-/* ============================================================
-   📌 INTERFACES
-============================================================ */
-interface ProductoStock {
-  codigo: string;
-  nombre: string;
-  cantidad: number;
-  estado: string;
-  categoria: string;
-}
-
-interface Props {
+interface ReportRegisterForMonthProps {
   onDidDismiss: () => void;
 }
 
-/* ============================================================
-   📌 COMPONENTE PRINCIPAL
-============================================================ */
-const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
-  const notify = async (msg: string) => {
-    await Toast.show({ text: msg });
+const ReportRegisterForMonth: React.FC<ReportRegisterForMonthProps> = ({
+  onDidDismiss,
+}) => {
+
+  // 🔹 Mostrar toast
+  const mostrarNotificacion = async (mensaje: string) => {
+    await Toast.show({ text: mensaje, duration: "long" });
   };
 
-  /* ============================================================
-     📥 OBTENER STOCK ORDENADO ASCENDENTE
-  ============================================================ */
-  const obtenerStock = async (): Promise<ProductoStock[]> => {
-    const { data, error } = await getSupabase()
-      .from("productos")
-      .select("id, nombre, marca, estado, stock");
+  // 🔹 Solicitar permiso de almacenamiento
+  const solicitarPermisoDescarga = async (): Promise<boolean> => {
+    if (Capacitor.getPlatform() === "android") {
+      try {
+        const check = await Filesystem.checkPermissions();
+        if (check.publicStorage !== "granted") {
+          const request = await Filesystem.requestPermissions();
+          if (request.publicStorage !== "granted") {
+            mostrarNotificacion(
+              "Por favor, concede permiso de almacenamiento para descargar archivos."
+            );
+            return false;
+          }
+        }
+      } catch (err) {
+        console.error("Error al verificar permisos de almacenamiento:", err);
+        mostrarNotificacion("No se pudo obtener el permiso de almacenamiento.");
+        return false;
+      }
+    }
+    return true;
+  };
 
-    if (error) throw error;
+  // 🔹 Obtener datos del mes actual
+  const getReportData = async () => {
+    const date = new Date();
+    const primerDia = new Date(date.getFullYear(), date.getMonth(), 1);
+    const ultimoDia = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+
+    const nombreMes = date.toLocaleString("es-ES", {
+      month: "long",
+      year: "numeric",
+    });
+    const mes = nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1);
+
+    const { data, error } = await supabase
+      .from("productos")
+      .select("id, sku, nombre, marca, created_at")
+      .gte("created_at", primerDia.toISOString())
+      .lte("created_at", ultimoDia.toISOString());
+
+    if (error) {
+      console.error("❌ Error al obtener productos:", error.message);
+      throw error;
+    }
 
     const productos = (data ?? []).map((p: any) => ({
-      codigo: p.id?.toString() ?? "",
-      nombre: p.nombre ?? "Sin nombre",
-      cantidad: p.stock ?? 0,
-      estado: p.estado ?? "Desconocido",
-      categoria: p.marca ?? "General",
+      codigo: p.sku,
+      nombre: p.nombre,
+      marca: p.marca || "General",
+      fecha: new Date(p.created_at).toLocaleDateString("es-CL"),
     }));
 
-    // Ordenar por cantidad ASC
-    return productos.sort((a, b) => a.cantidad - b.cantidad);
+    return { productos, mes };
   };
 
-  /* ============================================================
-     💾 GUARDAR ARCHIVO EN WEB O ANDROID
-  ============================================================ */
-  const guardarArchivo = async (
-    filename: string,
+  // 🔹 Guardar archivo y abrirlo
+  const guardarEnDispositivo = async (
+    fileName: string,
     base64Data: string,
     mimeType: string
   ) => {
-    const platform = Capacitor.getPlatform();
-
-    // 🌐 WEB
-    if (platform === "web") {
-      const link = document.createElement("a");
-      link.href = `data:${mimeType};base64,${base64Data}`;
-      link.download = filename;
-      link.click();
-      return;
-    }
-
-    // 🤖 ANDROID — usa DownloadManager real
-    await descargarAndroid(filename, base64Data, mimeType);
-  };
-
-  /* ============================================================
-     📄 EXPORTAR PDF
-  ============================================================ */
-  const exportarPDF = async () => {
-    notify("Generando PDF...");
-
     try {
-      const productos = await obtenerStock();
-
-      const fecha = new Date();
-      const mesActual = fecha.toLocaleString("es-ES", {
-        month: "long",
-        year: "numeric",
+      const savedFile = await Filesystem.writeFile({
+        path: fileName,
+        data: base64Data,
+        directory: Directory.Documents,
+        recursive: true,
       });
 
+      const fileUri = savedFile.uri;
+
+      try {
+        await FileOpener.open({
+          filePath: fileUri,
+          contentType: mimeType,
+        });
+      } catch (e) {
+        console.error("Error al abrir archivo automáticamente:", e);
+        mostrarNotificacion(
+          "Archivo guardado. Búscalo en la carpeta Documentos de tu dispositivo."
+        );
+      }
+    } catch (e) {
+      console.error("Error al guardar archivo", e);
+      mostrarNotificacion(
+        "Error al guardar archivo. ¿Otorgaste permisos a la app?"
+      );
+    }
+  };
+
+  // 🔹 Exportar PDF
+  const exportarPDF = async () => {
+    const permitido = await solicitarPermisoDescarga();
+    if (!permitido) return;
+
+    mostrarNotificacion("Generando PDF, la descarga se iniciará en breve...");
+
+    try {
+      const { productos, mes } = await getReportData();
       const doc = new jsPDF();
-      doc.text(`Reporte de Stock Mensual (${mesActual})`, 14, 15);
+      doc.text(`🗓️ Reporte de Registros (${mes})`, 14, 15);
 
       autoTable(doc, {
         startY: 20,
-        head: [["Código", "Nombre", "Cantidad", "Estado", "Categoría"]],
-        body: productos.map((p) => [
-          p.codigo,
-          p.nombre,
-          p.cantidad.toString(),
-          p.estado,
-          p.categoria,
-        ]),
+        head: [["Código", "Nombre", "Marca", "Fecha de Registro"]],
+        body: productos.map((p) => [p.codigo, p.nombre, p.marca, p.fecha]),
       });
 
-      const base64 = doc.output("datauristring").split(",")[1];
-      const timestamp = Date.now();
+      const finalY = (doc as any).lastAutoTable?.finalY || 30;
+      doc.text(
+        `Este reporte corresponde a los productos registrados durante ${mes}.`,
+        14,
+        finalY + 10
+      );
 
-      await guardarArchivo(
-        `stock_mensual_${timestamp}.pdf`,
-        base64,
+      const base64Data = doc.output("datauristring").split(",")[1];
+      const timestamp = new Date().getTime();
+      await guardarEnDispositivo(
+        `reporte_registros_${mes}_${timestamp}.pdf`,
+        base64Data,
         "application/pdf"
       );
 
-      notify("PDF generado correctamente 🎉");
-    } catch (err) {
-      console.error(err);
-      notify("Error al generar PDF.");
+      mostrarNotificacion(
+        "PDF descargado correctamente. Revisa el panel de notificaciones o la carpeta Documentos."
+      );
+    } catch (error) {
+      console.error("Error PDF:", error);
+      mostrarNotificacion("No se pudo generar el PDF.");
     }
   };
 
-  /* ============================================================
-     📊 EXPORTAR EXCEL
-  ============================================================ */
+  // 🔹 Exportar Excel
   const exportarExcel = async () => {
-    notify("Generando Excel...");
+    const permitido = await solicitarPermisoDescarga();
+    if (!permitido) return;
+
+    mostrarNotificacion("Generando Excel, la descarga se iniciará en breve...");
 
     try {
-      const productos = await obtenerStock();
-
-      const datos = productos.map((p) => ({
-        Código: p.codigo,
-        Nombre: p.nombre,
-        Cantidad: p.cantidad,
-        Estado: p.estado,
-        Categoría: p.categoria,
-      }));
-
-      const ws = XLSX.utils.json_to_sheet(datos);
+      const { productos, mes } = await getReportData();
+      const ws = XLSX.utils.json_to_sheet(productos);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Stock");
+      XLSX.utils.book_append_sheet(wb, ws, `Registros ${mes}`);
 
-      const base64 = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
-      const timestamp = Date.now();
-
-      await guardarArchivo(
-        `stock_mensual_${timestamp}.xlsx`,
-        base64,
+      const base64Data = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
+      const timestamp = new Date().getTime();
+      await guardarEnDispositivo(
+        `reporte_registros_${mes}_${timestamp}.xlsx`,
+        base64Data,
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
 
-      notify("Excel generado correctamente 🎉");
-    } catch (err) {
-      console.error(err);
-      notify("Error al generar Excel.");
+      mostrarNotificacion(
+        "Excel descargado correctamente. Revisa el panel de notificaciones o la carpeta Documentos."
+      );
+    } catch (error) {
+      console.error("Error Excel:", error);
+      mostrarNotificacion("No se pudo generar el Excel.");
     }
   };
 
-  /* ============================================================
-     🎨 RENDER
-  ============================================================ */
   return (
     <>
       <IonHeader>
         <IonToolbar>
-          <IonTitle>Stock del Mes</IonTitle>
+          <IonTitle>Registros del Mes</IonTitle>
           <IonButtons slot="end">
-            <IonButton onClick={onDidDismiss}>Cerrar</IonButton>
+            <IonButton onClick={onDidDismiss}>Cancelar</IonButton>
           </IonButtons>
         </IonToolbar>
       </IonHeader>
 
       <IonContent className="ion-padding">
         <IonText>
-          <h3 style={{ textAlign: "center", fontWeight: "bold" }}>
-            Descarga el Stock Mensual
+          <h3
+            style={{
+              textAlign: "center",
+              fontWeight: "bold",
+              marginTop: "1rem",
+            }}
+          >
+            ¿Deseas descargar en formato PDF o Excel?
           </h3>
         </IonText>
-
-        <div style={{ padding: "16px" }}>
-          <IonButton expand="block" color="danger" onClick={exportarPDF}>
+        <div className="modal-buttons-container" style={{ padding: "20px" }}>
+          <IonButton
+            className="modal-button"
+            color="danger"
+            expand="block"
+            onClick={exportarPDF}
+            style={{ marginBottom: "10px" }}
+          >
             Descargar PDF
           </IonButton>
-
           <IonButton
-            expand="block"
+            className="modal-button"
             color="success"
+            expand="block"
             onClick={exportarExcel}
-            style={{ marginTop: "10px" }}
           >
             Descargar Excel
           </IonButton>
@@ -213,4 +242,4 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
   );
 };
 
-export default ReportStockMonth;
+export default ReportRegisterForMonth;
