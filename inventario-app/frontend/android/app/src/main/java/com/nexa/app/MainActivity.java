@@ -1,7 +1,17 @@
 package com.nexa.app;
 
-import com.getcapacitor.BridgeActivity;
-import com.nexa.app.DownloadPlugin;
+import android.os.Bundle;
 
-public class MainActivity extends BridgeActivity {}
-registerPlugin(DownloadPlugin.class);
+import com.getcapacitor.BridgeActivity;
+import com.nexa.app.DownloadPlugin; // Import plugin
+
+public class MainActivity extends BridgeActivity {
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        // Registro del plugin personalizado
+        registerPlugin(DownloadPlugin.class);
+    }
+}
