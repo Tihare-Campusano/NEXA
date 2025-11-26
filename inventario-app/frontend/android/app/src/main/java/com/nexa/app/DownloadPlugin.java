@@ -1,24 +1,21 @@
 package com.nexa.app;
 
 import android.content.ContentValues;
-import android.content.Context;
-import android.os.Build;
 import android.provider.MediaStore;
 import android.util.Base64;
-import android.webkit.MimeTypeMap;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.annotation.CapacitorPlugin;
-import com.getcapacitor.annotation.PluginMethod;
+import com.getcapacitor.annotation.BridgeMethod;
 
 import java.io.OutputStream;
 
 @CapacitorPlugin(name = "DownloadPlugin")
 public class DownloadPlugin extends Plugin {
 
-    @PluginMethod
+    @BridgeMethod
     public void downloadFile(PluginCall call) {
         String fileName = call.getString("fileName");
         String base64Data = call.getString("base64Data");
@@ -30,35 +27,21 @@ public class DownloadPlugin extends Plugin {
         }
 
         try {
-            byte[] fileBytes = Base64.decode(base64Data, Base64.DEFAULT);
+            byte[] bytes = Base64.decode(base64Data, Base64.DEFAULT);
 
             ContentValues values = new ContentValues();
             values.put(MediaStore.Downloads.DISPLAY_NAME, fileName);
             values.put(MediaStore.Downloads.MIME_TYPE, mimeType);
             values.put(MediaStore.Downloads.RELATIVE_PATH, "Download/");
 
-            OutputStream os;
+            OutputStream os = getContext()
+                    .getContentResolver()
+                    .openOutputStream(
+                            getContext().getContentResolver()
+                                    .insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                    );
 
-            // MediaStore moderno (Android 10+)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                android.net.Uri uri = getContext()
-                        .getContentResolver()
-                        .insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
-
-                os = getContext().getContentResolver().openOutputStream(uri);
-            } else {
-                // Legacy fallback
-                java.io.File file = new java.io.File(
-                        android.os.Environment.getExternalStoragePublicDirectory(
-                                android.os.Environment.DIRECTORY_DOWNLOADS
-                        ),
-                        fileName
-                );
-
-                os = new java.io.FileOutputStream(file);
-            }
-
-            os.write(fileBytes);
+            os.write(bytes);
             os.close();
 
             JSObject ret = new JSObject();
