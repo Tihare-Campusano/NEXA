@@ -23,7 +23,7 @@ import { descargarAndroid } from "../../../plugins/downloadPlugin";
 import "./report_register_for_month.css";
 
 /* ============================================================
-   📌 Interfaces
+   📌 INTERFACES
 ============================================================ */
 interface ProductoStock {
   codigo: string;
@@ -38,18 +38,16 @@ interface Props {
 }
 
 /* ============================================================
-   📌 Componente Principal
+   📌 COMPONENTE PRINCIPAL
 ============================================================ */
 const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
-  const [alerta, setAlerta] = useState<string | null>(null);
-
-  const notificar = async (msg: string) => {
+  const notify = async (msg: string) => {
     await Toast.show({ text: msg });
   };
 
   /* ============================================================
-     📥 Obtener STOCK ordenado ASC
-============================================================ */
+     📥 OBTENER STOCK ORDENADO ASCENDENTE
+  ============================================================ */
   const obtenerStock = async (): Promise<ProductoStock[]> => {
     const { data, error } = await getSupabase()
       .from("productos")
@@ -59,18 +57,19 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
 
     const productos = (data ?? []).map((p: any) => ({
       codigo: p.id?.toString() ?? "",
-      nombre: p.nombre ?? "",
+      nombre: p.nombre ?? "Sin nombre",
       cantidad: p.stock ?? 0,
       estado: p.estado ?? "Desconocido",
       categoria: p.marca ?? "General",
     }));
 
+    // Ordenar por cantidad ASC
     return productos.sort((a, b) => a.cantidad - b.cantidad);
   };
 
   /* ============================================================
-     💾 Guardar archivo según plataforma
-============================================================ */
+     💾 GUARDAR ARCHIVO EN WEB O ANDROID
+  ============================================================ */
   const guardarArchivo = async (
     filename: string,
     base64Data: string,
@@ -87,15 +86,15 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
       return;
     }
 
-    // 🤖 ANDROID — descarga real
+    // 🤖 ANDROID — usa DownloadManager real
     await descargarAndroid(filename, base64Data, mimeType);
   };
 
   /* ============================================================
-     📄 Exportar PDF
-============================================================ */
+     📄 EXPORTAR PDF
+  ============================================================ */
   const exportarPDF = async () => {
-    notificar("Generando PDF...");
+    notify("Generando PDF...");
 
     try {
       const productos = await obtenerStock();
@@ -130,18 +129,18 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
         "application/pdf"
       );
 
-      notificar("PDF generado correctamente 🎉");
+      notify("PDF generado correctamente 🎉");
     } catch (err) {
       console.error(err);
-      notificar("Error al generar PDF.");
+      notify("Error al generar PDF.");
     }
   };
 
   /* ============================================================
-     📊 Exportar Excel
-============================================================ */
+     📊 EXPORTAR EXCEL
+  ============================================================ */
   const exportarExcel = async () => {
-    notificar("Generando Excel...");
+    notify("Generando Excel...");
 
     try {
       const productos = await obtenerStock();
@@ -167,25 +166,18 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
 
-      notificar("Excel generado correctamente 🎉");
+      notify("Excel generado correctamente 🎉");
     } catch (err) {
       console.error(err);
-      notificar("Error al generar Excel.");
+      notify("Error al generar Excel.");
     }
   };
 
   /* ============================================================
-     🎨 Render
-============================================================ */
+     🎨 RENDER
+  ============================================================ */
   return (
     <>
-      {alerta && (
-        <div className="alert-overlay">
-          <p>{alerta}</p>
-          <IonButton onClick={() => setAlerta(null)}>Aceptar</IonButton>
-        </div>
-      )}
-
       <IonHeader>
         <IonToolbar>
           <IonTitle>Stock del Mes</IonTitle>

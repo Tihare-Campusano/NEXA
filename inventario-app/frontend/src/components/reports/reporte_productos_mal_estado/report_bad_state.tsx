@@ -62,7 +62,7 @@ const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
       .in("estado", ["mal estado", "Mal estado"]);
 
     if (error) {
-      console.error(error);
+      console.error("Error consultando productos:", error);
       throw error;
     }
 
@@ -94,7 +94,7 @@ const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
       return;
     }
 
-    // 🤖 ANDROID — DownloadManager real
+    // 🤖 ANDROID — Guardar con plugin nativo
     await descargarAndroid(fileName, base64Data, mime);
   };
 
@@ -133,7 +133,7 @@ const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
 
       notify("PDF generado correctamente 🎉");
     } catch (err) {
-      console.error(err);
+      console.error("ERROR PDF:", err);
       notify("Error generando PDF.");
     }
   };
@@ -171,7 +171,7 @@ const ReportBadState: React.FC<Props> = ({ onDidDismiss }) => {
 
       notify("Excel generado correctamente 🎉");
     } catch (err) {
-      console.error(err);
+      console.error("ERROR EXCEL:", err);
       notify("Error generando Excel.");
     }
   };

@@ -59,15 +59,15 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
         stock,
         created_at
       `)
-      .in("estado", ["nuevo", "Nuevo"]);
+      .in("estado", ["Nuevo", "nuevo"]);
 
     if (error) {
-      console.error(error);
+      console.error("Error cargando productos nuevos:", error);
       throw error;
     }
 
     return (data ?? []).map((p: any) => ({
-      codigo: p.id?.toString() ?? "",
+      codigo: p.id?.toString() ?? "N/A",
       nombre: p.nombre ?? "Sin nombre",
       marca: p.marca ?? "General",
       stock: p.stock ?? 0,
@@ -87,7 +87,6 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
   ) => {
     const platform = Capacitor.getPlatform();
 
-    // 🌐 Web — descarga directa
     if (platform === "web") {
       const link = document.createElement("a");
       link.href = `data:${mime};base64,${base64Data}`;
@@ -96,7 +95,7 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
       return;
     }
 
-    // 🤖 Android — DownloadManager real
+    // Android (DownloadManager real)
     await descargarAndroid(filename, base64Data, mime);
   };
 
@@ -114,7 +113,7 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
 
       autoTable(doc, {
         startY: 20,
-        head: [["Código", "Nombre", "Marca", "Stock", "Fecha Ingreso"]],
+        head: [["Código", "Nombre", "Marca", "Stock", "Fecha"]],
         body: productos.map((p) => [
           p.codigo,
           p.nombre,
@@ -159,7 +158,7 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
 
       const ws = XLSX.utils.json_to_sheet(datos);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Nuevos");
+      XLSX.utils.book_append_sheet(wb, ws, "Productos Nuevos");
 
       const base64 = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
       const stamp = Date.now();
@@ -177,6 +176,9 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
     }
   };
 
+  /* ============================================================
+     📌 Render
+  ============================================================ */
   return (
     <>
       <IonHeader>
@@ -194,7 +196,7 @@ const ReportNewProduct: React.FC<Props> = ({ onDidDismiss }) => {
             Descargar Reporte
           </h3>
           <p style={{ textAlign: "center", color: "#777" }}>
-            Elige el formato para generar tu archivo.
+            Elige PDF o Excel. El archivo se guardará automáticamente.
           </p>
         </IonText>
 

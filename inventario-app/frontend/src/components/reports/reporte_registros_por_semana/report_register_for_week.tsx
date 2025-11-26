@@ -57,9 +57,7 @@ function obtenerSemana(fecha: Date): { semana: number; anio: number } {
    Componente principal
 ================================================================== */
 const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
-  const [alerta, setAlerta] = useState<string | null>(null);
-
-  const notificar = async (msg: string) => {
+  const notify = async (msg: string) => {
     await Toast.show({ text: msg });
   };
 
@@ -79,7 +77,7 @@ const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
         const { semana, anio } = obtenerSemana(fechaObj);
 
         return {
-          codigo: p.id ?? "",
+          codigo: p.id?.toString() ?? p.sku ?? "",
           nombre: p.nombre ?? "",
           marca: p.marca ?? "General",
           fecha: fechaObj.toLocaleDateString("es-CL"),
@@ -103,7 +101,6 @@ const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
   ) => {
     const platform = Capacitor.getPlatform();
 
-    // 🌐 Web
     if (platform === "web") {
       const a = document.createElement("a");
       a.href = `data:${mimeType};base64,${base64Data}`;
@@ -112,7 +109,6 @@ const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
       return;
     }
 
-    // 🤖 Android — descarga real
     await descargarAndroid(filename, base64Data, mimeType);
   };
 
@@ -120,7 +116,7 @@ const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
       📄 Exportar PDF
   ============================================================ */
   const exportarPDF = async () => {
-    notificar("Generando PDF...");
+    notify("Generando PDF...");
 
     try {
       const registros = await obtenerRegistros();
@@ -150,10 +146,10 @@ const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
         "application/pdf"
       );
 
-      notificar("PDF generado correctamente 🎉");
+      notify("PDF generado correctamente 🎉");
     } catch (err) {
       console.error(err);
-      notificar("Error al generar PDF.");
+      notify("Error al generar PDF.");
     }
   };
 
@@ -161,7 +157,7 @@ const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
       📊 Exportar Excel
   ============================================================ */
   const exportarExcel = async () => {
-    notificar("Generando Excel...");
+    notify("Generando Excel...");
 
     try {
       const registros = await obtenerRegistros();
@@ -189,25 +185,15 @@ const ReportRegisterForWeek: React.FC<Props> = ({ onDidDismiss }) => {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
 
-      notificar("Excel generado correctamente 🎉");
+      notify("Excel generado correctamente 🎉");
     } catch (err) {
       console.error(err);
-      notificar("Error al generar Excel.");
+      notify("Error al generar Excel.");
     }
   };
 
-  /* ============================================================
-     🎨 Render UI
-  ============================================================ */
   return (
     <>
-      {alerta && (
-        <div className="alert-overlay">
-          <p>{alerta}</p>
-          <IonButton onClick={() => setAlerta(null)}>Aceptar</IonButton>
-        </div>
-      )}
-
       <IonHeader>
         <IonToolbar>
           <IonTitle>Registros por Semana</IonTitle>

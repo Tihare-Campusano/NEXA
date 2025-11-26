@@ -22,7 +22,7 @@ import { descargarAndroid } from "../../../plugins/downloadPlugin";
 
 import "./report_all_products.css";
 
-// 🔹 Datos del producto
+// 🎯 Tipo de datos
 interface Producto {
   codigo: string;
   nombre: string;
@@ -38,24 +38,21 @@ interface ReportAllProductsProps {
 const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) => {
   const isWeb = Capacitor.getPlatform() === "web";
 
-  // Notificación universal
+  // 🔔 Toast universal
   const notify = async (text: string) => {
     await Toast.show({ text });
   };
 
-  // ------------------------------------------------------------------
-  // 🔹 Obtener productos
-  // ------------------------------------------------------------------
+  // 📌 Obtener productos
   const fetchProductos = async (): Promise<Producto[]> => {
-    const { data, error } = await supabase.from("productos").select(`
-      id,
-      nombre,
-      estado,
-      disponibilidad,
-      stock
-    `);
+    const { data, error } = await supabase
+      .from("productos")
+      .select("id, nombre, estado, disponibilidad, stock");
 
-    if (error) throw error;
+    if (error) {
+      console.error("Error cargando productos:", error);
+      throw new Error("No se pudieron cargar los productos");
+    }
 
     return (data ?? []).map((p: any) => ({
       codigo: p.id ?? "",
@@ -66,13 +63,11 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
     }));
   };
 
-  // ------------------------------------------------------------------
-  // 🔹 Guardar archivo en Web
-  // ------------------------------------------------------------------
+  // 💾 Guardado en navegador (solo web)
   const guardarWeb = (fileName: string, blob: Blob) => {
     const url = URL.createObjectURL(blob);
-
     const a = document.createElement("a");
+
     a.href = url;
     a.download = fileName;
     a.click();
@@ -80,9 +75,7 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
     URL.revokeObjectURL(url);
   };
 
-  // ------------------------------------------------------------------
-  // 🔹 EXPORTAR PDF
-  // ------------------------------------------------------------------
+  // 📄 Exportar PDF
   const exportarPDF = async () => {
     notify("Generando PDF…");
 
@@ -104,8 +97,7 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
         ]),
       });
 
-      const timestamp = Date.now();
-      const fileName = `reporte_productos_${timestamp}.pdf`;
+      const fileName = `reporte_productos_${Date.now()}.pdf`;
 
       if (isWeb) {
         const blob = doc.output("blob");
@@ -113,19 +105,17 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
       } else {
         const base64Data = doc.output("datauristring").split(",")[1];
 
-        // --- Android descarga REAL ---
         await descargarAndroid(fileName, base64Data, "application/pdf");
       }
 
       notify("PDF listo 🎉");
     } catch (e) {
+      console.error(e);
       notify("Error al generar PDF.");
     }
   };
 
-  // ------------------------------------------------------------------
-  // 🔹 EXPORTAR EXCEL
-  // ------------------------------------------------------------------
+  // 📊 Exportar Excel
   const exportarExcel = async () => {
     notify("Generando Excel…");
 
@@ -145,8 +135,7 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Productos");
 
-      const timestamp = Date.now();
-      const fileName = `reporte_productos_${timestamp}.xlsx`;
+      const fileName = `reporte_productos_${Date.now()}.xlsx`;
 
       if (isWeb) {
         const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
@@ -154,7 +143,6 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
       } else {
         const base64Data = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
 
-        // --- Android descarga REAL ---
         await descargarAndroid(
           fileName,
           base64Data,
@@ -163,7 +151,8 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
       }
 
       notify("Excel listo 🎉");
-    } catch {
+    } catch (e) {
+      console.error(e);
       notify("Error al generar Excel.");
     }
   };

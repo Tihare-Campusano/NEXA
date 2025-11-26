@@ -6,24 +6,12 @@ export const DownloadPlugin = registerPlugin<{
     base64: string;
     mimeType: string;
   }): Promise<{ success: boolean }>;
-}>("DownloadPlugin", {
-  web: () => import("../plugins/downloadPlugin.web").then((m) => new m.DownloadWeb()),
-});
+}>("DownloadPlugin");
 
-export const descargarAndroid = async (
+export async function descargarAndroid(
   fileName: string,
   base64: string,
   mimeType: string
-) => {
-  try {
-    await DownloadPlugin.downloadFile({
-      fileName,
-      base64,
-      mimeType,
-    });
-
-    console.log("Archivo descargado con éxito ✔️");
-  } catch (e) {
-    console.error("Error en descarga:", e);
-  }
-};
+) {
+  return await DownloadPlugin.downloadFile({ fileName, base64, mimeType });
+}

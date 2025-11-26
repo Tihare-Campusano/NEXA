@@ -24,7 +24,6 @@ export default function Home() {
           <ProductosSearch onResults={setProductosFiltrados} />
           <br />
           <ProductosTable productos={productosFiltrados === null ? undefined : productosFiltrados} />
-          <br />
           <ResumenDisponibilidad />
           <br />
         </div>

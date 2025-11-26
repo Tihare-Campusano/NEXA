@@ -5,13 +5,14 @@ import android.content.Context;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginMethod;
+import com.getcapacitor.PluginCall;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 @CapacitorPlugin(name = "DownloadPlugin")
 public class DownloadPlugin extends Plugin {
 
     @PluginMethod
-    public void downloadFile(com.getcapacitor.PluginCall call) {
+    public void downloadFile(PluginCall call) {
         String fileName = call.getString("fileName");
         String base64 = call.getString("base64");
         String mimeType = call.getString("mimeType");
@@ -23,14 +24,14 @@ public class DownloadPlugin extends Plugin {
 
         try {
             Context context = getContext();
-            DownloadHelper.startDownload(context, fileName, base64, mimeType);
+            DownloadHelper.saveFile(context, fileName, base64, mimeType);
 
             JSObject ret = new JSObject();
             ret.put("success", true);
             call.resolve(ret);
 
         } catch (Exception e) {
-            call.reject("No se pudo guardar el archivo", e);
+            call.reject("Error guardando archivo", e);
         }
     }
 }

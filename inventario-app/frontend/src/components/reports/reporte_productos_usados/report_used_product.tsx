@@ -41,8 +41,6 @@ interface Props {
    📌 Componente principal
 ============================================================ */
 const ReportUsedProduct: React.FC<Props> = ({ onDidDismiss }) => {
-  const [alertMsg, setAlertMsg] = useState<string | null>(null);
-
   const notify = async (msg: string) => {
     await Toast.show({ text: msg });
   };
@@ -57,18 +55,18 @@ const ReportUsedProduct: React.FC<Props> = ({ onDidDismiss }) => {
       .in("estado", ["usado", "Usado"]);
 
     if (error) {
-      console.error("ERROR SUPABASE:", error);
+      console.error("SUPABASE ERROR:", error);
       throw error;
     }
 
     return (data ?? []).map((p: any) => ({
       codigo: p.id?.toString() ?? "",
-      nombre: p.nombre ?? "",
+      nombre: p.nombre ?? "Sin nombre",
       marca: p.marca ?? "General",
       cantidad: p.stock ?? 0,
       fecha: p.created_at
         ? new Date(p.created_at).toLocaleDateString("es-CL")
-        : "Sin fecha",
+        : "N/A",
     }));
   };
 
@@ -174,13 +172,6 @@ const ReportUsedProduct: React.FC<Props> = ({ onDidDismiss }) => {
 
   return (
     <>
-      {alertMsg && (
-        <div className="alert-overlay">
-          <p>{alertMsg}</p>
-          <IonButton onClick={() => setAlertMsg(null)}>Aceptar</IonButton>
-        </div>
-      )}
-
       <IonHeader>
         <IonToolbar>
           <IonTitle>Productos Usados</IonTitle>
@@ -193,10 +184,10 @@ const ReportUsedProduct: React.FC<Props> = ({ onDidDismiss }) => {
       <IonContent className="ion-padding">
         <IonText>
           <h3 style={{ textAlign: "center", fontWeight: "bold" }}>
-            ¿Deseas descargar el reporte?
+            Descargar Reporte
           </h3>
           <p style={{ textAlign: "center", color: "#666" }}>
-            Guarda en PDF o Excel directamente en tu dispositivo.
+            Elige PDF o Excel. El archivo se descargará directamente.
           </p>
         </IonText>
 

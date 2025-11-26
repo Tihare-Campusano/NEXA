@@ -65,12 +65,12 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
 
     return (data ?? []).map((p: any) => ({
       codigo: p.id?.toString() ?? "",
-      nombre: p.nombre ?? "",
-      marca: p.marca ?? "",
-      cantidad: Number(p.stock) ?? 0,
+      nombre: p.nombre ?? "Sin nombre",
+      marca: p.marca ?? "General",
+      cantidad: Number(p.stock) || 0,
       fecha: p.created_at
         ? new Date(p.created_at).toLocaleDateString("es-CL")
-        : "N/A",
+        : "Sin fecha",
     }));
   };
 
@@ -106,8 +106,14 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
     try {
       const productos = await obtenerStockMes();
 
+      const fechaActual = new Date();
+      const titulo = `Reporte de Stock del Mes (${fechaActual.toLocaleString(
+        "es-CL",
+        { month: "long", year: "numeric" }
+      )})`;
+
       const doc = new jsPDF();
-      doc.text("Reporte de Stock del Mes", 14, 15);
+      doc.text(titulo, 14, 15);
 
       autoTable(doc, {
         startY: 20,
@@ -122,9 +128,12 @@ const ReportStockMonth: React.FC<Props> = ({ onDidDismiss }) => {
       });
 
       const base64 = doc.output("datauristring").split(",")[1];
-      const filename = `stock_mes_${Date.now()}.pdf`;
 
-      await guardarArchivo(filename, base64, "application/pdf");
+      await guardarArchivo(
+        `stock_mes_${Date.now()}.pdf`,
+        base64,
+        "application/pdf"
+      );
 
       notificar("PDF generado exitosamente 🎉");
     } catch (err) {
