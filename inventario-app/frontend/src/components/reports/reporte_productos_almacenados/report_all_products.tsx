@@ -18,12 +18,14 @@ import * as XLSX from "xlsx";
 import { Capacitor } from "@capacitor/core";
 import { Toast } from "@capacitor/toast";
 
-// ⚡ archivos internos de la app (no requieren plugin nativo)
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { FileOpener } from "@capacitor-community/file-opener";
 
 import "./report_all_products.css";
 
+// ----------------------
+// INTERFACES
+// ----------------------
 interface Producto {
   codigo: string;
   nombre: string;
@@ -106,28 +108,27 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
       const nombre = `reporte_${Date.now()}.pdf`;
 
       if (isWeb) {
-        const blob = doc.output("blob") as Blob;
+        const blob = doc.output("blob");
         descargarWeb(nombre, blob);
         return;
       }
 
-      // ANDROID → base64
+      // ANDROID
       const base64 = doc.output("datauristring").split(",")[1];
 
-      // guardar internamente
       const result = await Filesystem.writeFile({
         path: nombre,
         data: base64,
-        directory: Directory.Data, // carpeta privada
+        directory: Directory.Documents, // carpeta accesible
       });
 
-      // abrir el archivo
       await FileOpener.open({
         filePath: result.uri,
         contentType: "application/pdf",
       });
 
       await notificar("PDF generado y abierto ✔");
+
     } catch (err) {
       console.log("Error PDF:", err);
       await notificar("No se pudo generar el PDF.");
@@ -165,12 +166,13 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
         return;
       }
 
+      // ANDROID
       const base64 = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
 
       const result = await Filesystem.writeFile({
         path: nombre,
         data: base64,
-        directory: Directory.Data,
+        directory: Directory.Documents,
       });
 
       await FileOpener.open({
@@ -180,6 +182,7 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
       });
 
       await notificar("Excel generado y abierto ✔");
+
     } catch (err) {
       console.log("Error Excel:", err);
       await notificar("No se pudo generar el Excel.");
@@ -217,7 +220,11 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
             Descargar PDF
           </IonButton>
 
-          <IonButton expand="block" color="success" onClick={exportarExcel}>
+          <IonButton
+            expand="block"
+            color="success"
+            onClick={exportarExcel}
+          >
             Descargar Excel
           </IonButton>
         </div>
