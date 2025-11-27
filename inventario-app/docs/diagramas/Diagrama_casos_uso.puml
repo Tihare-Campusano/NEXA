@@ -1,0 +1,44 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+skinparam usecase {
+    BackgroundColor White
+    BorderColor Black
+}
+actor "Administrador" as Admin
+
+rectangle "SISTEMA NEXA" {
+
+    (Iniciar sesión) as U1
+    (Cerrar sesión) as U2
+
+    (Gestionar usuarios y roles) as U3
+    (Respaldo y restauración BD) as U4
+    (Configurar umbrales de reposición) as U5
+    (Ajustar parámetros de IA) as U6
+
+    (Visualizar inventario) as U7
+
+    (Generar reportes) as U8
+    (Revisar evaluación de IA) as U9
+    (Auditoría y logs) as U10
+}
+
+' Relaciones del actor
+Admin --> U1
+Admin --> U2
+Admin --> U3
+Admin --> U4
+Admin --> U5
+Admin --> U6
+Admin --> U8
+Admin --> U10
+Admin --> U7
+Admin --> U9
+
+' Relaciones internas
+U8 --> U7 : <<include>>
+U10 --> U7 : <<extend>>
+U10 --> U9 : <<extend>>
+
+@enduml
