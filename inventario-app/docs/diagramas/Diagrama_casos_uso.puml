@@ -2,43 +2,109 @@
 left to right direction
 skinparam packageStyle rectangle
 skinparam usecase {
-    BackgroundColor White
-    BorderColor Black
+  BackgroundColor White
+  BorderColor Black
 }
+
+'========================
+' ACTORES
+'========================
 actor "Administrador" as Admin
+actor "Operador (Usuario App)" as User
 
 rectangle "SISTEMA NEXA" {
 
-    (Iniciar sesión) as U1
-    (Cerrar sesión) as U2
+  '========================
+  ' AUTENTICACIÓN
+  '========================
+  (Iniciar sesión) as U1
+  (Cerrar sesión) as U2
 
-    (Gestionar usuarios y roles) as U3
-    (Respaldo y restauración BD) as U4
-    (Configurar umbrales de reposición) as U5
-    (Ajustar parámetros de IA) as U6
+  '========================
+  ' MÓDULO ADMINISTRACIÓN
+  '========================
+  (Gestionar usuarios y roles) as A1
+  (Respaldo y restauración BD) as A2
+  (Configurar umbrales de reposición) as A3
+  (Ajustar parámetros de IA) as A4
 
-    (Visualizar inventario) as U7
+  '========================
+  ' MÓDULO INVENTARIO
+  '========================
+  (Visualizar inventario) as I1
+  (Gestionar stock y movimientos) as I2
 
-    (Generar reportes) as U8
-    (Revisar evaluación de IA) as U9
-    (Auditoría y logs) as U10
+  '========================
+  ' REGISTRO DE PRODUCTO
+  '========================
+  (Registrar producto) as R1
+  (Escanear código de barras) as R2
+  (Capturar imagen para IA) as R3
+  (Registro manual de producto) as R4
+  (Subir imagen a Supabase Storage) as R5
+
+  '========================
+  ' IA
+  '========================
+  (Inspeccionar producto con IA) as IA1
+  (Revisar evaluación de IA) as IA2
+
+  '========================
+  ' REPORTES
+  '========================
+  (Generar reportes PDF/Excel) as REP1
+
+  '========================
+  ' AUDITORÍA
+  '========================
+  (Auditoría y logs del sistema) as AUD1
 }
 
-' Relaciones del actor
+'========================
+' Relaciones del Administrador
+'========================
 Admin --> U1
 Admin --> U2
-Admin --> U3
-Admin --> U4
-Admin --> U5
-Admin --> U6
-Admin --> U8
-Admin --> U10
-Admin --> U7
-Admin --> U9
+Admin --> A1
+Admin --> A2
+Admin --> A3
+Admin --> A4
+Admin --> REP1
+Admin --> AUD1
+Admin --> I1
+Admin --> IA2
 
-' Relaciones internas
-U8 --> U7 : <<include>>
-U10 --> U7 : <<extend>>
-U10 --> U9 : <<extend>>
+'========================
+' Relaciones del Operador
+'========================
+User --> U1
+User --> U2
+User --> R1
+User --> I1
+User --> I2
+User --> IA1
+User --> IA2
+User --> REP1
+
+'========================
+' RELACIONES INTERNAS
+'========================
+
+' Registro producto
+R1 --> R2 : <<include>>
+R1 --> R3 : <<extend>>
+R1 --> R4 : <<extend>>
+R1 --> R5 : <<include>>
+
+' IA
+IA1 --> IA2 : <<include>>
+
+' Reportes
+REP1 --> I1 : <<include>>
+
+' Auditoría
+AUD1 --> I1 : <<extend>>
+AUD1 --> IA2 : <<extend>>
+AUD1 --> I2 : <<extend>>
 
 @enduml
