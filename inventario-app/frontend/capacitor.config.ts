@@ -4,6 +4,9 @@ const config: CapacitorConfig = {
     appId: 'com.nexa.app',// identificador único de tu app
     appName: 'NEXA', // nombre visible en Android
     webDir: 'dist', 
+    android: {
+    path: "android"
+    },
     plugins: {
         // La configuración del plugin se deja, pero la lógica que lo usa fue eliminada en login.tsx
         GoogleAuth: {

@@ -15,17 +15,15 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
-// Plugins Capacitor (corregidos)
-import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Capacitor } from "@capacitor/core";
-import { FileOpener } from "@capacitor-community/file-opener";
 import { Toast } from "@capacitor/toast";
+
+// ⚡ archivos internos de la app (no requieren plugin nativo)
+import { Filesystem, Directory } from "@capacitor/filesystem";
+import { FileOpener } from "@capacitor-community/file-opener";
 
 import "./report_all_products.css";
 
-// ----------------------
-// INTERFACES
-// ----------------------
 interface Producto {
   codigo: string;
   nombre: string;
@@ -38,33 +36,11 @@ interface ReportAllProductsProps {
   onDidDismiss: () => void;
 }
 
-// ----------------------
-// COMPONENTE
-// ----------------------
 const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) => {
+  const isWeb = Capacitor.getPlatform() === "web";
+
   const notificar = async (msg: string) => {
     await Toast.show({ text: msg });
-  };
-
-  // ----------------------
-  // PERMISOS EN ANDROID
-  // ----------------------
-  const solicitarPermisos = async () => {
-    if (Capacitor.getPlatform() === "android") {
-      try {
-        const permisos = await Filesystem.requestPermissions();
-
-        if (permisos.publicStorage === "denied") {
-          notificar("Debes otorgar permisos de almacenamiento.");
-          return false;
-        }
-      } catch (err) {
-        console.log("Error permisos:", err);
-        notificar("No se pudieron solicitar permisos.");
-        return false;
-      }
-    }
-    return true;
   };
 
   // ----------------------
@@ -93,37 +69,23 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
   };
 
   // ----------------------
-  // GUARDAR ARCHIVO
+  // DESCARGA WEB
   // ----------------------
-  const guardarArchivo = async (fileName: string, base64: string, mimeType: string) => {
-    try {
-      const resultado = await Filesystem.writeFile({
-        path: fileName,
-        data: base64,
-        directory: Directory.ExternalStorage, // ✔ Android Download
-        recursive: true,
-      });
-
-      await FileOpener.open({
-        filePath: resultado.uri,
-        contentType: mimeType,
-      });
-
-      notificar(`Archivo guardado en Descargas: ${fileName}`);
-    } catch (err) {
-      console.log("Error guardando archivo:", err);
-      notificar("Error al guardar o abrir el archivo.");
-    }
+  const descargarWeb = (fileName: string, blob: Blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   // ----------------------
   // EXPORTAR PDF
   // ----------------------
   const exportarPDF = async () => {
-    if (!(await solicitarPermisos())) return;
-    notificar("Generando PDF...");
-
     try {
+      await notificar("Generando PDF...");
       const productos = await fetchProductos();
 
       const doc = new jsPDF();
@@ -141,13 +103,34 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
         ]),
       });
 
-      const base64 = doc.output("datauristring").split(",")[1];
-      const fileName = `reporte_productos_${Date.now()}.pdf`;
+      const nombre = `reporte_${Date.now()}.pdf`;
 
-      await guardarArchivo(fileName, base64, "application/pdf");
+      if (isWeb) {
+        const blob = doc.output("blob") as Blob;
+        descargarWeb(nombre, blob);
+        return;
+      }
+
+      // ANDROID → base64
+      const base64 = doc.output("datauristring").split(",")[1];
+
+      // guardar internamente
+      const result = await Filesystem.writeFile({
+        path: nombre,
+        data: base64,
+        directory: Directory.Data, // carpeta privada
+      });
+
+      // abrir el archivo
+      await FileOpener.open({
+        filePath: result.uri,
+        contentType: "application/pdf",
+      });
+
+      await notificar("PDF generado y abierto ✔");
     } catch (err) {
       console.log("Error PDF:", err);
-      notificar("No se pudo generar el PDF.");
+      await notificar("No se pudo generar el PDF.");
     }
   };
 
@@ -155,10 +138,8 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
   // EXPORTAR EXCEL
   // ----------------------
   const exportarExcel = async () => {
-    if (!(await solicitarPermisos())) return;
-    notificar("Generando Excel...");
-
     try {
+      await notificar("Generando Excel...");
       const productos = await fetchProductos();
 
       const rows = productos.map((p) => ({
@@ -173,17 +154,35 @@ const ReportAllProducts: React.FC<ReportAllProductsProps> = ({ onDidDismiss }) =
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Productos");
 
-      const base64 = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
-      const fileName = `reporte_productos_${Date.now()}.xlsx`;
+      const nombre = `reporte_${Date.now()}.xlsx`;
 
-      await guardarArchivo(
-        fileName,
-        base64,
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-      );
+      if (isWeb) {
+        const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+        const blob = new Blob([wbout], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+        descargarWeb(nombre, blob);
+        return;
+      }
+
+      const base64 = XLSX.write(wb, { bookType: "xlsx", type: "base64" });
+
+      const result = await Filesystem.writeFile({
+        path: nombre,
+        data: base64,
+        directory: Directory.Data,
+      });
+
+      await FileOpener.open({
+        filePath: result.uri,
+        contentType:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+
+      await notificar("Excel generado y abierto ✔");
     } catch (err) {
       console.log("Error Excel:", err);
-      notificar("No se pudo generar el Excel.");
+      await notificar("No se pudo generar el Excel.");
     }
   };
 
